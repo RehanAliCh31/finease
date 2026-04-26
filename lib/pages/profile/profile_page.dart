@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 
@@ -9,157 +10,162 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final user = authService.user;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final primaryColor = const Color(0xFF2E3192);
+    final darkColor = const Color(0xFF1A1A1A);
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: const Color(0xFFF8F9FF),
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
           SliverAppBar(
-            expandedHeight: 280,
+            expandedHeight: 320,
             pinned: true,
-            backgroundColor: Colors.transparent,
+            stretch: true,
+            backgroundColor: primaryColor,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
+              stretchModes: const [StretchMode.zoomBackground],
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      colorScheme.primary.withOpacity(0.8),
-                      colorScheme.surface,
+                      primaryColor,
+                      primaryColor.withOpacity(0.8),
                     ],
                   ),
                 ),
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 40),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                      ),
+                      child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: colorScheme.surface, width: 4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: colorScheme.shadow.withOpacity(0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            )
-                          ],
+                          color: Colors.white,
                         ),
                         child: CircleAvatar(
-                          radius: 56,
-                          backgroundColor: colorScheme.surface,
-                          child: Icon(Icons.person_outline, size: 48, color: colorScheme.primary),
+                          radius: 50,
+                          backgroundColor: primaryColor.withOpacity(0.1),
+                          child: Icon(Icons.person_rounded, size: 50, color: primaryColor),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(user?.email ?? 'Anonymous User', 
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        )),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.secondary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.secondary.withOpacity(0.2)),
-                        ),
-                        child: Text('FinEase Elite Member', 
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: colorScheme.secondary,
-                            fontWeight: FontWeight.bold,
-                          )),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(user?.email?.split('@')[0].toUpperCase() ?? 'ALEX JOHNSON', 
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 1,
+                      )),
+                    const SizedBox(height: 4),
+                    Text(user?.email ?? 'alex.johnson@example.com', 
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.7),
+                      )),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(100),
                       ),
-                    ],
-                  ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.workspace_premium_rounded, color: Color(0xFFF7941D), size: 16),
+                          const SizedBox(width: 8),
+                          Text('ELITE MEMBER', 
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 1,
+                            )),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Account', style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface.withOpacity(0.5),
-                  )),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.shadow.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-                      border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+            child: Transform.translate(
+              offset: const Offset(0, -30),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 32, 20, 100),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8F9FF),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStatsRow(),
+                    const SizedBox(height: 32),
+                    Text('ACCOUNT SETTINGS', 
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey[500],
+                        letterSpacing: 1.2,
+                      )),
+                    const SizedBox(height: 16),
+                    _buildSettingsGroup([
+                      _buildSettingItem('Personal Info', Icons.person_outline_rounded, primaryColor),
+                      _buildSettingItem('My Cards', Icons.credit_card_rounded, const Color(0xFF1BFFFF)),
+                      _buildSettingItem('Security', Icons.shield_outlined, const Color(0xFFFFB7B7)),
+                    ]),
+                    const SizedBox(height: 32),
+                    Text('PREFERENCES', 
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey[500],
+                        letterSpacing: 1.2,
+                      )),
+                    const SizedBox(height: 16),
+                    _buildSettingsGroup([
+                      _buildSettingItem('Notifications', Icons.notifications_none_rounded, const Color(0xFFF7941D)),
+                      _buildSettingItem('Appearance', Icons.palette_outlined, const Color(0xFF00B09B)),
+                      _buildSettingItem('Language', Icons.language_rounded, const Color(0xFF2E3192)),
+                    ]),
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => authService.signOut(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFFFF4B2B),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: const BorderSide(color: Color(0xFFFFE5E0)),
+                          ),
+                        ),
+                        child: Text('Log Out', 
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          )),
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        _buildProfileOption(context, Icons.person_outline, 'Personal Information'),
-                        _buildDivider(context),
-                        _buildProfileOption(context, Icons.security_outlined, 'Security'),
-                        _buildDivider(context),
-                        _buildProfileOption(context, Icons.notifications_outlined, 'Notifications'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Text('Preferences', style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface.withOpacity(0.5),
-                  )),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.shadow.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-                      border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildProfileOption(context, Icons.palette_outlined, 'Appearance'),
-                        _buildDivider(context),
-                        _buildProfileOption(context, Icons.language_outlined, 'Language'),
-                        _buildDivider(context),
-                        _buildProfileOption(context, Icons.help_outline, 'Help & Support'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton.icon(
-                    onPressed: () => authService.signOut(),
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Log Out'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.errorContainer.withOpacity(0.3),
-                      foregroundColor: colorScheme.error,
-                      elevation: 0,
-                      minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                  ),
-                  const SizedBox(height: 48), // Bottom padding
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -168,48 +174,94 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildDivider(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      indent: 56,
-      color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+  Widget _buildStatsRow() {
+    return Row(
+      children: [
+        Expanded(child: _buildStatItem('Savings', '$12.5k')),
+        const SizedBox(width: 12),
+        Expanded(child: _buildStatItem('Credits', '742')),
+        const SizedBox(width: 12),
+        Expanded(child: _buildStatItem('Goals', '4/6')),
+      ],
     );
   }
 
-  Widget _buildProfileOption(BuildContext context, IconData icon, String title, {Color? color, VoidCallback? onTap}) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final itemColor = color ?? colorScheme.onSurface;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap ?? () {},
+  Widget _buildStatItem(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: colorScheme.primary, size: 22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(value, 
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF1A1A1A),
+            )),
+          const SizedBox(height: 4),
+          Text(label, 
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsGroup(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 20,
+          )
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildSettingItem(String title, IconData icon, Color color) {
+    return InkWell(
+      onTap: () {},
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(title, 
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: itemColor,
-                    fontWeight: FontWeight.w500,
-                  )),
-              ),
-              Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.2)),
-            ],
-          ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(title, 
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1A1A1A),
+                )),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey[300], size: 14),
+          ],
         ),
       ),
     );

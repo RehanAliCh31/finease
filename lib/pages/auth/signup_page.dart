@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 
@@ -16,250 +17,254 @@ class _SignupPageState extends State<SignupPage> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
+  final Color primaryColor = const Color(0xFF2E3192);
+  final Color secondaryColor = const Color(0xFF1BFFFF);
+  final Color darkColor = const Color(0xFF1A1A1A);
+
   @override
   Widget build(BuildContext context) {
-    // Custom colors matching the reference design
-    const Color primaryBlue = Color(0xFF1A1A7F);
-    const Color inputBackground = Color(0xFFF8F9FE);
-    const Color labelColor = Color(0xFF666666);
-    const Color accentGreen = Color(0xFF006D5B);
-
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: primaryBlue, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 20),
-              // Header section
-              const Text(
-                'Create Account',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: primaryBlue,
-                  fontFamily: 'Plus Jakarta Sans',
-                ),
+      body: Stack(
+        children: [
+          // Background soft gradient blobs
+          Positioned(
+            top: -100,
+            left: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.05),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Join FinEase today and start your journey to financial freedom.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: labelColor,
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // Full Name field
-              _buildLabel('FULL NAME'),
-              TextField(
-                controller: _nameController,
-                style: const TextStyle(fontSize: 16),
-                decoration: _inputDecoration('Enter your full name'),
-              ),
-              const SizedBox(height: 24),
-
-              // Email field
-              _buildLabel('EMAIL ADDRESS'),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: const TextStyle(fontSize: 16),
-                decoration: _inputDecoration('Enter your email address'),
-              ),
-              const SizedBox(height: 24),
-
-              // Password field
-              _buildLabel('PASSWORD'),
-              TextField(
-                controller: _passwordController,
-                obscureText: !_isPasswordVisible,
-                style: const TextStyle(fontSize: 16),
-                decoration: _inputDecoration('Enter your password').copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                      color: primaryBlue.withOpacity(0.5),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // Signup Button
-              ElevatedButton(
-                onPressed: _isLoading ? null : _signup,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'SIGN UP',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Icon(Icons.arrow_forward, size: 18),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 32),
-
-              // Login Link
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    "Already have an account? ",
-                    style: TextStyle(color: labelColor, fontSize: 15),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      'Log in',
-                      style: TextStyle(
-                        color: accentGreen,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 60),
-
-              // Security info
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.lock_outline, size: 14, color: labelColor),
-                  SizedBox(width: 4),
-                  Text(
-                    '256-bit AES Encrypted Connection',
-                    style: TextStyle(
-                      color: labelColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Branding footer
-              Center(
-                child: Text(
-                  '© 2024 FinEase Financial Systems.\nAll rights reserved.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: labelColor.withOpacity(0.5),
-                    fontSize: 11,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
-        ),
+          Positioned(
+            bottom: -50,
+            right: -50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: secondaryColor.withOpacity(0.1),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Icon(Icons.arrow_back_ios_new_rounded, color: darkColor, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [secondaryColor, primaryColor]),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.person_add_rounded, color: Colors.white, size: 32),
+                        ),
+                        const SizedBox(height: 32),
+                        Text('Create Account', 
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: darkColor,
+                            letterSpacing: -1,
+                          )),
+                        const SizedBox(height: 8),
+                        Text('Join FinEase and master your wealth.', 
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                            height: 1.5,
+                          )),
+                        const SizedBox(height: 40),
+                        
+                        _buildLabel('Full Name'),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _nameController,
+                          hint: 'John Doe',
+                          icon: Icons.person_outline_rounded,
+                        ),
+                        const SizedBox(height: 24),
+
+                        _buildLabel('Email Address'),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _emailController,
+                          hint: 'name@example.com',
+                          icon: Icons.alternate_email_rounded,
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        _buildLabel('Password'),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _passwordController,
+                          hint: '••••••••',
+                          icon: Icons.lock_outline_rounded,
+                          isPassword: true,
+                          isPasswordVisible: _isPasswordVisible,
+                          onTogglePassword: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                        ),
+                        const SizedBox(height: 40),
+                        
+                        _buildSignupButton(),
+                        const SizedBox(height: 32),
+                        
+                        Center(
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('Already have an account? ', style: GoogleFonts.inter(color: Colors.grey[600])),
+                                  GestureDetector(
+                                    onTap: () => Navigator.pop(context),
+                                    child: Text('Login', 
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.bold,
+                                        color: primaryColor,
+                                      )),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 40),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.verified_user_rounded, size: 14, color: Colors.grey[400]),
+                                  const SizedBox(width: 8),
+                                  Text('GDPR Compliant & Secure', 
+                                    style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[400])),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF666666),
-          letterSpacing: 1.0,
+    return Text(text, 
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        color: darkColor,
+      ));
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool isPassword = false,
+    bool isPasswordVisible = false,
+    VoidCallback? onTogglePassword,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FE),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F1F1)),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword && !isPasswordVisible,
+        style: GoogleFonts.inter(fontSize: 15, color: darkColor),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: GoogleFonts.inter(color: Colors.grey[400]),
+          prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
+          suffixIcon: isPassword 
+            ? IconButton(
+                icon: Icon(
+                  isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey[400],
+                  size: 20,
+                ),
+                onPressed: onTogglePassword,
+              )
+            : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5), fontSize: 15),
-      filled: true,
-      fillColor: const Color(0xFFF8F9FE),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+  Widget _buildSignupButton() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.8)]),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF1A1A7F), width: 1),
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _signup,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        child: _isLoading 
+          ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+          : Text('Create Free Account', 
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              )),
       ),
     );
   }
 
   Future<void> _signup() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
-      return;
-    }
-
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) return;
     setState(() => _isLoading = true);
     try {
-      // In a real app, you'd also save the name
       await Provider.of<AuthService>(context, listen: false)
           .signUpWithEmail(_emailController.text, _passwordController.text);
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 }
-
