@@ -47,12 +47,12 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> with SingleTi
           Positioned(
             top: -100,
             right: -50,
-            child: _buildGlowOrb(accentColor.withOpacity(0.15), 300),
+            child: _buildGlowOrb(accentColor.withValues(alpha: 0.15), 300),
           ),
           Positioned(
             bottom: 100,
             left: -100,
-            child: _buildGlowOrb(primaryColor.withOpacity(0.2), 400),
+            child: _buildGlowOrb(primaryColor.withValues(alpha: 0.2), 400),
           ),
           
           SafeArea(
@@ -62,7 +62,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> with SingleTi
                 _buildSliverAppBar(),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
-                  child: SliverList(
+                  sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       _buildAIConciergeHeader(),
                       const SizedBox(height: 32),
@@ -80,7 +80,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> with SingleTi
                       _buildStrategicInsight(
                         'Spending Anomaly',
                         'Dining out is 22% higher this week. Consider a home-cooked meal to stay on track.',
-                        Icons.Psychology_alt_rounded,
+                        Icons.psychology_alt_rounded,
                         const Color(0xFFFF4B2B),
                       ),
                       const SizedBox(height: 32),
@@ -140,7 +140,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> with SingleTi
                 Text('Precision Intelligence',
                   style: GoogleFonts.inter(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     fontWeight: FontWeight.w500,
                   )),
               ],

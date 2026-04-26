@@ -81,7 +81,7 @@ class _LiteracyHubPageState extends State<LiteracyHubPage> {
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: secondaryColor.withOpacity(0.1),
+                  color: secondaryColor.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -119,7 +119,7 @@ class _LiteracyHubPageState extends State<LiteracyHubPage> {
           padding: const EdgeInsets.only(right: 16),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -165,7 +165,7 @@ class _LiteracyHubPageState extends State<LiteracyHubPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: secondaryColor.withOpacity(0.1),
+                  color: secondaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(color: secondaryColor.withOpacity(0.3)),
                 ),
@@ -186,7 +186,7 @@ class _LiteracyHubPageState extends State<LiteracyHubPage> {
                 height: 8,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(100),
                 ),
               ),
@@ -297,7 +297,7 @@ class _LiteracyHubPageState extends State<LiteracyHubPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text('NEW', 
-                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.black, color: Colors.black)),
+                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.black)),
             ),
             const SizedBox(height: 12),
             Text('Advanced Portfolio Diversification', 

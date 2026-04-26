@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'dart:ui';
+
 import '../../services/auth_service.dart';
 import '../../models/transaction.dart';
 
@@ -106,7 +106,7 @@ class HomePage extends StatelessWidget {
                     border: Border.all(color: Colors.white, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       )
@@ -125,7 +125,7 @@ class HomePage extends StatelessWidget {
                       'Welcome back,',
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: Colors.slate[500],
+                        color: Color(0xFF64748B),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -145,7 +145,7 @@ class HomePage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.slate[200]!),
+                border: Border.all(color: Color(0xFFE2E8F0)),
               ),
               child: IconButton(
                 onPressed: () {},
@@ -188,7 +188,7 @@ class HomePage extends StatelessWidget {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -224,8 +224,8 @@ class HomePage extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildBalanceStat('Income', '+\$4,250.00', Colors.emeraldAccent),
-                    Container(width: 1, height: 24, color: Colors.white.withOpacity(0.2)),
+                    _buildBalanceStat('Income', '+\$4,250.00', const Color(0xFF10B981)),
+                    Container(width: 1, height: 24, color: Colors.white.withValues(alpha: 0.2)),
                     _buildBalanceStat('Expenses', '-\$1,120.00', Colors.orangeAccent),
                   ],
                 ),
@@ -286,7 +286,7 @@ class HomePage extends StatelessWidget {
             border: Border.all(color: Colors.white, width: 2),
             boxShadow: [
               BoxShadow(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               )
@@ -345,7 +345,7 @@ class HomePage extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.slate[100]!),
+        border: Border.all(color: Color(0xFFF1F5F9)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -387,7 +387,7 @@ class HomePage extends StatelessWidget {
                   DateFormat('MMM dd, yyyy').format(t.date),
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: Colors.slate[500],
+                    color: Color(0xFF64748B),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -412,12 +412,12 @@ class HomePage extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 40),
-          Icon(Icons.receipt_long_rounded, size: 64, color: Colors.slate[200]),
+          Icon(Icons.receipt_long_rounded, size: 64, color: Color(0xFFE2E8F0)),
           const SizedBox(height: 16),
           Text(
             'No transactions yet',
             style: GoogleFonts.inter(
-              color: Colors.slate[400],
+              color: Color(0xFF94A3B8),
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
@@ -455,7 +455,7 @@ class HomePage extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.slate[200],
+                    color: Color(0xFFE2E8F0),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -475,7 +475,7 @@ class HomePage extends StatelessWidget {
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
                   labelText: 'What for?',
-                  labelStyle: GoogleFonts.inter(color: Colors.slate[500]),
+                  labelStyle: GoogleFonts.inter(color: Color(0xFF64748B)),
                   filled: true,
                   fillColor: const Color(0xFFF8F9FF),
                   border: OutlineInputBorder(
@@ -492,7 +492,7 @@ class HomePage extends StatelessWidget {
                 decoration: InputDecoration(
                   labelText: 'How much?',
                   prefixText: '\$ ',
-                  labelStyle: GoogleFonts.inter(color: Colors.slate[500]),
+                  labelStyle: GoogleFonts.inter(color: Color(0xFF64748B)),
                   filled: true,
                   fillColor: const Color(0xFFF8F9FF),
                   border: OutlineInputBorder(
@@ -579,7 +579,7 @@ class HomePage extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.inter(
-            color: isSelected ? Colors.white : Colors.slate[600],
+            color: isSelected ? Colors.white : Color(0xFF475569),
             fontWeight: FontWeight.w700,
           ),
         ),

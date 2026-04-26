@@ -11,7 +11,7 @@ class ProfilePage extends StatelessWidget {
     final authService = Provider.of<AuthService>(context);
     final user = authService.user;
     final primaryColor = const Color(0xFF2E3192);
-    final darkColor = const Color(0xFF1A1A1A);
+
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
@@ -33,7 +33,7 @@ class ProfilePage extends StatelessWidget {
                     end: Alignment.bottomCenter,
                     colors: [
                       primaryColor,
-                      primaryColor.withOpacity(0.8),
+                      primaryColor.withValues(alpha: 0.8),
                     ],
                   ),
                 ),
@@ -45,7 +45,7 @@ class ProfilePage extends StatelessWidget {
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
                       ),
                       child: Container(
                         padding: const EdgeInsets.all(4),
@@ -55,7 +55,7 @@ class ProfilePage extends StatelessWidget {
                         ),
                         child: CircleAvatar(
                           radius: 50,
-                          backgroundColor: primaryColor.withOpacity(0.1),
+                          backgroundColor: primaryColor.withValues(alpha: 0.1),
                           child: Icon(Icons.person_rounded, size: 50, color: primaryColor),
                         ),
                       ),
@@ -72,13 +72,13 @@ class ProfilePage extends StatelessWidget {
                     Text(user?.email ?? 'alex.johnson@example.com', 
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                       )),
                     const SizedBox(height: 20),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Row(
@@ -177,7 +177,7 @@ class ProfilePage extends StatelessWidget {
   Widget _buildStatsRow() {
     return Row(
       children: [
-        Expanded(child: _buildStatItem('Savings', '$12.5k')),
+        Expanded(child: _buildStatItem('Savings', '\$12.5k')),
         const SizedBox(width: 12),
         Expanded(child: _buildStatItem('Credits', '742')),
         const SizedBox(width: 12),
@@ -194,7 +194,7 @@ class ProfilePage extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -227,7 +227,7 @@ class ProfilePage extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 20,
           )
         ],
@@ -246,7 +246,7 @@ class ProfilePage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 20),
