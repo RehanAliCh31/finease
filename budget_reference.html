@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FinEase AI-Powered Budget Advisor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#00504d",
+            "outline-variant": "#c7c5d4",
+            "secondary-container": "#29fcf3",
+            "secondary-fixed-dim": "#00ddd6",
+            "surface-variant": "#d3e4fe",
+            "on-tertiary-container": "#f19160",
+            "on-tertiary-fixed-variant": "#773207",
+            "on-secondary": "#ffffff",
+            "secondary": "#006a66",
+            "primary": "#15157d",
+            "inverse-on-surface": "#eaf1ff",
+            "surface-container-highest": "#d3e4fe",
+            "on-primary-fixed-variant": "#373a9b",
+            "on-primary-fixed": "#04006d",
+            "on-tertiary-fixed": "#341100",
+            "outline": "#777683",
+            "on-surface": "#0b1c30",
+            "on-error": "#ffffff",
+            "tertiary": "#491a00",
+            "primary-fixed-dim": "#c0c1ff",
+            "on-primary-container": "#9da1ff",
+            "tertiary-fixed": "#ffdbcb",
+            "tertiary-container": "#6c2a00",
+            "surface-tint": "#4f54b4",
+            "surface-container": "#e5eeff",
+            "on-surface-variant": "#464652",
+            "secondary-fixed": "#29fcf3",
+            "surface-container-high": "#dce9ff",
+            "surface": "#f8f9ff",
+            "on-error-container": "#93000a",
+            "tertiary-fixed-dim": "#ffb692",
+            "on-primary": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "background": "#f8f9ff",
+            "surface-container-lowest": "#ffffff",
+            "surface-dim": "#cbdbf5",
+            "surface-bright": "#f8f9ff",
+            "on-secondary-container": "#00716d",
+            "surface-container-low": "#eff4ff",
+            "on-background": "#0b1c30",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6",
+            "primary-fixed": "#e1e0ff",
+            "on-secondary-fixed": "#00201e",
+            "inverse-primary": "#c0c1ff",
+            "primary-container": "#2e3192",
+            "inverse-surface": "#213145"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "gutter": "16px",
+            "md": "24px",
+            "sm": "16px",
+            "xs": "8px",
+            "margin": "20px",
+            "xl": "48px",
+            "base": "4px",
+            "lg": "32px"
+          },
+          "fontFamily": {
+            "body-md": ["Inter"],
+            "caption-xs": ["Inter"],
+            "display-lg": ["Plus Jakarta Sans"],
+            "body-lg": ["Inter"],
+            "label-sm": ["Inter"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "title-sm": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+            "caption-xs": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+            "display-lg": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+            "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+            "label-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+            "headline-md": ["32px", {"lineHeight": "1.3", "fontWeight": "600"}],
+            "title-sm": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .soft-shadow {
+      shadow-color: rgba(46, 49, 146, 0.05);
+      box-shadow: 0px 4px 20px rgba(46, 49, 146, 0.05);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-50 flex justify-between items-center w-full px-6 h-16 bg-white border-b border-slate-200">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="User Profile" data-alt="close up professional portrait of a smiling businessman in a navy suit with soft studio lighting and a clean grey background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkWKJdk0qgV6M7Q4TYASe-DvjpG-CfQYL6WwBOBQ8o8d0GS5E0CfaP8C94asvPRBZtZal-ksCjYfDB2xBV65tXKupDeKYvhQlA2oArtgWgRWKwPWen8Vhgs9eq_mik7VXWXFWKLXA7yPfnv77sBg1KwGmC67qALu-miK30TWg3re_6mQ8_cAXl8OHqNfcR8d8Q8ePllEri44j7Q4Qa594rV3stMb_D97h7EPGmG9OhqpnWXjRZf_qTkU8gMa2Dem019Hu4VH4sR1zI"/>
+</div>
+<h1 class="text-xl font-black text-indigo-900 tracking-tight font-display-lg">FinEase</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-indigo-900" data-icon="notifications">notifications</span>
+</div>
+</header>
+<main class="max-w-5xl mx-auto px-margin pt-lg space-y-lg">
+<!-- Hero Summary Section: Bento Style -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- Income vs Expense Card -->
+<div class="md:col-span-2 bg-white p-lg rounded-xl border border-slate-200 soft-shadow flex flex-col justify-between">
+<div class="flex justify-between items-start mb-lg">
+<div>
+<p class="text-label-sm font-label-sm text-outline mb-xs">Budget Performance</p>
+<h2 class="text-headline-md font-headline-md text-primary">Monthly Overview</h2>
+</div>
+<div class="flex bg-surface-container-low p-base rounded-lg">
+<button class="px-sm py-xs text-caption-xs font-label-sm bg-white text-primary rounded-md shadow-sm">June 2024</button>
+<button class="px-sm py-xs text-caption-xs font-label-sm text-outline-variant">May 2024</button>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-md">
+<div class="space-y-xs">
+<div class="flex items-center gap-xs">
+<div class="w-2 h-6 bg-secondary rounded-full"></div>
+<p class="text-label-sm font-label-sm text-outline">Total Income</p>
+</div>
+<p class="text-title-sm font-title-sm text-on-surface">$8,450.00</p>
+</div>
+<div class="space-y-xs">
+<div class="flex items-center gap-xs">
+<div class="w-2 h-6 bg-primary rounded-full"></div>
+<p class="text-label-sm font-label-sm text-outline">Total Expenses</p>
+</div>
+<p class="text-title-sm font-title-sm text-on-surface">$5,280.40</p>
+</div>
+</div>
+<div class="mt-lg">
+<div class="h-4 w-full bg-surface-container-low rounded-full overflow-hidden flex">
+<div class="h-full bg-primary" style="width: 62.5%;"></div>
+<div class="h-full bg-secondary-fixed-dim" style="width: 37.5%;"></div>
+</div>
+<p class="mt-sm text-caption-xs font-caption-xs text-outline">You have used <span class="font-bold text-primary">62.5%</span> of your planned budget for this month.</p>
+</div>
+</div>
+<!-- Quick Action / AI Status -->
+<div class="bg-primary-container text-on-primary-container p-lg rounded-xl flex flex-col justify-between relative overflow-hidden">
+<div class="relative z-10">
+<div class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center mb-md">
+<span class="material-symbols-outlined text-white" data-icon="smart_toy">smart_toy</span>
+</div>
+<h3 class="text-title-sm font-title-sm mb-xs">Advisor is Live</h3>
+<p class="text-caption-xs opacity-80">Scanning 42 new transactions for optimization opportunities.</p>
+</div>
+<button class="mt-lg w-full bg-secondary-fixed text-on-secondary-fixed py-sm rounded-lg font-label-sm hover:opacity-90 transition-opacity z-10">
+          View Recommendations
+        </button>
+<div class="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+</div>
+</section>
+<!-- Spending Breakdown & AI Insights -->
+<section class="grid grid-cols-1 md:grid-cols-12 gap-md">
+<!-- Categorized Spending (Donut Mockup) -->
+<div class="md:col-span-7 bg-white p-lg rounded-xl border border-slate-200 soft-shadow">
+<h3 class="text-title-sm font-title-sm text-on-surface mb-lg">Spending Breakdown</h3>
+<div class="flex flex-col sm:flex-row items-center gap-lg">
+<!-- Donut Chart Mockup -->
+<div class="relative w-48 h-48">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-low" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="24"></circle>
+<circle class="text-primary" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502" stroke-dashoffset="150" stroke-width="24"></circle>
+<circle class="text-secondary" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502" stroke-dashoffset="350" stroke-width="24"></circle>
+<circle class="text-on-tertiary-container" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502" stroke-dashoffset="450" stroke-width="24"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<p class="text-caption-xs font-label-sm text-outline">Total</p>
+<p class="text-title-sm font-title-sm text-on-surface">$5.2k</p>
+</div>
+</div>
+<!-- Legend -->
+<div class="flex-1 w-full space-y-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-xs">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<p class="text-label-sm font-label-sm text-on-surface">Rent &amp; Utilities</p>
+</div>
+<p class="text-label-sm font-label-sm text-on-surface">$2,400</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-xs">
+<div class="w-3 h-3 rounded-full bg-secondary"></div>
+<p class="text-label-sm font-label-sm text-on-surface">Groceries</p>
+</div>
+<p class="text-label-sm font-label-sm text-on-surface">$850</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-xs">
+<div class="w-3 h-3 rounded-full bg-on-tertiary-container"></div>
+<p class="text-label-sm font-label-sm text-on-surface">Dining &amp; Leisure</p>
+</div>
+<p class="text-label-sm font-label-sm text-on-surface">$1,220</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-xs">
+<div class="w-3 h-3 rounded-full bg-outline-variant"></div>
+<p class="text-label-sm font-label-sm text-on-surface">Other</p>
+</div>
+<p class="text-label-sm font-label-sm text-on-surface">$810.40</p>
+</div>
+</div>
+</div>
+</div>
+<!-- AI Insights Section -->
+<div class="md:col-span-5 space-y-md">
+<div class="bg-surface-container-low p-lg rounded-xl border border-primary/10">
+<div class="flex items-center gap-sm mb-md">
+<span class="material-symbols-outlined text-primary" data-icon="auto_awesome">auto_awesome</span>
+<h3 class="text-label-sm font-title-sm text-primary">AI Insights</h3>
+</div>
+<div class="space-y-md">
+<div class="bg-white p-sm rounded-lg border border-slate-100 flex gap-sm">
+<span class="material-symbols-outlined text-error" data-icon="warning">warning</span>
+<div>
+<p class="text-label-sm font-label-sm text-on-surface mb-base">Dining Alert</p>
+<p class="text-caption-xs text-outline leading-relaxed">You spent <span class="font-bold text-error">15% more</span> on dining this month. Consider setting a $400 limit to stay on track.</p>
+</div>
+</div>
+<div class="bg-white p-sm rounded-lg border border-slate-100 flex gap-sm">
+<span class="material-symbols-outlined text-secondary" data-icon="savings">savings</span>
+<div>
+<p class="text-label-sm font-label-sm text-on-surface mb-base">Saving Potential</p>
+<p class="text-caption-xs text-outline leading-relaxed">Switching your energy provider could save you <span class="font-bold text-secondary">$24/mo</span>. Would you like to compare?</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Progress to Goals -->
+<div class="bg-white p-lg rounded-xl border border-slate-200 soft-shadow">
+<h4 class="text-label-sm font-label-sm text-outline mb-md uppercase tracking-wider">Goal Progress</h4>
+<div class="space-y-md">
+<div>
+<div class="flex justify-between mb-xs">
+<p class="text-caption-xs font-label-sm">Europe Trip</p>
+<p class="text-caption-xs font-label-sm text-primary">75%</p>
+</div>
+<div class="h-1.5 w-full bg-surface-container-low rounded-full">
+<div class="h-full bg-secondary-fixed-dim rounded-full" style="width: 75%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-xs">
+<p class="text-caption-xs font-label-sm">Emergency Fund</p>
+<p class="text-caption-xs font-label-sm text-primary">40%</p>
+</div>
+<div class="h-1.5 w-full bg-surface-container-low rounded-full">
+<div class="h-full bg-primary rounded-full" style="width: 40%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Transactions Section -->
+<section class="bg-white p-lg rounded-xl border border-slate-200 soft-shadow">
+<div class="flex justify-between items-center mb-lg">
+<h3 class="text-title-sm font-title-sm text-on-surface">Unusual Spending Detected</h3>
+<button class="text-label-sm font-label-sm text-primary">See All</button>
+</div>
+<div class="divide-y divide-slate-100">
+<div class="py-sm flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="restaurant">restaurant</span>
+</div>
+<div>
+<p class="text-label-sm font-label-sm text-on-surface">The Steakhouse Grill</p>
+<p class="text-caption-xs text-outline">Yesterday, 8:45 PM • Dining</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-label-sm font-bold text-on-surface">-$154.00</p>
+<p class="text-[10px] text-error font-medium">3x usual spend</p>
+</div>
+</div>
+<div class="py-sm flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="shopping_bag">shopping_bag</span>
+</div>
+<div>
+<p class="text-label-sm font-label-sm text-on-surface">Urban Outfitters</p>
+<p class="text-caption-xs text-outline">Oct 12, 2:15 PM • Shopping</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-label-sm font-bold text-on-surface">-$89.99</p>
+<p class="text-[10px] text-tertiary font-medium">Subscription renewal?</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe h-20 bg-white/80 backdrop-blur-md border-t border-slate-200">
+<a class="flex flex-col items-center justify-center text-slate-500 px-3 py-1.5 hover:text-indigo-700 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-plus-jakarta-sans text-[10px] font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-3 py-1.5 hover:text-indigo-700 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="school">school</span>
+<span class="font-plus-jakarta-sans text-[10px] font-medium">Literacy</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-3 py-1.5 hover:text-indigo-700 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="savings">savings</span>
+<span class="font-plus-jakarta-sans text-[10px] font-medium">Savings</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-indigo-50 text-indigo-900 rounded-xl px-3 py-1.5 scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-plus-jakarta-sans text-[10px] font-bold">Budget</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-3 py-1.5 hover:text-indigo-700 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-plus-jakarta-sans text-[10px] font-medium">Profile</span>
+</a>
+</nav>
+</body></html>
