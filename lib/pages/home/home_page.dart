@@ -5,6 +5,10 @@ import 'package:intl/intl.dart';
 
 import '../../services/auth_service.dart';
 import '../../models/transaction.dart';
+import '../chatbot/chatbot_page.dart';
+import '../loans/loan_simulator_page.dart';
+import '../welfare/welfare_programs_page.dart';
+import '../forum/community_forum_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -35,7 +39,7 @@ class HomePage extends StatelessWidget {
                 delegate: SliverChildListDelegate([
                   _buildBalanceCard(context, primaryColor, secondaryColor),
                   const SizedBox(height: 32),
-                  _buildQuickActions(),
+                  _buildQuickActions(context),
                   const SizedBox(height: 32),
                   _buildSectionHeader('Recent Transactions', () {}),
                   const SizedBox(height: 16),
@@ -262,48 +266,59 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildActionItem(Icons.send_rounded, 'Send', const Color(0xFFEEF2FF), const Color(0xFF4F46E5)),
-        _buildActionItem(Icons.south_west_rounded, 'Request', const Color(0xFFECFDF5), const Color(0xFF059669)),
-        _buildActionItem(Icons.receipt_rounded, 'Pay', const Color(0xFFFFF7ED), const Color(0xFFD97706)),
-        _buildActionItem(Icons.more_horiz_rounded, 'More', const Color(0xFFF1F5F9), const Color(0xFF475569)),
+        _buildActionItem(Icons.auto_awesome, 'FinEase AI', const Color(0xFFEEF2FF), const Color(0xFF4F46E5), () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatbotPage()));
+        }),
+        _buildActionItem(Icons.calculate_rounded, 'Loans', const Color(0xFFECFDF5), const Color(0xFF059669), () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const LoanSimulatorPage()));
+        }),
+        _buildActionItem(Icons.volunteer_activism_rounded, 'Welfare', const Color(0xFFFFF7ED), const Color(0xFFD97706), () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const WelfareProgramsPage()));
+        }),
+        _buildActionItem(Icons.forum_rounded, 'Forum', const Color(0xFFF1F5F9), const Color(0xFF475569), () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityForumPage()));
+        }),
       ],
     );
   }
 
-  Widget _buildActionItem(IconData icon, String label, Color bgColor, Color iconColor) {
-    return Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: iconColor.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              )
-            ],
+  Widget _buildActionItem(IconData icon, String label, Color bgColor, Color iconColor, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: iconColor.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: Icon(icon, color: iconColor, size: 28),
           ),
-          child: Icon(icon, color: iconColor, size: 28),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1E293B),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF1E293B),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
