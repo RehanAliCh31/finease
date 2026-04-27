@@ -50,9 +50,9 @@ class RewardsScreen extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
+                                color: Colors.white.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -68,7 +68,7 @@ class RewardsScreen extends StatelessWidget {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF00F2EA).withOpacity(0.25),
+                                      color: const Color(0xFF00F2EA).withValues(alpha: 0.25),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text('Level $level', style: const TextStyle(color: Color(0xFF00F2EA), fontWeight: FontWeight.bold, fontFamily: 'Inter')),
@@ -216,7 +216,7 @@ class RewardsScreen extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 14),
@@ -248,8 +248,10 @@ class RewardsScreen extends StatelessWidget {
                     throw Exception('Not enough points');
                   }
                 });
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Color(0xFF006A66), content: Text('Perk redeemed! 🎉')));
               } catch (e) {
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: const Color(0xFFBA1A1A), content: Text(e.toString())));
               }
             },

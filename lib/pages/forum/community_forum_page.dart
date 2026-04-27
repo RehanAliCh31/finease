@@ -283,14 +283,25 @@ class _PostCardState extends State<_PostCard> {
   }
 
   String _timeAgo(dynamic ts) {
-    if (ts == null) return 'just now';
+    if (ts == null) {
+      return 'just now';
+    }
     DateTime dt;
-    if (ts is Timestamp) dt = ts.toDate();
-    else return 'just now';
+    if (ts is Timestamp) {
+      dt = ts.toDate();
+    } else {
+      return 'just now';
+    }
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inMinutes < 1) {
+      return 'just now';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes}m ago';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours}h ago';
+    }
     return '${diff.inDays}d ago';
   }
 }

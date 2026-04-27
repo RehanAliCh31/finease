@@ -64,7 +64,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Row(children: [
                       CircleAvatar(
                         radius: 36,
-                        backgroundColor: Colors.white.withOpacity(0.2),
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
                         backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
                         child: user?.photoURL == null ? const Icon(Icons.person_rounded, size: 36, color: Colors.white) : null,
                       ),
@@ -74,7 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: 4),
                         const Text('Premium Member since 2023', style: TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'Inter')),
                         const SizedBox(height: 8),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF00F2EA).withOpacity(0.25), borderRadius: BorderRadius.circular(12)), child: const Text('Pro Member', style: TextStyle(color: Color(0xFF00F2EA), fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Inter'))),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF00F2EA).withValues(alpha: 0.25), borderRadius: BorderRadius.circular(12)), child: const Text('Pro Member', style: TextStyle(color: Color(0xFF00F2EA), fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Inter'))),
                       ]),
                     ]),
                   ),
@@ -91,13 +91,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // Security & Privacy
                   _sectionHeader('Security & Privacy'),
                   _tile(Icons.lock_outline_rounded, 'Change Password', subtitle: 'Update your login credentials'),
-                  _tile(Icons.fingerprint_rounded, 'Biometric Login', trailing: Switch(value: _biometric, onChanged: (v) { setState(() => _biometric = v); _save('biometricLogin', v); }, activeColor: const Color(0xFF00F2EA))),
+                  _tile(Icons.fingerprint_rounded, 'Biometric Login', trailing: Switch(value: _biometric, onChanged: (v) { setState(() => _biometric = v); _save('biometricLogin', v); }, activeThumbColor: const Color(0xFF00F2EA))),
                   _tile(Icons.security_rounded, 'Two-Factor Authentication', subtitle: 'Add an extra layer of security'),
 
                   const SizedBox(height: 20),
                   _sectionHeader('Notifications'),
-                  _tile(Icons.notifications_active_rounded, 'Push Alerts', subtitle: 'Real-time spending updates', trailing: Switch(value: _pushAlerts, onChanged: (v) { setState(() => _pushAlerts = v); _save('pushAlerts', v); }, activeColor: const Color(0xFF00F2EA))),
-                  _tile(Icons.bar_chart_rounded, 'Monthly Reports', subtitle: 'Detailed expense analysis', trailing: Switch(value: _monthlyReports, onChanged: (v) { setState(() => _monthlyReports = v); _save('monthlyReports', v); }, activeColor: const Color(0xFF00F2EA))),
+                  _tile(Icons.notifications_active_rounded, 'Push Alerts', subtitle: 'Real-time spending updates', trailing: Switch(value: _pushAlerts, onChanged: (v) { setState(() => _pushAlerts = v); _save('pushAlerts', v); }, activeThumbColor: const Color(0xFF00F2EA))),
+                  _tile(Icons.bar_chart_rounded, 'Monthly Reports', subtitle: 'Detailed expense analysis', trailing: Switch(value: _monthlyReports, onChanged: (v) { setState(() => _monthlyReports = v); _save('monthlyReports', v); }, activeThumbColor: const Color(0xFF00F2EA))),
 
                   const SizedBox(height: 20),
                   _sectionHeader('Language'),
@@ -105,13 +105,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 20),
                   _sectionHeader('Theme Selection'),
-                  _tile(Icons.dark_mode_rounded, 'Dark Theme', trailing: Switch(value: _darkTheme, onChanged: (v) { setState(() => _darkTheme = v); _save('darkTheme', v); }, activeColor: const Color(0xFF00F2EA))),
+                  _tile(Icons.dark_mode_rounded, 'Dark Theme', trailing: Switch(value: _darkTheme, onChanged: (v) { setState(() => _darkTheme = v); _save('darkTheme', v); }, activeThumbColor: const Color(0xFF00F2EA))),
 
                   const SizedBox(height: 20),
                   _sectionHeader('Danger Zone'),
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: const Color(0xFFFFDAD6), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFBA1A1A).withOpacity(0.3))),
+                    decoration: BoxDecoration(color: const Color(0xFFFFDAD6), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFBA1A1A).withValues(alpha: 0.3))),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       const Text('Delete Account', style: TextStyle(color: Color(0xFFBA1A1A), fontWeight: FontWeight.bold, fontFamily: 'Plus Jakarta Sans', fontSize: 15)),
                       const SizedBox(height: 6),

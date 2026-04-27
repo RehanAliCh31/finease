@@ -85,7 +85,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF15157D), Color(0xFF2E3192)]), borderRadius: BorderRadius.circular(20)),
                 child: Row(children: [
-                  Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.verified_user_rounded, color: Color(0xFF00F2EA), size: 28)),
+                  Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.verified_user_rounded, color: Color(0xFF00F2EA), size: 28)),
                   const SizedBox(width: 14),
                   const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('The FinEdge Guarantee', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15, fontFamily: 'Plus Jakarta Sans')),
@@ -108,7 +108,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: (p['color'] as Color).withOpacity(0.1), borderRadius: BorderRadius.circular(14)), child: Icon(p['icon'] as IconData, color: p['color'] as Color, size: 22)),
+          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: (p['color'] as Color).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)), child: Icon(p['icon'] as IconData, color: p['color'] as Color, size: 22)),
           const SizedBox(width: 12),
           Expanded(child: Text(p['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0B1C30), fontFamily: 'Plus Jakarta Sans'))),
           if ((p['badge'] as String).isNotEmpty)

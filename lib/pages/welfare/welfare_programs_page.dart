@@ -430,7 +430,7 @@ class _WelfareProgramsPageState extends State<WelfareProgramsPage> {
           Text(
             'FinEase has partnered with over 500+ NGOs to deliver critical support to those who need it most. Our verification process ensures your data and applications are always secure.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
             ),
           ),
           const SizedBox(height: 24),
@@ -462,7 +462,7 @@ class _WelfareProgramsPageState extends State<WelfareProgramsPage> {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
             fontSize: 10,
             letterSpacing: 0.5,
           ),

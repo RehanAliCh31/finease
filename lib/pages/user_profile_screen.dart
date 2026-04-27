@@ -35,8 +35,9 @@ class UserProfileScreen extends StatelessWidget {
             .doc(userId)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
 
           return SingleChildScrollView(

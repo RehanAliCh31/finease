@@ -46,7 +46,7 @@ class UserProfileScreen extends StatelessWidget {
                           const SizedBox(height: 8),
                           CircleAvatar(
                             radius: 44,
-                            backgroundColor: Colors.white.withOpacity(0.2),
+                            backgroundColor: Colors.white.withValues(alpha: 0.2),
                             backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
                             child: user?.photoURL == null ? const Icon(Icons.person_rounded, size: 44, color: Colors.white) : null,
                           ),
@@ -72,7 +72,7 @@ class UserProfileScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(colors: [Color(0xFF2E3192), Color(0xFF4F54B4)]),
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: const Color(0xFF2E3192).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6))],
+                          boxShadow: [BoxShadow(color: const Color(0xFF2E3192).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))],
                         ),
                         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -80,9 +80,9 @@ class UserProfileScreen extends StatelessWidget {
                             const SizedBox(height: 6),
                             Text('\$${_formatNum(netWorth)}', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold, fontFamily: 'Plus Jakarta Sans')),
                             const SizedBox(height: 4),
-                            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)), child: Text('Member since $memberSince', style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'Inter'))),
+                            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)), child: Text('Member since $memberSince', style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'Inter'))),
                           ]),
-                          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.trending_up_rounded, color: Color(0xFF00F2EA), size: 30)),
+                          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.trending_up_rounded, color: Color(0xFF00F2EA), size: 30)),
                         ]),
                       ),
                       const SizedBox(height: 20),
