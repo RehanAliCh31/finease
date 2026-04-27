@@ -10,7 +10,7 @@ class AIService {
   AIService({String? apiKey}) {
     final key = (apiKey?.isNotEmpty == true) ? apiKey! : _apiKey;
     _useRealAI = key.isNotEmpty && key != 'YOUR_API_KEY';
-    _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: key);
+    _model = GenerativeModel(model: 'gemini-2.0-flash', apiKey: key);
   }
 
   // --------------- Budget Advisor ---------------
