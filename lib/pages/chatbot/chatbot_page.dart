@@ -1,119 +1,104 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../theme/app_theme.dart';
 
 class ChatMessage {
   final String text;
   final bool isUser;
   final DateTime timestamp;
-
   ChatMessage({required this.text, required this.isUser, required this.timestamp});
 }
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({super.key});
-
   @override
   State<ChatbotPage> createState() => _ChatbotPageState();
 }
 
 class _ChatbotPageState extends State<ChatbotPage> {
-  final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final _ctrl = TextEditingController();
+  final _scroll = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isTyping = false;
-
-  late final String _apiKey;
   late final GenerativeModel _model;
-  late final ChatSession _chatSession;
+  late final ChatSession _session;
+
+  final _prompts = [
+    'How can I pay off debt faster? 💳',
+    'Explain index funds simply 📈',
+    'Should I get a loan right now? 🏦',
+    'How to build an emergency fund? 💰',
+  ];
+
+  static const String _fallbackKey = 'AIzaSyB97wIZHlQXBrbl5tEPCXJGjNmeIq14xtU';
 
   @override
   void initState() {
     super.initState();
-    
-    // Initialize Gemini model
-    _apiKey = dotenv.env['GEMINI_API_KEY'] ?? 'ADD_YOUR_GEMINI_API_KEY_HERE';
+    final envKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    final key = envKey.isNotEmpty ? envKey : _fallbackKey;
     _model = GenerativeModel(
-      model: 'gemini-flash-latest',
-      apiKey: _apiKey,
+      model: 'gemini-2.0-flash',
+      apiKey: key,
+      systemInstruction: Content.system(
+        'You are FinEase AI, a professional and friendly financial advisor. '
+        'You specialize in personal finance, budgeting, savings, loans, and investments. '
+        'Give concise, practical advice tailored to users in Pakistan and globally. '
+        'Use bullet points for lists. Keep responses under 200 words unless detail is needed. '
+        'Always encourage smart financial decisions. Never recommend specific stocks.',
+      ),
     );
-    _chatSession = _model.startChat();
-
-    // Initial welcome message
+    _session = _model.startChat();
     _messages.add(ChatMessage(
-      text: "Hi there! I'm your FinEase AI Assistant. I can help you analyze your budget, understand loan terms, or find the best welfare programs. How can I help you today?",
+      text: "Hi! I'm **FinEase AI** — your personal financial advisor 🎯\n\nI can help with budgeting, loans, savings goals, and investment basics. What's on your mind?",
       isUser: false,
       timestamp: DateTime.now(),
     ));
   }
 
-  void _sendMessage() async {
-    if (_controller.text.trim().isEmpty) return;
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
 
-    final userMessage = _controller.text.trim();
+  Future<void> _send(String text) async {
+    if (text.trim().isEmpty) return;
+    _ctrl.clear();
     setState(() {
-      _messages.add(ChatMessage(
-        text: userMessage,
-        isUser: true,
-        timestamp: DateTime.now(),
-      ));
+      _messages.add(ChatMessage(text: text, isUser: true, timestamp: DateTime.now()));
       _isTyping = true;
     });
-    _controller.clear();
     _scrollToBottom();
-
     try {
-      if (_apiKey == 'ADD_YOUR_GEMINI_API_KEY_HERE') {
-        await Future.delayed(const Duration(seconds: 1));
-        throw Exception('API Key not configured');
-      }
-
-      final response = await _chatSession.sendMessage(Content.text(userMessage));
-      final aiResponse = response.text ?? 'I apologize, but I could not generate a response.';
-      
+      final resp = await _session.sendMessage(Content.text(text));
       if (mounted) {
         setState(() {
           _isTyping = false;
-          _messages.add(ChatMessage(
-            text: aiResponse,
-            isUser: false,
-            timestamp: DateTime.now(),
-          ));
+          _messages.add(ChatMessage(text: resp.text ?? 'Sorry, I could not respond.', isUser: false, timestamp: DateTime.now()));
         });
         _scrollToBottom();
       }
     } catch (e) {
-      String aiResponse;
-      if (e.toString().contains('API Key not configured')) {
-        aiResponse = "I'm currently running in offline mode because my API key hasn't been set. Please add a valid Gemini API key in the source code to enable live AI responses!\n\nFor now, try checking out our Loan Simulator and Budget Advisor tools.";
-      } else {
-        aiResponse = "I'm having trouble connecting to the AI server right now. Please try again later. ($e)";
-      }
-
       if (mounted) {
+        final errMsg = e.toString().contains('API_KEY') || e.toString().contains('403')
+            ? 'API key error. Please contact support.'
+            : 'Sorry, I could not connect. Please check your internet and try again. (${e.runtimeType})';
         setState(() {
           _isTyping = false;
-          _messages.add(ChatMessage(
-            text: aiResponse,
-            isUser: false,
-            timestamp: DateTime.now(),
-          ));
+          _messages.add(ChatMessage(text: errMsg, isUser: false, timestamp: DateTime.now()));
         });
-        _scrollToBottom();
       }
     }
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       }
     });
   }
@@ -124,159 +109,166 @@ class _ChatbotPageState extends State<ChatbotPage> {
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.surface,
-        elevation: 1,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.pop(context),
-          color: AppTheme.primary,
         ),
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'FinEase AI',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
-                ),
-                Text(
-                  _isTyping ? 'Typing...' : 'Online',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: _isTyping ? AppTheme.primary : Colors.green,
-                  ),
-                ),
+                Text('FinEase AI', style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                Text(_isTyping ? 'Typing...' : '● Online', style: GoogleFonts.inter(fontSize: 11, color: _isTyping ? AppTheme.warning : AppTheme.success)),
               ],
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
+            onPressed: () => setState(() {
+              _messages.clear();
+              _messages.add(ChatMessage(text: "Chat cleared. How can I help you?", isUser: false, timestamp: DateTime.now()));
+            }),
+          ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return _buildMessageBubble(message);
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              itemCount: _messages.length + (_isTyping ? 1 : 0),
+              itemBuilder: (ctx, i) {
+                if (i == _messages.length) return _TypingIndicator();
+                return _Bubble(msg: _messages[i]);
               },
             ),
           ),
-          if (_isTyping)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+          // Quick prompts (only before first user message)
+          if (_messages.length == 1)
+            SizedBox(
+              height: 44,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _prompts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => GestureDetector(
+                  onTap: () => _send(_prompts[i]),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                     ),
-                    const SizedBox(width: 8),
-                    Text('AI is analyzing...', style: Theme.of(context).textTheme.labelSmall),
-                  ],
+                    child: Text(_prompts[i], style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.primary)),
+                  ),
                 ),
               ),
             ),
-          _buildMessageInput(),
+          _InputBar(ctrl: _ctrl, onSend: _send),
         ],
       ),
     );
   }
+}
 
-  Widget _buildMessageBubble(ChatMessage message) {
+class _Bubble extends StatelessWidget {
+  final ChatMessage msg;
+  const _Bubble({required this.msg});
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = msg.isUser;
     return Align(
-      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
+        margin: const EdgeInsets.only(bottom: 12),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: message.isUser ? AppTheme.primary : Colors.white,
-          borderRadius: BorderRadius.circular(20).copyWith(
-            bottomRight: message.isUser ? const Radius.circular(0) : const Radius.circular(20),
-            bottomLeft: !message.isUser ? const Radius.circular(0) : const Radius.circular(20),
+          color: isUser ? AppTheme.primary : AppTheme.surface,
+          borderRadius: BorderRadius.circular(18).copyWith(
+            bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(18),
+            bottomLeft: isUser ? const Radius.circular(18) : const Radius.circular(4),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: AppTheme.softShadow,
+          border: isUser ? null : Border.all(color: AppTheme.border),
         ),
         child: Text(
-          message.text,
-          style: GoogleFonts.inter(
-            color: message.isUser ? Colors.white : AppTheme.textPrimary,
-            fontSize: 15,
-            height: 1.4,
-          ),
+          msg.text,
+          style: GoogleFonts.inter(fontSize: 14, color: isUser ? Colors.white : AppTheme.textPrimary, height: 1.5),
         ),
       ),
     );
   }
+}
 
-  Widget _buildMessageInput() {
+class _TypingIndicator extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppTheme.border)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary)),
+          const SizedBox(width: 10),
+          Text('Thinking...', style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _InputBar extends StatelessWidget {
+  final TextEditingController ctrl;
+  final ValueChanged<String> onSend;
+  const _InputBar({required this.ctrl, required this.onSend});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16).copyWith(bottom: MediaQuery.of(context).padding.bottom + 16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                hintText: 'Ask about loans, budgets, or savings...',
-                hintStyle: GoogleFonts.inter(color: AppTheme.textSecondary.withOpacity(0.5)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: AppTheme.background,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              onSubmitted: (_) => _sendMessage(),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      decoration: BoxDecoration(color: AppTheme.surface, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -4))]),
+      child: Row(children: [
+        Expanded(
+          child: TextField(
+            controller: ctrl,
+            textCapitalization: TextCapitalization.sentences,
+            onSubmitted: onSend,
+            decoration: InputDecoration(
+              hintText: 'Ask about finances...',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+              fillColor: AppTheme.background,
+              filled: true,
             ),
           ),
-          const SizedBox(width: 12),
-          Container(
-            decoration: const BoxDecoration(
-              color: AppTheme.primary,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.send_rounded, color: Colors.white),
-              onPressed: _sendMessage,
-            ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: () => onSend(ctrl.text),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(16), boxShadow: AppTheme.cardShadow),
+            child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
           ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 }

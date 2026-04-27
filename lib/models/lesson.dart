@@ -6,7 +6,7 @@ class Lesson {
   final String icon;
   final int points;
 
-  Lesson({
+  const Lesson({
     required this.id,
     required this.title,
     required this.description,

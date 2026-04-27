@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:provider/provider.dart';
+
 import '../../services/auth_service.dart';
 import 'signup_page.dart';
 
@@ -15,21 +16,30 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final LocalAuthentication _auth = LocalAuthentication();
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+  bool _enableBiometricLogin = true;
 
   final Color primaryColor = const Color(0xFF2E3192);
   final Color secondaryColor = const Color(0xFF1BFFFF);
   final Color darkColor = const Color(0xFF1A1A1A);
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authService = context.watch<AuthService>();
+    final biometricLabel = _biometricLabel(authService.availableBiometrics);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Background soft gradient blobs
           Positioned(
             top: -100,
             right: -100,
@@ -38,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primaryColor.withOpacity(0.05),
+                color: primaryColor.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -50,13 +60,13 @@ class _LoginPageState extends State<LoginPage> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: secondaryColor.withOpacity(0.1),
+                color: secondaryColor.withValues(alpha: 0.1),
               ),
             ),
           ),
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -64,28 +74,37 @@ class _LoginPageState extends State<LoginPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [primaryColor, secondaryColor]),
+                      gradient: LinearGradient(
+                        colors: [primaryColor, secondaryColor],
+                      ),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 32),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
                   const SizedBox(height: 32),
-                  Text('Welcome back', 
+                  Text(
+                    'Welcome back',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
                       color: darkColor,
                       letterSpacing: -1,
-                    )),
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  Text('Securely access your financial world.', 
+                  Text(
+                    'Securely access your financial world with password and biometric unlock.',
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       color: Colors.grey[600],
                       height: 1.5,
-                    )),
+                    ),
+                  ),
                   const SizedBox(height: 48),
-                  
                   _buildLabel('Email Address'),
                   const SizedBox(height: 12),
                   _buildTextField(
@@ -94,82 +113,89 @@ class _LoginPageState extends State<LoginPage> {
                     icon: Icons.alternate_email_rounded,
                   ),
                   const SizedBox(height: 24),
-                  
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildLabel('Password'),
-                      TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                        child: Text('Forgot Password?', 
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: primaryColor,
-                          )),
-                      ),
-                    ],
-                  ),
+                  _buildLabel('Password'),
                   const SizedBox(height: 12),
                   _buildTextField(
                     controller: _passwordController,
-                    hint: '••••••••',
+                    hint: 'Enter your password',
                     icon: Icons.lock_outline_rounded,
                     isPassword: true,
                     isPasswordVisible: _isPasswordVisible,
-                    onTogglePassword: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                    onTogglePassword: () => setState(
+                      () => _isPasswordVisible = !_isPasswordVisible,
+                    ),
                   ),
-                  const SizedBox(height: 32),
-                  
+                  const SizedBox(height: 18),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Enable Touch ID / Face ID after login',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        color: darkColor,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Credentials are stored securely on this device.',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    value: _enableBiometricLogin,
+                    onChanged: (value) =>
+                        setState(() => _enableBiometricLogin = value),
+                    activeThumbColor: primaryColor,
+                  ),
+                  const SizedBox(height: 14),
                   _buildLoginButton(),
                   const SizedBox(height: 32),
-                  
                   Row(
                     children: [
                       const Expanded(child: Divider()),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR QUICK ACCESS', 
+                        child: Text(
+                          'QUICK ACCESS',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: Colors.grey[400],
                             letterSpacing: 1.5,
-                          )),
+                          ),
+                        ),
                       ),
                       const Expanded(child: Divider()),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                  
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSocialButton(Icons.fingerprint_rounded, 'Touch ID'),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildSocialButton(Icons.face_unlock_rounded, 'Face ID'),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 24),
+                  _buildBiometricButton(biometricLabel),
                   const SizedBox(height: 48),
-                  
                   Center(
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('New to FinEase? ', style: GoogleFonts.inter(color: Colors.grey[600])),
+                            Text(
+                              'New to FinEase? ',
+                              style: GoogleFonts.inter(color: Colors.grey[600]),
+                            ),
                             GestureDetector(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupPage())),
-                              child: Text('Create an account', 
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const SignupPage(),
+                                ),
+                              ),
+                              child: Text(
+                                'Create an account',
                                 style: GoogleFonts.inter(
                                   fontWeight: FontWeight.bold,
                                   color: const Color(0xFF00B09B),
-                                )),
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -177,10 +203,19 @@ class _LoginPageState extends State<LoginPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.shield_rounded, size: 14, color: Colors.grey[400]),
+                            Icon(
+                              Icons.shield_rounded,
+                              size: 14,
+                              color: Colors.grey[400],
+                            ),
                             const SizedBox(width: 8),
-                            Text('256-bit AES Encryption', 
-                              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[400])),
+                            Text(
+                              '256-bit encryption and secure device storage',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: Colors.grey[400],
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -196,12 +231,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildLabel(String text) {
-    return Text(text, 
+    return Text(
+      text,
       style: GoogleFonts.plusJakartaSans(
         fontSize: 14,
         fontWeight: FontWeight.bold,
         color: darkColor,
-      ));
+      ),
+    );
   }
 
   Widget _buildTextField({
@@ -226,18 +263,21 @@ class _LoginPageState extends State<LoginPage> {
           hintText: hint,
           hintStyle: GoogleFonts.inter(color: Colors.grey[400]),
           prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
-          suffixIcon: isPassword 
-            ? IconButton(
-                icon: Icon(
-                  isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                  color: Colors.grey[400],
-                  size: 20,
-                ),
-                onPressed: onTogglePassword,
-              )
-            : null,
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey[400],
+                    size: 20,
+                  ),
+                  onPressed: onTogglePassword,
+                )
+              : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
         ),
       ),
     );
@@ -247,14 +287,16 @@ class _LoginPageState extends State<LoginPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.8)]),
+        gradient: LinearGradient(
+          colors: [primaryColor, primaryColor.withValues(alpha: 0.8)],
+        ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: ElevatedButton(
@@ -263,21 +305,32 @@ class _LoginPageState extends State<LoginPage> {
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
-        child: _isLoading 
-          ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-          : Text('Login to Account', 
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              )),
+        child: _isLoading
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : Text(
+                'Login to Account',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
       ),
     );
   }
 
-  Widget _buildSocialButton(IconData icon, String label) {
+  Widget _buildBiometricButton(String biometricLabel) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -287,15 +340,42 @@ class _LoginPageState extends State<LoginPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: _authenticateWithBiometrics,
+          onTap: _isLoading ? null : _authenticateWithBiometrics,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
+            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+            child: Row(
               children: [
-                Icon(icon, color: darkColor, size: 28),
-                const SizedBox(height: 8),
-                Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: darkColor)),
+                Icon(Icons.fingerprint_rounded, color: primaryColor, size: 28),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        biometricLabel,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: darkColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Use saved credentials after biometric verification.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: Colors.grey[400],
+                ),
               ],
             ),
           ),
@@ -305,28 +385,72 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _authenticateWithBiometrics() async {
+    setState(() => _isLoading = true);
     try {
-      final bool canAuthenticate = await _auth.canCheckBiometrics || await _auth.isDeviceSupported();
-      if (!canAuthenticate) return;
-      final bool didAuthenticate = await _auth.authenticate(localizedReason: 'Login to FinEase');
-      if (didAuthenticate && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Success!')));
+      final authService = context.read<AuthService>();
+      final didLogin = await authService.authenticateWithBiometrics();
+      if (!didLogin && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Biometric login is unavailable until you sign in once and enable it.',
+            ),
+          ),
+        );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) return;
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      await Provider.of<AuthService>(context, listen: false)
-          .signInWithEmail(_emailController.text, _passwordController.text);
+      final authService = context.read<AuthService>();
+      await authService.signInWithEmail(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (_enableBiometricLogin && await authService.canUseBiometrics()) {
+        await authService.enableBiometricLogin(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  String _biometricLabel(List<BiometricType> biometrics) {
+    if (biometrics.contains(BiometricType.face)) {
+      return 'Face ID Login';
+    }
+    if (biometrics.contains(BiometricType.fingerprint) ||
+        biometrics.contains(BiometricType.strong) ||
+        biometrics.contains(BiometricType.weak)) {
+      return 'Touch ID Login';
+    }
+    return 'Biometric Login';
   }
 }
