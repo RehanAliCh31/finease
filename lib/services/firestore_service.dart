@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/demo_finance_data.dart';
+import '../models/budget_plan.dart';
 import '../models/saving_goal.dart';
 import '../models/transaction.dart';
 
@@ -13,6 +14,7 @@ class FirestoreService {
     final userRef = _db.collection('users').doc(uid);
     final transactionsRef = userRef.collection('transactions');
     final goalsRef = userRef.collection('saving_goals');
+    final budgetsRef = userRef.collection('budget_plans');
     final profileRef = userRef;
 
     final existingTransactions = await transactionsRef.limit(1).get();
@@ -31,6 +33,18 @@ class FirestoreService {
       for (final goal in DemoFinanceData.sampleGoals()) {
         final doc = goalsRef.doc();
         final map = goal.toMap();
+        map['createdAt'] = FieldValue.serverTimestamp();
+        batch.set(doc, map);
+      }
+      await batch.commit();
+    }
+
+    final existingBudgets = await budgetsRef.limit(1).get();
+    if (existingBudgets.docs.isEmpty) {
+      final batch = _db.batch();
+      for (final budget in DemoFinanceData.sampleBudgetPlans()) {
+        final doc = budgetsRef.doc();
+        final map = budget.toMap();
         map['createdAt'] = FieldValue.serverTimestamp();
         batch.set(doc, map);
       }
@@ -77,6 +91,50 @@ class FirestoreService {
         .doc(uid)
         .collection('transactions')
         .doc(id)
+        .delete();
+  }
+
+  // --------------- Budget Plans ---------------
+
+  Stream<List<BudgetPlan>> getBudgetPlans({String? monthKey}) {
+    final query = _db
+        .collection('users')
+        .doc(uid)
+        .collection('budget_plans')
+        .orderBy('createdAt', descending: true);
+
+    return query.snapshots().map((snapshot) {
+      final budgets = snapshot.docs
+          .map((doc) => BudgetPlan.fromFirestore(doc))
+          .toList();
+      if (monthKey == null || monthKey.isEmpty) {
+        return budgets;
+      }
+      return budgets.where((budget) => budget.monthKey == monthKey).toList();
+    });
+  }
+
+  Future<void> addBudgetPlan(BudgetPlan budgetPlan) {
+    final map = budgetPlan.toMap();
+    map['createdAt'] = FieldValue.serverTimestamp();
+    return _db.collection('users').doc(uid).collection('budget_plans').add(map);
+  }
+
+  Future<void> updateBudgetPlan(String budgetId, Map<String, dynamic> data) {
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('budget_plans')
+        .doc(budgetId)
+        .update(data);
+  }
+
+  Future<void> deleteBudgetPlan(String budgetId) {
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('budget_plans')
+        .doc(budgetId)
         .delete();
   }
 

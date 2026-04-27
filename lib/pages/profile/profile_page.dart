@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/saving_goal.dart';
 import '../../services/auth_service.dart';
+import '../../utils/currency_utils.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -90,7 +91,10 @@ class ProfilePage extends StatelessWidget {
                             Expanded(
                               child: _StatCard(
                                 label: 'Saved',
-                                value: '\$${saved.toStringAsFixed(0)}',
+                                value: CurrencyUtils.format(
+                                  saved,
+                                  compact: true,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),

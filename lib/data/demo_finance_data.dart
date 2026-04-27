@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/lesson.dart';
+import '../models/budget_plan.dart';
 import '../models/saving_goal.dart';
 import '../models/transaction.dart';
 
@@ -67,7 +68,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-1',
         title: 'Salary Deposit',
-        amount: 4200,
+        amount: 325000,
         date: DateTime(now.year, now.month, 1),
         category: 'Income',
         type: 'income',
@@ -75,7 +76,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-2',
         title: 'Apartment Rent',
-        amount: 1450,
+        amount: 85000,
         date: DateTime(now.year, now.month, 2),
         category: 'Housing',
         type: 'expense',
@@ -83,7 +84,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-3',
         title: 'Groceries',
-        amount: 142,
+        amount: 18500,
         date: now.subtract(const Duration(days: 2)),
         category: 'Food',
         type: 'expense',
@@ -91,7 +92,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-4',
         title: 'Coffee and Breakfast',
-        amount: 18,
+        amount: 1200,
         date: now.subtract(const Duration(days: 1)),
         category: 'Food',
         type: 'expense',
@@ -99,7 +100,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-5',
         title: 'Gym Membership',
-        amount: 49,
+        amount: 6500,
         date: DateTime(now.year, now.month, 4),
         category: 'Health',
         type: 'expense',
@@ -107,7 +108,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-6',
         title: 'Streaming Bundle',
-        amount: 31,
+        amount: 2100,
         date: DateTime(now.year, now.month, 5),
         category: 'Subscriptions',
         type: 'expense',
@@ -115,7 +116,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-7',
         title: 'Ride Share',
-        amount: 64,
+        amount: 4800,
         date: now.subtract(const Duration(days: 3)),
         category: 'Transport',
         type: 'expense',
@@ -123,7 +124,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-8',
         title: 'Weekend Dining',
-        amount: 126,
+        amount: 9600,
         date: now.subtract(const Duration(days: 4)),
         category: 'Dining',
         type: 'expense',
@@ -131,7 +132,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-9',
         title: 'Freelance Design',
-        amount: 620,
+        amount: 72000,
         date: now.subtract(const Duration(days: 6)),
         category: 'Income',
         type: 'income',
@@ -139,7 +140,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-10',
         title: 'New Headphones',
-        amount: 189,
+        amount: 28500,
         date: now.subtract(const Duration(days: 7)),
         category: 'Shopping',
         type: 'expense',
@@ -147,7 +148,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-11',
         title: 'Electric Bill',
-        amount: 118,
+        amount: 14200,
         date: now.subtract(const Duration(days: 8)),
         category: 'Utilities',
         type: 'expense',
@@ -155,7 +156,7 @@ class DemoFinanceData {
       FinancialTransaction(
         id: 'seed-tx-12',
         title: 'Emergency Fund Transfer',
-        amount: 300,
+        amount: 25000,
         date: now.subtract(const Duration(days: 9)),
         category: 'Savings',
         type: 'expense',
@@ -169,8 +170,8 @@ class DemoFinanceData {
       SavingGoal(
         id: 'seed-goal-1',
         title: 'Emergency Fund',
-        targetAmount: 6000,
-        currentAmount: 2850,
+        targetAmount: 500000,
+        currentAmount: 235000,
         targetDate: DateTime(now.year, now.month + 8, 1),
         category: 'Emergency',
         emoji: 'Shield',
@@ -178,8 +179,8 @@ class DemoFinanceData {
       SavingGoal(
         id: 'seed-goal-2',
         title: 'Japan Trip',
-        targetAmount: 3500,
-        currentAmount: 1680,
+        targetAmount: 420000,
+        currentAmount: 165000,
         targetDate: DateTime(now.year + 1, 4, 15),
         category: 'Travel',
         emoji: 'Plane',
@@ -187,8 +188,8 @@ class DemoFinanceData {
       SavingGoal(
         id: 'seed-goal-3',
         title: 'Investing Starter Fund',
-        targetAmount: 2000,
-        currentAmount: 940,
+        targetAmount: 300000,
+        currentAmount: 118000,
         targetDate: DateTime(now.year, now.month + 5, 10),
         category: 'General',
         emoji: 'Chart',
@@ -199,9 +200,52 @@ class DemoFinanceData {
   static const Map<String, dynamic> sampleProfile = {
     'fullName': 'Alex Morgan',
     'membershipTier': 'Elite Member',
-    'monthlyIncome': 4820.0,
+    'monthlyIncome': 397000.0,
     'targetSavingsRate': 0.22,
   };
+
+  static List<BudgetPlan> sampleBudgetPlans() {
+    final now = DateTime.now();
+    final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    return [
+      BudgetPlan(
+        id: 'seed-budget-1',
+        title: 'Home Essentials',
+        category: 'Housing',
+        allocatedAmount: 95000,
+        notes: 'Rent, maintenance, utilities, and internet.',
+        monthKey: monthKey,
+        createdAt: now,
+      ),
+      BudgetPlan(
+        id: 'seed-budget-2',
+        title: 'Food and Groceries',
+        category: 'Food',
+        allocatedAmount: 45000,
+        notes: 'Groceries plus weekly dining cap.',
+        monthKey: monthKey,
+        createdAt: now,
+      ),
+      BudgetPlan(
+        id: 'seed-budget-3',
+        title: 'Mobility',
+        category: 'Transport',
+        allocatedAmount: 18000,
+        notes: 'Fuel, ride hailing, and bus fares.',
+        monthKey: monthKey,
+        createdAt: now,
+      ),
+      BudgetPlan(
+        id: 'seed-budget-4',
+        title: 'Family Savings',
+        category: 'Savings',
+        allocatedAmount: 60000,
+        notes: 'Emergency fund and travel contributions.',
+        monthKey: monthKey,
+        createdAt: now,
+      ),
+    ];
+  }
 
   static List<LessonCourse> courses = const [
     LessonCourse(
@@ -423,6 +467,81 @@ class DemoFinanceData {
             correctIndex: 1,
             explanation:
                 'Utilization measures how much of your revolving credit line you are using.',
+          ),
+        ],
+      ),
+    ),
+    LessonCourse(
+      id: 'pakistan-finance-playbook',
+      title: 'Pakistan Finance Playbook',
+      subtitle: 'Budget, save, and borrow using real local realities',
+      description:
+          'Learn how to manage salary cycles, inflation pressure, committee savings, and responsible borrowing in Pakistan.',
+      coverImageUrl:
+          'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=1200&q=80',
+      category: 'Local Finance',
+      durationMinutes: 34,
+      rating: 4.9,
+      xpReward: 210,
+      lessons: [
+        Lesson(
+          id: 'pf-1',
+          title: 'Budgeting for Inflation',
+          description: 'Protect essentials when prices move fast',
+          content:
+              'Separate fixed bills from volatile items like groceries and fuel, then review those flexible categories weekly instead of monthly.',
+          icon: 'pie_chart',
+          points: 45,
+        ),
+        Lesson(
+          id: 'pf-2',
+          title: 'Emergency Funds in PKR',
+          description: 'Build a cushion before chasing returns',
+          content:
+              'Aim for three to six months of core expenses in accessible savings so medical, job, or repair shocks do not force debt.',
+          icon: 'shield',
+          points: 55,
+        ),
+        Lesson(
+          id: 'pf-3',
+          title: 'Borrowing Carefully',
+          description: 'Compare markup, tenure, and real repayment pressure',
+          content:
+              'Do not judge a loan by monthly installment alone. Check total repayment, income ratio, and whether the purpose improves your finances.',
+          icon: 'credit_score',
+          points: 60,
+        ),
+      ],
+      quiz: CourseQuiz(
+        id: 'pf-quiz',
+        title: 'Pakistan Finance Playbook Quiz',
+        questions: [
+          QuizQuestion(
+            id: 'pf-q1',
+            prompt:
+                'Which category should be reviewed most often during inflation?',
+            options: [
+              'Volatile essentials like groceries and fuel',
+              'Only annual subscriptions',
+              'Only charitable giving',
+              'None, budgets should stay fixed all year',
+            ],
+            correctIndex: 0,
+            explanation:
+                'Fast-moving essential categories drift first, so they need more frequent review.',
+          ),
+          QuizQuestion(
+            id: 'pf-q2',
+            prompt: 'What should you compare before taking a loan?',
+            options: [
+              'Only the monthly installment',
+              'Total repayment, markup, and income impact',
+              'Only the loan advertisement',
+              'Only the branch location',
+            ],
+            correctIndex: 1,
+            explanation:
+                'A strong loan decision checks the total cost and affordability, not just the headline installment.',
           ),
         ],
       ),

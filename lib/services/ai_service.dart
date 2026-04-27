@@ -1,8 +1,10 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
+import '../models/budget_plan.dart';
 import '../models/saving_goal.dart';
 import '../models/transaction.dart';
+import '../utils/currency_utils.dart';
 
 class AIService {
   AIService({String? apiKey})
@@ -30,7 +32,7 @@ You are a financial coach. Return exactly 3 bullet points.
 Focus on savings, unusual spending, and one specific action for this month.
 Keep each bullet under 24 words.
 Transactions:
-${transactions.take(30).map((t) => '${t.title} | ${t.type} | ${t.category} | \$${t.amount.toStringAsFixed(0)}').join('\n')}
+${transactions.take(30).map((t) => '${t.title} | ${t.type} | ${t.category} | ${CurrencyUtils.format(t.amount)}').join('\n')}
 ''';
 
     return _generateOrFallback(prompt, _mockBudgetAdvice(transactions));
@@ -80,7 +82,7 @@ ${transactions.take(30).map((t) => '${t.title} | ${t.type} | ${t.category} | \$$
 You are a savings coach. Return exactly 2 bullet points with concrete tactics.
 Keep each bullet below 22 words.
 Goals:
-${goals.map((goal) => '${goal.title}: \$${goal.currentAmount.toStringAsFixed(0)} / \$${goal.targetAmount.toStringAsFixed(0)} due ${goal.targetDate.toIso8601String()}').join('\n')}
+${goals.map((goal) => '${goal.title}: ${CurrencyUtils.format(goal.currentAmount)} / ${CurrencyUtils.format(goal.targetAmount)} due ${goal.targetDate.toIso8601String()}').join('\n')}
 ''';
 
     return _generateOrFallback(prompt, _mockSavingsInsight(goals));
@@ -142,6 +144,45 @@ Days left: $daysLeft
     }
   }
 
+  Future<String> getBudgetPlanRecommendations(
+    List<BudgetPlan> budgets,
+    List<FinancialTransaction> transactions,
+  ) async {
+    final fallback = _mockBudgetPlanRecommendations(budgets, transactions);
+    if (!_useRealAI || budgets.isEmpty) {
+      return fallback;
+    }
+
+    final budgetLines = budgets
+        .map(
+          (budget) =>
+              '${budget.title} | ${budget.category} | allocated ${CurrencyUtils.format(budget.allocatedAmount)}',
+        )
+        .join('\n');
+    final transactionLines = transactions
+        .take(25)
+        .map(
+          (tx) =>
+              '${tx.category} | ${tx.type} | ${CurrencyUtils.format(tx.amount)}',
+        )
+        .join('\n');
+
+    final prompt =
+        '''
+You are a budgeting coach for a university final year project app in Pakistan.
+Return exactly 3 bullet points.
+Each bullet must mention one practical action tied to the user's budget plans.
+Use PKR, keep each bullet under 28 words.
+Budgets:
+$budgetLines
+
+Transactions:
+$transactionLines
+''';
+
+    return _generateOrFallback(prompt, fallback);
+  }
+
   String _mockBudgetAdvice(List<FinancialTransaction> transactions) {
     if (transactions.isEmpty) {
       return '- Add a few transactions first so FinEase can build personalized budget advice.\n- Start by tracking fixed bills, food, and transport.\n- Set a weekly spending check-in to catch drift early.';
@@ -154,7 +195,7 @@ Days left: $daysLeft
         : totalExpense / expenses.length;
     final topCategory = _topExpenseCategory(transactions);
 
-    return '- $topCategory is your largest expense category. Cap it before month-end.\n- Average expense size is \$${averageExpense.toStringAsFixed(0)}. Watch frequent small purchases.\n- Move 10% of every income transaction into savings automatically.';
+    return '- $topCategory is your largest expense category. Set a weekly cap before month-end.\n- Average expense size is ${CurrencyUtils.format(averageExpense)}. Watch frequent small purchases.\n- Move 10% of every income transaction into savings automatically.';
   }
 
   String _mockSavingsInsight(List<SavingGoal> goals) {
@@ -167,12 +208,12 @@ Days left: $daysLeft
         ? mostUrgent.remaining
         : mostUrgent.remaining / (mostUrgent.daysLeft / 7);
 
-    return '- ${mostUrgent.title} needs about \$${weeklyNeeded.toStringAsFixed(0)} per week to stay on schedule.\n- Redirect one non-essential category into your top-priority goal this month.';
+    return '- ${mostUrgent.title} needs about ${CurrencyUtils.format(weeklyNeeded)} per week to stay on schedule.\n- Redirect one non-essential category into your top-priority goal this month.';
   }
 
   String _mockInvestmentSuggestions(double saved) {
     if (saved < 1000) {
-      return '- Keep emergency cash in a high-yield savings account before taking risk.\n- Use round-up savings or recurring transfers to build your first \$1,000 buffer.\n- Learn index funds now, but prioritize liquidity first.';
+      return '- Keep emergency cash in a high-yield savings account before taking risk.\n- Use recurring transfers to build your first PKR 100,000 buffer.\n- Learn index funds now, but prioritize liquidity first.';
     }
     if (saved < 5000) {
       return '- Consider a broad-market index fund for long-term growth if your emergency fund is stable.\n- Compare Roth IRA eligibility for tax-advantaged investing.\n- Keep near-term goals in cash, not volatile assets.';
@@ -190,5 +231,39 @@ Days left: $daysLeft
       return 'General';
     }
     return totals.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+  }
+
+  String _mockBudgetPlanRecommendations(
+    List<BudgetPlan> budgets,
+    List<FinancialTransaction> transactions,
+  ) {
+    if (budgets.isEmpty) {
+      return '- Create category budgets for housing, food, transport, and savings.\n- Review actual spending weekly so your budget stays realistic.\n- Reserve part of each income deposit for savings before other spending.';
+    }
+
+    final expenseTotals = <String, double>{};
+    for (final tx in transactions.where((t) => t.type == 'expense')) {
+      expenseTotals[tx.category] =
+          (expenseTotals[tx.category] ?? 0) + tx.amount;
+    }
+
+    final lines = budgets.take(3).map((budget) {
+      final spent = expenseTotals[budget.category] ?? 0;
+      final remaining = budget.allocatedAmount - spent;
+      if (remaining < 0) {
+        return '- ${budget.category} is over budget by ${CurrencyUtils.format(remaining.abs())}. Cut discretionary spending there this week.';
+      }
+      if (remaining < budget.allocatedAmount * 0.25) {
+        return '- ${budget.category} has only ${CurrencyUtils.format(remaining)} left. Slow spending and move essentials to planned purchases.';
+      }
+      return '- ${budget.category} still has ${CurrencyUtils.format(remaining)} available. Protect that margin for planned needs only.';
+    }).toList();
+
+    while (lines.length < 3) {
+      lines.add(
+        '- Increase your savings budget first whenever monthly income rises.',
+      );
+    }
+    return lines.join('\n');
   }
 }

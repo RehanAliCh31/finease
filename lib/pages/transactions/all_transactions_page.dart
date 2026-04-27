@@ -27,8 +27,13 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text('All Transactions',
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: Text(
+          'All Transactions',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
         backgroundColor: AppTheme.background,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
@@ -44,14 +49,18 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
               onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
               decoration: InputDecoration(
                 hintText: 'Search transactions...',
-                prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: AppTheme.textSecondary,
+                ),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.close_rounded, size: 18),
                         onPressed: () {
                           _searchCtrl.clear();
                           setState(() => _searchQuery = '');
-                        })
+                        },
+                      )
                     : null,
               ),
             ),
@@ -77,21 +86,43 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                         return const Center(child: CircularProgressIndicator());
                       }
                       var txns = snap.data ?? [];
-                      if (_filter != 'all') txns = txns.where((t) => t.type == _filter).toList();
-                      if (_searchQuery.isNotEmpty) {
-                        txns = txns.where((t) =>
-                            t.title.toLowerCase().contains(_searchQuery) ||
-                            t.category.toLowerCase().contains(_searchQuery)).toList();
+                      if (_filter != 'all') {
+                        txns = txns.where((t) => t.type == _filter).toList();
                       }
-                      if (txns.isEmpty) return Center(child: Text('No transactions found', style: GoogleFonts.inter(color: AppTheme.textSecondary)));
+                      if (_searchQuery.isNotEmpty) {
+                        txns = txns
+                            .where(
+                              (t) =>
+                                  t.title.toLowerCase().contains(
+                                    _searchQuery,
+                                  ) ||
+                                  t.category.toLowerCase().contains(
+                                    _searchQuery,
+                                  ),
+                            )
+                            .toList();
+                      }
+                      if (txns.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'No transactions found',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        );
+                      }
                       return ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         itemCount: txns.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 8),
                         itemBuilder: (ctx, i) {
                           final t = txns[i];
                           final isIncome = t.type == 'income';
-                          final color = isIncome ? AppTheme.success : AppTheme.error;
+                          final color = isIncome
+                              ? AppTheme.success
+                              : AppTheme.error;
                           return Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -102,30 +133,51 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                             child: Row(
                               children: [
                                 Container(
-                                  width: 44, height: 44,
+                                  width: 44,
+                                  height: 44,
                                   decoration: BoxDecoration(
                                     color: color.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
-                                    isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                    color: color, size: 22,
+                                    isIncome
+                                        ? Icons.arrow_downward_rounded
+                                        : Icons.arrow_upward_rounded,
+                                    color: color,
+                                    size: 22,
                                   ),
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(t.title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                                      Text('${t.category} · ${DateFormat('MMM dd, yyyy').format(t.date)}',
-                                          style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
+                                      Text(
+                                        t.title,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${t.category} · ${DateFormat('MMM dd, yyyy').format(t.date)}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
                                 Text(
                                   '${isIncome ? '+' : '-'}\$${t.amount.toStringAsFixed(2)}',
-                                  style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: color),
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: color,
+                                  ),
                                 ),
                               ],
                             ),
@@ -151,9 +203,18 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primary : AppTheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? AppTheme.primary : AppTheme.border),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.border,
+          ),
         ),
-        child: Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppTheme.textSecondary)),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : AppTheme.textSecondary,
+          ),
+        ),
       ),
     );
   }

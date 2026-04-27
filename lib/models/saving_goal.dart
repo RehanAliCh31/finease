@@ -28,7 +28,9 @@ class SavingGoal {
       title: data['title'] ?? '',
       targetAmount: (data['targetAmount'] ?? 0).toDouble(),
       currentAmount: (data['currentAmount'] ?? 0).toDouble(),
-      targetDate: (data['targetDate'] as Timestamp?)?.toDate() ?? DateTime.now().add(const Duration(days: 365)),
+      targetDate:
+          (data['targetDate'] as Timestamp?)?.toDate() ??
+          DateTime.now().add(const Duration(days: 365)),
       category: data['category'] ?? 'General',
       emoji: data['emoji'] ?? '🎯',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
@@ -67,7 +69,9 @@ class SavingGoal {
     );
   }
 
-  double get progress => targetAmount > 0 ? (currentAmount / targetAmount).clamp(0.0, 1.0) : 0;
-  double get remaining => (targetAmount - currentAmount).clamp(0, double.infinity);
+  double get progress =>
+      targetAmount > 0 ? (currentAmount / targetAmount).clamp(0.0, 1.0) : 0;
+  double get remaining =>
+      (targetAmount - currentAmount).clamp(0, double.infinity);
   int get daysLeft => targetDate.difference(DateTime.now()).inDays;
 }

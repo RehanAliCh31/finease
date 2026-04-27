@@ -1,33 +1,43 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../theme/app_theme.dart';
+import 'package:provider/provider.dart';
+
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 
 class CommunityForumPage extends StatefulWidget {
   const CommunityForumPage({super.key});
+
   @override
   State<CommunityForumPage> createState() => _CommunityForumPageState();
 }
 
 class _CommunityForumPageState extends State<CommunityForumPage>
     with SingleTickerProviderStateMixin {
-  late TabController _tab;
-  final _db = FirebaseFirestore.instance;
+  late TabController _tabController;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
   String _selectedCategory = 'All';
 
-  final _categories = ['All', 'Savings', 'Loans', 'Investing', 'Success', 'General'];
+  final _categories = const [
+    'All',
+    'Savings',
+    'Loans',
+    'Budgeting',
+    'Investing',
+    'Success',
+    'General',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
-    _tab.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -36,44 +46,52 @@ class _CommunityForumPageState extends State<CommunityForumPage>
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: NestedScrollView(
-        headerSliverBuilder: (ctx, inner) => [
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
             pinned: true,
             backgroundColor: AppTheme.background,
             elevation: 0,
-            title: Text('Community', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.textPrimary)),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.search_rounded, color: AppTheme.textPrimary),
-                onPressed: () {},
+            title: Text(
+              'Community Forum',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                color: AppTheme.textPrimary,
               ),
-            ],
+            ),
             bottom: TabBar(
-              controller: _tab,
+              controller: _tabController,
               labelColor: AppTheme.primary,
               unselectedLabelColor: AppTheme.textSecondary,
               indicatorColor: AppTheme.primary,
-              indicatorWeight: 3,
-              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
-              tabs: const [Tab(text: 'Discussions'), Tab(text: 'Categories')],
+              labelStyle: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+              tabs: const [
+                Tab(text: 'Discussions'),
+                Tab(text: 'Categories'),
+              ],
             ),
           ),
           SliverToBoxAdapter(
             child: _CategoryFilter(
               categories: _categories,
               selected: _selectedCategory,
-              onSelect: (c) => setState(() => _selectedCategory = c),
+              onSelect: (value) => setState(() => _selectedCategory = value),
             ),
           ),
         ],
         body: TabBarView(
-          controller: _tab,
+          controller: _tabController,
           children: [
             _PostsList(category: _selectedCategory),
-            _CategoriesGrid(onCategoryTap: (c) {
-              setState(() => _selectedCategory = c);
-              _tab.animateTo(0);
-            }),
+            _CategoriesGrid(
+              onCategoryTap: (category) {
+                setState(() => _selectedCategory = category);
+                _tabController.animateTo(0);
+              },
+            ),
           ],
         ),
       ),
@@ -81,7 +99,13 @@ class _CommunityForumPageState extends State<CommunityForumPage>
         onPressed: () => _showCreatePostSheet(context),
         backgroundColor: AppTheme.primary,
         icon: const Icon(Icons.edit_rounded, color: Colors.white),
-        label: Text('Post', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700)),
+        label: Text(
+          'Post',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -91,41 +115,54 @@ class _CommunityForumPageState extends State<CommunityForumPage>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CreatePostSheet(db: _db),
+      builder: (context) => _CreatePostSheet(db: _db),
     );
   }
 }
 
-// ─── Category Filter ────────────────────────────────────────────────────────
 class _CategoryFilter extends StatelessWidget {
+  const _CategoryFilter({
+    required this.categories,
+    required this.selected,
+    required this.onSelect,
+  });
+
   final List<String> categories;
   final String selected;
   final ValueChanged<String> onSelect;
-  const _CategoryFilter({required this.categories, required this.selected, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final cat = categories[i];
-          final sel = selected == cat;
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final category = categories[index];
+          final isSelected = selected == category;
           return GestureDetector(
-            onTap: () => onSelect(cat),
+            onTap: () => onSelect(category),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: sel ? AppTheme.primary : AppTheme.surface,
+                color: isSelected ? AppTheme.primary : AppTheme.surface,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: sel ? AppTheme.primary : AppTheme.border),
+                border: Border.all(
+                  color: isSelected ? AppTheme.primary : AppTheme.border,
+                ),
               ),
-              child: Text(cat, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: sel ? Colors.white : AppTheme.textSecondary)),
+              child: Text(
+                category,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                ),
+              ),
             ),
           );
         },
@@ -134,43 +171,57 @@ class _CategoryFilter extends StatelessWidget {
   }
 }
 
-// ─── Posts List ──────────────────────────────────────────────────────────────
 class _PostsList extends StatelessWidget {
-  final String category;
   const _PostsList({required this.category});
+
+  final String category;
 
   @override
   Widget build(BuildContext context) {
-    final db = FirebaseFirestore.instance;
-    Query<Map<String, dynamic>> q = db.collection('forum_posts').orderBy('createdAt', descending: true);
-    if (category != 'All') q = q.where('category', isEqualTo: category);
+    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
+        .collection('forum_posts')
+        .orderBy('createdAt', descending: true);
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: q.snapshots(),
-      builder: (ctx, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
+    if (category != 'All') {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: query.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final docs = snap.data?.docs ?? [];
+        final docs = snapshot.data?.docs ?? [];
         if (docs.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.forum_outlined, size: 56, color: AppTheme.textHint),
+                const Icon(
+                  Icons.forum_outlined,
+                  size: 56,
+                  color: AppTheme.textHint,
+                ),
                 const SizedBox(height: 12),
-                Text('No posts yet. Be the first!', style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 14)),
+                Text(
+                  'No posts yet. Start the first conversation.',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
               ],
             ),
           );
         }
+
         return ListView.separated(
           padding: const EdgeInsets.all(20),
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (ctx, i) {
-            final data = docs[i].data() as Map<String, dynamic>;
-            return _PostCard(data: data, docId: docs[i].id);
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            return _PostCard(docId: docs[index].id, data: docs[index].data());
           },
         );
       },
@@ -178,11 +229,12 @@ class _PostsList extends StatelessWidget {
   }
 }
 
-// ─── Post Card ───────────────────────────────────────────────────────────────
 class _PostCard extends StatefulWidget {
-  final Map<String, dynamic> data;
+  const _PostCard({required this.docId, required this.data});
+
   final String docId;
-  const _PostCard({required this.data, required this.docId});
+  final Map<String, dynamic> data;
+
   @override
   State<_PostCard> createState() => _PostCardState();
 }
@@ -193,6 +245,7 @@ class _PostCardState extends State<_PostCard> {
   static const Map<String, Color> _tagColors = {
     'Savings': Color(0xFF06C270),
     'Loans': Color(0xFF2E3192),
+    'Budgeting': Color(0xFF0EA5A4),
     'Investing': Color(0xFF8B5CF6),
     'Success': Color(0xFFFF6B35),
     'General': Color(0xFF6B7A99),
@@ -200,12 +253,21 @@ class _PostCardState extends State<_PostCard> {
 
   @override
   Widget build(BuildContext context) {
-    final d = widget.data;
-    final cat = d['category'] ?? 'General';
-    final tagColor = _tagColors[cat] ?? AppTheme.primary;
-    final likes = (d['likes'] ?? 0) + (_liked ? 1 : 0);
-    final comments = d['comments'] ?? 0;
-    final avatar = d['authorAvatar'] as String?;
+    final authService = context.watch<AuthService>();
+    final user = authService.user;
+    final data = widget.data;
+    final category = data['category'] ?? 'General';
+    final tagColor = _tagColors[category] ?? AppTheme.primary;
+    final likes = (data['likes'] ?? 0) + (_liked ? 1 : 0);
+    final comments = data['comments'] ?? 0;
+    final avatar = data['authorAvatar'] as String?;
+    final savedDoc = user == null
+        ? null
+        : FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('saved_posts')
+              .doc(widget.docId);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -223,9 +285,17 @@ class _PostCardState extends State<_PostCard> {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                backgroundImage: (avatar != null && avatar.isNotEmpty) ? NetworkImage(avatar) : null,
+                backgroundImage: (avatar != null && avatar.isNotEmpty)
+                    ? NetworkImage(avatar)
+                    : null,
                 child: (avatar == null || avatar.isEmpty)
-                    ? Text((d['authorName'] ?? 'A')[0].toUpperCase(), style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppTheme.primary))
+                    ? Text(
+                        (data['authorName'] ?? 'A')[0].toUpperCase(),
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
+                      )
                     : null,
               ),
               const SizedBox(width: 10),
@@ -233,25 +303,62 @@ class _PostCardState extends State<_PostCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(d['authorName'] ?? 'Anonymous', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                    Text(_timeAgo(d['createdAt']), style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textSecondary)),
+                    Text(
+                      data['authorName'] ?? 'Anonymous',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      _timeAgo(data['createdAt']),
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: tagColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(cat, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: tagColor)),
+                child: Text(
+                  category,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: tagColor,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          Text(d['title'] ?? '', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+          Text(
+            data['title'] ?? '',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(d['content'] ?? '', style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary, height: 1.5), maxLines: 3, overflow: TextOverflow.ellipsis),
+          Text(
+            data['content'] ?? '',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+              height: 1.5,
+            ),
+          ),
           const SizedBox(height: 16),
           Divider(color: AppTheme.border, thickness: 1, height: 1),
           const SizedBox(height: 12),
@@ -259,22 +366,69 @@ class _PostCardState extends State<_PostCard> {
             children: [
               GestureDetector(
                 onTap: () => setState(() => _liked = !_liked),
-                child: Row(children: [
-                  Icon(_liked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined, size: 18, color: _liked ? AppTheme.primary : AppTheme.textSecondary),
-                  const SizedBox(width: 6),
-                  Text('$likes', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _liked ? AppTheme.primary : AppTheme.textSecondary)),
-                ]),
+                child: Row(
+                  children: [
+                    Icon(
+                      _liked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+                      size: 18,
+                      color: _liked ? AppTheme.primary : AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$likes',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _liked
+                            ? AppTheme.primary
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: 20),
-              Row(children: [
-                const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: AppTheme.textSecondary),
-                const SizedBox(width: 6),
-                Text('$comments', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-              ]),
+              GestureDetector(
+                onTap: () => _openComments(context),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 18,
+                      color: AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$comments',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const Spacer(),
-              const Icon(Icons.share_outlined, size: 18, color: AppTheme.textSecondary),
-              const SizedBox(width: 16),
-              const Icon(Icons.bookmark_border_rounded, size: 18, color: AppTheme.textSecondary),
+              if (savedDoc != null) ...[
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: savedDoc.snapshots(),
+                  builder: (context, snapshot) {
+                    final isSaved = snapshot.data?.exists ?? false;
+                    return IconButton(
+                      onPressed: () => _toggleSave(savedDoc, isSaved),
+                      icon: Icon(
+                        isSaved
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_border_rounded,
+                        color: isSaved
+                            ? AppTheme.primary
+                            : AppTheme.textSecondary,
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ],
@@ -282,17 +436,37 @@ class _PostCardState extends State<_PostCard> {
     );
   }
 
+  Future<void> _toggleSave(
+    DocumentReference<Map<String, dynamic>> savedDoc,
+    bool isSaved,
+  ) async {
+    if (isSaved) {
+      await savedDoc.delete();
+      return;
+    }
+    await savedDoc.set({
+      'postId': widget.docId,
+      'savedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  void _openComments(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CommentsSheet(
+        postId: widget.docId,
+        postTitle: widget.data['title'] ?? 'Discussion',
+      ),
+    );
+  }
+
   String _timeAgo(dynamic ts) {
-    if (ts == null) {
+    if (ts is! Timestamp) {
       return 'just now';
     }
-    DateTime dt;
-    if (ts is Timestamp) {
-      dt = ts.toDate();
-    } else {
-      return 'just now';
-    }
-    final diff = DateTime.now().difference(dt);
+    final diff = DateTime.now().difference(ts.toDate());
     if (diff.inMinutes < 1) {
       return 'just now';
     }
@@ -306,18 +480,202 @@ class _PostCardState extends State<_PostCard> {
   }
 }
 
-// ─── Categories Grid ─────────────────────────────────────────────────────────
+class _CommentsSheet extends StatefulWidget {
+  const _CommentsSheet({required this.postId, required this.postTitle});
+
+  final String postId;
+  final String postTitle;
+
+  @override
+  State<_CommentsSheet> createState() => _CommentsSheetState();
+}
+
+class _CommentsSheetState extends State<_CommentsSheet> {
+  final TextEditingController _commentController = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = context.watch<AuthService>();
+    final user = authService.user;
+    final commentsQuery = FirebaseFirestore.instance
+        .collection('forum_posts')
+        .doc(widget.postId)
+        .collection('comments')
+        .orderBy('createdAt');
+
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.75,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              widget.postTitle,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: commentsQuery.snapshots(),
+                builder: (context, snapshot) {
+                  final docs = snapshot.data?.docs ?? [];
+                  if (docs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No comments yet. Add the first one.',
+                        style: GoogleFonts.inter(color: AppTheme.textSecondary),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    itemCount: docs.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data();
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceCard,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              data['authorName'] ?? 'FinEase User',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              data['content'] ?? '',
+                              style: GoogleFonts.inter(
+                                color: AppTheme.textSecondary,
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    maxLines: 3,
+                    minLines: 1,
+                    decoration: const InputDecoration(
+                      hintText: 'Write a comment',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: user == null || _sending ? null : _submitComment,
+                  child: Text(_sending ? '...' : 'Send'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitComment() async {
+    final authService = context.read<AuthService>();
+    final user = authService.user;
+    final content = _commentController.text.trim();
+    if (user == null || content.isEmpty) {
+      return;
+    }
+
+    setState(() => _sending = true);
+    final postRef = FirebaseFirestore.instance
+        .collection('forum_posts')
+        .doc(widget.postId);
+
+    await postRef.collection('comments').add({
+      'content': content,
+      'authorName': user.displayName ?? user.email ?? 'FinEase User',
+      'authorId': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await postRef.update({'comments': FieldValue.increment(1)});
+
+    if (mounted) {
+      _commentController.clear();
+      setState(() => _sending = false);
+    }
+  }
+}
+
 class _CategoriesGrid extends StatelessWidget {
-  final ValueChanged<String> onCategoryTap;
   const _CategoriesGrid({required this.onCategoryTap});
 
-  static const _cats = [
-    _CatInfo('Savings Tips', Icons.savings_rounded, Color(0xFF06C270), 'Budget hacks & wealth strategies'),
-    _CatInfo('Loan Advice', Icons.description_rounded, Color(0xFF2E3192), 'Navigate rates & repayment'),
-    _CatInfo('Investing', Icons.trending_up_rounded, Color(0xFF8B5CF6), 'Stocks, ETFs & mutual funds'),
-    _CatInfo('Success Stories', Icons.celebration_rounded, Color(0xFFFF6B35), 'Journeys to financial freedom'),
-    _CatInfo('General', Icons.chat_rounded, Color(0xFF6B7A99), 'General financial discussions'),
-    _CatInfo('Ask an Expert', Icons.contact_support_rounded, Color(0xFF0099CC), 'Get professional advice'),
+  final ValueChanged<String> onCategoryTap;
+
+  static const _categories = [
+    _CatInfo(
+      'Savings',
+      Icons.savings_rounded,
+      Color(0xFF06C270),
+      'Build saving habits and emergency funds',
+    ),
+    _CatInfo(
+      'Loans',
+      Icons.account_balance_rounded,
+      Color(0xFF2E3192),
+      'Borrow carefully and manage repayments',
+    ),
+    _CatInfo(
+      'Budgeting',
+      Icons.account_balance_wallet_rounded,
+      Color(0xFF0EA5A4),
+      'Monthly plans, category caps, and spending control',
+    ),
+    _CatInfo(
+      'Investing',
+      Icons.trending_up_rounded,
+      Color(0xFF8B5CF6),
+      'Long-term growth and risk basics',
+    ),
   ];
 
   @override
@@ -328,68 +686,100 @@ class _CategoriesGrid extends StatelessWidget {
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
       childAspectRatio: 1.1,
-      children: _cats.map((c) => GestureDetector(
-        onTap: () => onCategoryTap(c.name.split(' ').first),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.border),
-            boxShadow: AppTheme.softShadow,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
+      children: _categories
+          .map(
+            (category) => GestureDetector(
+              onTap: () => onCategoryTap(category.name),
+              child: Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: c.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.border),
+                  boxShadow: AppTheme.softShadow,
                 ),
-                child: Icon(c.icon, color: c.color, size: 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: category.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(category.icon, color: category.color),
+                    ),
+                    const Spacer(),
+                    Text(
+                      category.name,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      category.subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(),
-              Text(c.name, style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-              const SizedBox(height: 4),
-              Text(c.subtitle, style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textSecondary), maxLines: 2, overflow: TextOverflow.ellipsis),
-            ],
-          ),
-        ),
-      )).toList(),
+            ),
+          )
+          .toList(),
     );
   }
 }
 
 class _CatInfo {
+  const _CatInfo(this.name, this.icon, this.color, this.subtitle);
+
   final String name;
   final IconData icon;
   final Color color;
   final String subtitle;
-  const _CatInfo(this.name, this.icon, this.color, this.subtitle);
 }
 
-// ─── Create Post Sheet ───────────────────────────────────────────────────────
 class _CreatePostSheet extends StatefulWidget {
-  final FirebaseFirestore db;
   const _CreatePostSheet({required this.db});
+
+  final FirebaseFirestore db;
+
   @override
   State<_CreatePostSheet> createState() => _CreatePostSheetState();
 }
 
 class _CreatePostSheetState extends State<_CreatePostSheet> {
-  final _titleCtrl = TextEditingController();
-  final _contentCtrl = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _contentController = TextEditingController();
   String _category = 'General';
   bool _posting = false;
 
-  final _cats = ['General', 'Savings', 'Loans', 'Investing', 'Success'];
+  final _categories = const [
+    'General',
+    'Savings',
+    'Loans',
+    'Budgeting',
+    'Investing',
+    'Success',
+  ];
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Container(
-      padding: EdgeInsets.fromLTRB(24, 16, 24, bottom + 24),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, bottomInset + 24),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -398,40 +788,67 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.border, borderRadius: BorderRadius.circular(2)))),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
-          Text('Start a Discussion', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+          Text(
+            'Start a Discussion',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+            ),
+          ),
           const SizedBox(height: 20),
           TextField(
-            controller: _titleCtrl,
-            decoration: const InputDecoration(hintText: 'Title — what\'s your topic?'),
-            textCapitalization: TextCapitalization.sentences,
+            controller: _titleController,
+            decoration: const InputDecoration(hintText: 'Post title'),
           ),
           const SizedBox(height: 14),
           TextField(
-            controller: _contentCtrl,
+            controller: _contentController,
             maxLines: 4,
-            decoration: const InputDecoration(hintText: 'Share your thoughts, question, or story...'),
-            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              hintText: 'Share your question, tip, or experience...',
+            ),
           ),
           const SizedBox(height: 14),
-          Text('Category', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            children: _cats.map((c) {
-              final sel = _category == c;
+            runSpacing: 8,
+            children: _categories.map((category) {
+              final isSelected = _category == category;
               return GestureDetector(
-                onTap: () => setState(() => _category = c),
+                onTap: () => setState(() => _category = category),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: sel ? AppTheme.primary : AppTheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: sel ? AppTheme.primary : AppTheme.border),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
                   ),
-                  child: Text(c, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: sel ? Colors.white : AppTheme.textSecondary)),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppTheme.primary : AppTheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? AppTheme.primary : AppTheme.border,
+                    ),
+                  ),
+                  child: Text(
+                    category,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                    ),
+                  ),
                 ),
               );
             }).toList(),
@@ -441,13 +858,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _posting ? null : _post,
-              child: _posting
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Icon(Icons.send_rounded, size: 18),
-                      const SizedBox(width: 8),
-                      Text('Publish', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
-                    ]),
+              child: Text(_posting ? 'Publishing...' : 'Publish'),
             ),
           ),
         ],
@@ -456,30 +867,35 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
   }
 
   Future<void> _post() async {
-    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in all fields')));
+    if (_titleController.text.trim().isEmpty ||
+        _contentController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
       return;
     }
+
     setState(() => _posting = true);
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final authService = context.read<AuthService>();
     final user = authService.user;
+
     await widget.db.collection('forum_posts').add({
-      'title': _titleCtrl.text.trim(),
-      'content': _contentCtrl.text.trim(),
+      'title': _titleController.text.trim(),
+      'content': _contentController.text.trim(),
       'category': _category,
-      'authorName': user?.displayName ?? 'FinEase User',
+      'authorName': user?.displayName ?? user?.email ?? 'FinEase User',
       'authorAvatar': user?.photoURL ?? '',
       'authorId': user?.uid ?? '',
       'likes': 0,
       'comments': 0,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
     if (mounted) {
-      setState(() => _posting = false);
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Discussion posted! ✓'), backgroundColor: AppTheme.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Discussion posted.')));
     }
   }
 }

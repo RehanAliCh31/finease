@@ -1,9 +1,11 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'home/home_page.dart';
-import 'literacy/literacy_hub_page.dart';
-import 'savings/savings_tracker_page.dart';
+
 import 'budget/ai_budget_advisor_page.dart';
+import 'chatbot/chatbot_page.dart';
+import 'home/home_page.dart';
+import 'loans/loan_simulator_page.dart';
 import 'profile/profile_page.dart';
 
 class MainScaffold extends StatefulWidget {
@@ -18,9 +20,9 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   final List<Widget> _pages = const [
     HomePage(),
-    LiteracyHubPage(),
-    SavingsTrackerPage(),
     AIBudgetAdvisorPage(),
+    LoanSimulatorPage(embedded: true),
+    ChatbotPage(embedded: true),
     ProfilePage(),
   ];
 
@@ -45,10 +47,12 @@ class _MainScaffoldState extends State<MainScaffold> {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
+              color: Colors.white.withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3), width: 1.5),
+                color: Colors.white.withValues(alpha: 0.4),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF2E3192).withValues(alpha: 0.08),
@@ -60,10 +64,14 @@ class _MainScaffoldState extends State<MainScaffold> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.dashboard_rounded, 'Home'),
-                _buildNavItem(1, Icons.school_rounded, 'Literacy'),
-                _buildNavItem(2, Icons.savings_rounded, 'Savings'),
-                _buildNavItem(3, Icons.smart_toy_rounded, 'Budget'),
+                _buildNavItem(0, Icons.home_rounded, 'Home'),
+                _buildNavItem(
+                  1,
+                  Icons.account_balance_wallet_rounded,
+                  'Budget',
+                ),
+                _buildNavItem(2, Icons.calculate_rounded, 'Loans'),
+                _buildNavItem(3, Icons.smart_toy_rounded, 'Chatbot'),
                 _buildNavItem(4, Icons.person_rounded, 'Profile'),
               ],
             ),
@@ -85,7 +93,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF2E3192).withValues(alpha: 0.08)
@@ -95,15 +103,14 @@ class _MainScaffoldState extends State<MainScaffold> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 26),
+            Icon(icon, color: color, size: 25),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 color: color,
                 fontSize: 10,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 fontFamily: 'Plus Jakarta Sans',
               ),
             ),

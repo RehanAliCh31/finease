@@ -8,17 +8,53 @@ class NotificationsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final notifications = [
-      _NotifData('Budget Alert', 'You\'ve used 80% of your Food budget this month.', Icons.warning_amber_rounded, AppTheme.warning, '5m ago'),
-      _NotifData('AI Insight Ready', 'Your weekly financial report is ready to view.', Icons.auto_awesome_rounded, AppTheme.primary, '1h ago'),
-      _NotifData('Savings Goal', 'You\'re 75% toward your Emergency Fund goal! 🎉', Icons.savings_rounded, AppTheme.success, '3h ago'),
-      _NotifData('Loan Reminder', 'Your loan EMI of \$1,245 is due in 3 days.', Icons.account_balance_rounded, AppTheme.error, '1d ago'),
-      _NotifData('New Welfare Program', 'A new welfare program matching your profile is available.', Icons.volunteer_activism_rounded, const Color(0xFFFF6B35), '2d ago'),
+      _NotifData(
+        'Budget Alert',
+        'You\'ve used 80% of your Food budget this month.',
+        Icons.warning_amber_rounded,
+        AppTheme.warning,
+        '5m ago',
+      ),
+      _NotifData(
+        'AI Insight Ready',
+        'Your weekly financial report is ready to view.',
+        Icons.auto_awesome_rounded,
+        AppTheme.primary,
+        '1h ago',
+      ),
+      _NotifData(
+        'Savings Goal',
+        'You\'re 75% toward your Emergency Fund goal! 🎉',
+        Icons.savings_rounded,
+        AppTheme.success,
+        '3h ago',
+      ),
+      _NotifData(
+        'Loan Reminder',
+        'Your loan EMI of PKR 124,500 is due in 3 days.',
+        Icons.account_balance_rounded,
+        AppTheme.error,
+        '1d ago',
+      ),
+      _NotifData(
+        'New Welfare Program',
+        'A new welfare program matching your profile is available.',
+        Icons.volunteer_activism_rounded,
+        const Color(0xFFFF6B35),
+        '2d ago',
+      ),
     ];
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text('Notifications', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: Text(
+          'Notifications',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
         backgroundColor: AppTheme.background,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
@@ -27,14 +63,21 @@ class NotificationsPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () {},
-            child: Text('Mark all read', style: GoogleFonts.inter(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Mark all read',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
       body: ListView.separated(
         padding: const EdgeInsets.all(20),
         itemCount: notifications.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
         itemBuilder: (ctx, i) => _NotifCard(data: notifications[i]),
       ),
     );
@@ -83,12 +126,32 @@ class _NotifCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(data.title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                    Text(data.time, style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textSecondary)),
+                    Text(
+                      data.title,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      data.time,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(data.message, style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary, height: 1.4)),
+                Text(
+                  data.message,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
