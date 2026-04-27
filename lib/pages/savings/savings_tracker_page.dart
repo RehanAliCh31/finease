@@ -1,248 +1,358 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../services/auth_service.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
 import '../../models/saving_goal.dart';
+import '../../services/ai_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 
 class SavingsTrackerPage extends StatelessWidget {
   const SavingsTrackerPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
-    final firestoreService = authService.firestoreService;
-    
-    const Color primaryColor = Color(0xFF2E3192);
-    const Color accentColor = Color(0xFF1BFFFF);
-    const Color surfaceColor = Color(0xFFFBFBFE);
+    final firestoreService = context.watch<AuthService>().firestoreService;
+    const primaryColor = Color(0xFF2E3192);
+    const accentColor = Color(0xFF1BFFFF);
+
+    if (firestoreService == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
-      backgroundColor: surfaceColor,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          _buildSliverAppBar(primaryColor),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (firestoreService != null)
-                    StreamBuilder<List<SavingGoal>>(
-                      stream: firestoreService.getSavingGoals(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: Padding(
-                            padding: EdgeInsets.all(100.0),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ));
-                        }
-                        
-                        final goals = snapshot.data ?? [];
-                        
-                        if (goals.isEmpty) {
-                          return _buildEmptyState(context, firestoreService, primaryColor);
-                        }
+      backgroundColor: const Color(0xFFFBFBFE),
+      body: StreamBuilder<List<SavingGoal>>(
+        stream: firestoreService.getSavingGoals(),
+        builder: (context, snapshot) {
+          final goals = snapshot.data ?? const <SavingGoal>[];
+          final totalSaved = goals.fold<double>(
+            0,
+            (sum, goal) => sum + goal.currentAmount,
+          );
+          final totalTarget = goals.fold<double>(
+            0,
+            (sum, goal) => sum + goal.targetAmount,
+          );
+          final progress = totalTarget == 0 ? 0.0 : totalSaved / totalTarget;
+          final aiService = AIService();
 
-                        double totalTarget = goals.fold(0, (sum, g) => sum + g.targetAmount);
-                        double totalSaved = goals.fold(0, (sum, g) => sum + g.currentAmount);
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSummaryCard(totalSaved, totalTarget, primaryColor, accentColor),
-                            const SizedBox(height: 40),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Active Milestones', 
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF1A1A1A),
-                                  )),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: primaryColor.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text('${goals.length} active', 
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
-                                    )),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: goals.length,
-                              separatorBuilder: (context, index) => const SizedBox(height: 16),
-                              itemBuilder: (context, index) => _buildGoalCard(context, goals[index], primaryColor),
-                            ),
-                          ],
-                        );
-                      },
-                    )
-                  else
-                    _buildLoginRequired(context, primaryColor),
-                ],
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 150,
+                pinned: true,
+                backgroundColor: primaryColor,
+                flexibleSpace: FlexibleSpaceBar(
+                  titlePadding: const EdgeInsets.only(left: 20, bottom: 18),
+                  title: Text(
+                    'Savings Tracker',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(color: primaryColor),
+                      Positioned(
+                        right: -24,
+                        top: -24,
+                        child: Container(
+                          width: 160,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: accentColor.withValues(alpha: 0.12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _SummaryCard(
+                      totalSaved: totalSaved,
+                      totalTarget: totalTarget,
+                      progress: progress.clamp(0.0, 1.0),
+                    ),
+                    const SizedBox(height: 24),
+                    FutureBuilder<String>(
+                      future: aiService.getSavingsInsight(goals),
+                      builder: (context, snapshot) => _AdviceCard(
+                        title: 'AI Savings Suggestions',
+                        body:
+                            snapshot.data ??
+                            'Generating savings suggestions...',
+                        icon: Icons.auto_awesome_rounded,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FutureBuilder<String>(
+                      future: aiService.getInvestmentSuggestions(
+                        goals,
+                        totalSaved,
+                      ),
+                      builder: (context, snapshot) => _AdviceCard(
+                        title: 'AI Investment Opportunities',
+                        body:
+                            snapshot.data ??
+                            'Analyzing suitable opportunities...',
+                        icon: Icons.trending_up_rounded,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Your Goals',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF111827),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => _showGoalEditor(
+                            context,
+                            firestoreService: firestoreService,
+                          ),
+                          child: const Text('Add Goal'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (goals.isEmpty)
+                      _EmptyState(
+                        onPressed: () => _showGoalEditor(
+                          context,
+                          firestoreService: firestoreService,
+                        ),
+                      )
+                    else
+                      ...goals.map(
+                        (goal) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _GoalCard(goal: goal),
+                        ),
+                      ),
+                  ]),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () =>
+            _showGoalEditor(context, firestoreService: firestoreService),
+        backgroundColor: primaryColor,
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: Text(
+          'New Goal',
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.totalSaved,
+    required this.totalTarget,
+    required this.progress,
+  });
+
+  final double totalSaved;
+  final double totalTarget;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Saved across all goals',
+            style: GoogleFonts.inter(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '\$${totalSaved.toStringAsFixed(0)}',
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 36,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 18),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 10,
+              backgroundColor: Colors.white.withValues(alpha: 0.08),
+              color: const Color(0xFF1BFFFF),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '${(progress * 100).round()}% of \$${totalTarget.toStringAsFixed(0)} total targets funded.',
+            style: GoogleFonts.inter(
+              color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
         ],
       ),
-      floatingActionButton: firestoreService != null ? Container(
-        margin: const EdgeInsets.only(bottom: 90),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            )
-          ],
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () => _showAddGoalDialog(context, firestoreService, primaryColor),
-          backgroundColor: primaryColor,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          icon: const Icon(Icons.add_rounded, color: Colors.white),
-          label: Text('New Goal', 
-            style: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            )),
-        ),
-      ) : null,
     );
   }
+}
 
-  Widget _buildSliverAppBar(Color primary) {
-    return SliverAppBar(
-      expandedHeight: 140,
-      floating: false,
-      pinned: true,
-      backgroundColor: primary,
-      elevation: 0,
-      flexibleSpace: FlexibleSpaceBar(
-        centerTitle: false,
-        titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
-        title: Text('Savings', 
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            fontSize: 28,
-            color: Colors.white,
-          )),
-        background: Stack(
-          children: [
-            Container(color: primary),
-            Positioned(
-              right: -20,
-              top: -20,
-              child: Container(
-                width: 150,
-                height: 150,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.history_rounded, color: Colors.white),
-          onPressed: () {},
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
+class _AdviceCard extends StatelessWidget {
+  const _AdviceCard({
+    required this.title,
+    required this.body,
+    required this.icon,
+  });
 
-  Widget _buildSummaryCard(double current, double target, Color primary, Color accent) {
-    double progress = target > 0 ? (current / target).clamp(0.0, 1.0) : 0;
-    
+  final String title;
+  final String body;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: const Color(0xFF2E3192)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF475569),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-      padding: const EdgeInsets.all(28),
+    );
+  }
+}
+
+class _GoalCard extends StatelessWidget {
+  const _GoalCard({required this.goal});
+
+  final SavingGoal goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final firestoreService = context.read<AuthService>().firestoreService!;
+    final aiService = AIService();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('TOTAL SAVINGS', 
-                style: GoogleFonts.inter(
-                  color: Colors.grey[500],
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                )),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.auto_graph_rounded, color: accent, size: 18),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text('\$${current.toStringAsFixed(0)}', 
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
-              fontSize: 38,
-              fontWeight: FontWeight.w900,
-            )),
-          const SizedBox(height: 32),
-          Stack(
-            children: [
-              Container(
-                height: 10,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-              ),
-              AnimatedContainer(
-                duration: const Duration(seconds: 1),
-                curve: Curves.fastOutSlowIn,
-                height: 10,
-                width: 300 * progress, // Simplified for placeholder
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [accent, primary]),
-                  borderRadius: BorderRadius.circular(100),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withOpacity(0.4),
-                      blurRadius: 10,
-                    )
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      goal.title,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${goal.category} • ${goal.daysLeft} days left',
+                      style: GoogleFonts.inter(color: Colors.grey[600]),
+                    ),
                   ],
                 ),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    _showGoalEditor(
+                      context,
+                      firestoreService: firestoreService,
+                      existingGoal: goal,
+                    );
+                  } else if (value == 'delete') {
+                    await firestoreService.deleteSavingGoal(goal.id);
+                  } else if (value == 'contribute') {
+                    _showContributionDialog(context, firestoreService, goal);
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'contribute',
+                    child: Text('Add Contribution'),
+                  ),
+                  PopupMenuItem(value: 'edit', child: Text('Edit Goal')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete Goal')),
+                ],
               ),
             ],
           ),
@@ -250,247 +360,222 @@ class SavingsTrackerPage extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('${(progress * 100).toInt()}% completed', 
+              Text(
+                '\$${goal.currentAmount.toStringAsFixed(0)} saved',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF2E3192),
+                ),
+              ),
+              Text(
+                'Target \$${goal.targetAmount.toStringAsFixed(0)}',
                 style: GoogleFonts.inter(
-                  color: Colors.grey[400],
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                )),
-              Text('Target \$${target.toStringAsFixed(0)}', 
-                style: GoogleFonts.inter(
-                  color: Colors.grey[400],
-                  fontSize: 13,
-                )),
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF334155),
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: goal.progress,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFF1F5F9),
+              color: const Color(0xFF2E3192),
+            ),
+          ),
+          const SizedBox(height: 14),
+          FutureBuilder<String>(
+            future: aiService.getGoalImprovementTips(goal),
+            builder: (context, snapshot) => Text(
+              snapshot.data ?? 'Generating personalized goal suggestion...',
+              style: GoogleFonts.inter(
+                color: const Color(0xFF475569),
+                height: 1.45,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Recent contributions',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 12),
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: firestoreService.getContributions(goal.id),
+            builder: (context, snapshot) {
+              final contributions = snapshot.data ?? const [];
+              if (contributions.isEmpty) {
+                return Text(
+                  'No contributions yet. Add one to start tracking savings growth.',
+                  style: GoogleFonts.inter(color: Colors.grey[600]),
+                );
+              }
+
+              final monthlyGrowth = contributions.fold<double>(
+                0,
+                (sum, item) => sum + (item['amount'] as double? ?? 0),
+              );
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Savings growth: +\$${monthlyGrowth.toStringAsFixed(0)} from recent contributions',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF059669),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ...contributions
+                      .take(4)
+                      .map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEEF2FF),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.north_east_rounded,
+                                  color: Color(0xFF2E3192),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  DateFormat(
+                                    'MMM dd, yyyy',
+                                  ).format(item['date'] as DateTime),
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '+\$${(item['amount'] as double).toStringAsFixed(0)}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF059669),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildGoalCard(BuildContext context, SavingGoal goal, Color primary) {
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF1F1F1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(goal.category).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(goal.category),
-                    color: _getCategoryColor(goal.category),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(goal.title, 
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1A1A1A),
-                        )),
-                      const SizedBox(height: 4),
-                      Text(goal.category, 
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: Colors.grey[500],
-                        )),
-                    ],
-                  ),
-                ),
-                _buildDaysLeftBadge(goal.targetDate),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('SAVED', 
-                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.grey[400], letterSpacing: 1)),
-                    const SizedBox(height: 4),
-                    Text('\$${goal.currentAmount.toStringAsFixed(0)}', 
-                      style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: primary)),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('TARGET', 
-                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.grey[400], letterSpacing: 1)),
-                    const SizedBox(height: 4),
-                    Text('\$${goal.targetAmount.toStringAsFixed(0)}', 
-                      style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: const Color(0xFF1A1A1A))),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Stack(
-              children: [
-                Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F1F1),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                ),
-                FractionallySizedBox(
-                  widthFactor: goal.progress.clamp(0.0, 1.0),
-                  child: Container(
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: primary,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDaysLeftBadge(DateTime date) {
-    final days = date.difference(DateTime.now()).inDays;
-    final color = days < 30 ? Colors.orange : Colors.green;
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text('$days days left', 
-        style: GoogleFonts.inter(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context, dynamic firestoreService, Color primary) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 60),
-        child: Column(
-          children: [
-            Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                color: primary.withOpacity(0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.savings_outlined, size: 80, color: primary.withOpacity(0.2)),
-            ),
-            const SizedBox(height: 32),
-            Text('No goals set yet', 
-              style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 12),
-            Text('Set your first saving goal and start\nyour journey to wealth.', 
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(color: Colors.grey, fontSize: 16, height: 1.5)),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () => _showAddGoalDialog(context, firestoreService, primary),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: Text('Create Goal', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoginRequired(BuildContext context, Color primary) {
-    return Center(
       child: Column(
         children: [
-          const SizedBox(height: 100),
-          Icon(Icons.lock_outline_rounded, size: 64, color: primary.withOpacity(0.2)),
-          const SizedBox(height: 24),
-          Text('Login Required', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Icon(Icons.savings_rounded, size: 56, color: Color(0xFF2E3192)),
+          const SizedBox(height: 16),
+          Text(
+            'No savings goals yet',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Create a goal to track progress, contributions, AI savings tips, and investment-ready milestones.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(color: Colors.grey[600], height: 1.5),
+          ),
+          const SizedBox(height: 18),
+          ElevatedButton(
+            onPressed: onPressed,
+            child: const Text('Create Goal'),
+          ),
         ],
       ),
     );
   }
+}
 
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'travel': return Icons.flight_rounded;
-      case 'home': return Icons.home_rounded;
-      case 'car': return Icons.directions_car_rounded;
-      case 'emergency': return Icons.emergency_rounded;
-      case 'education': return Icons.school_rounded;
-      case 'gadget': return Icons.devices_rounded;
-      case 'shopping': return Icons.shopping_bag_rounded;
-      default: return Icons.savings_rounded;
-    }
-  }
+Future<void> _showGoalEditor(
+  BuildContext context, {
+  required FirestoreService firestoreService,
+  SavingGoal? existingGoal,
+}) async {
+  final titleController = TextEditingController(
+    text: existingGoal?.title ?? '',
+  );
+  final targetController = TextEditingController(
+    text: existingGoal?.targetAmount.toStringAsFixed(0) ?? '',
+  );
+  final currentController = TextEditingController(
+    text: existingGoal?.currentAmount.toStringAsFixed(0) ?? '0',
+  );
+  final dateController = TextEditingController(
+    text: existingGoal == null
+        ? DateFormat(
+            'yyyy-MM-dd',
+          ).format(DateTime.now().add(const Duration(days: 180)))
+        : DateFormat('yyyy-MM-dd').format(existingGoal.targetDate),
+  );
+  var category = existingGoal?.category ?? 'General';
+  final categories = [
+    'General',
+    'Emergency',
+    'Travel',
+    'Home',
+    'Education',
+    'Investment',
+    'Shopping',
+  ];
 
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'travel': return Colors.blue;
-      case 'home': return Colors.orange;
-      case 'car': return Colors.purple;
-      case 'emergency': return Colors.red;
-      case 'education': return Colors.indigo;
-      case 'gadget': return Colors.teal;
-      case 'shopping': return Colors.pink;
-      default: return const Color(0xFF2E3192);
-    }
-  }
-
-  void _showAddGoalDialog(BuildContext context, dynamic firestoreService, Color primary) {
-    final titleController = TextEditingController();
-    final targetController = TextEditingController();
-    String selectedCategory = 'General';
-    final categories = ['General', 'Travel', 'Home', 'Car', 'Emergency', 'Education', 'Gadget', 'Shopping'];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
           return Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-              left: 28,
-              right: 28,
-              top: 32,
+            padding: EdgeInsets.fromLTRB(
+              24,
+              20,
+              24,
+              MediaQuery.of(context).viewInsets.bottom + 24,
             ),
             decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -502,115 +587,142 @@ class SavingsTrackerPage extends StatelessWidget {
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                Text('Set New Goal', 
+                const SizedBox(height: 18),
+                Text(
+                  existingGoal == null ? 'Create Goal' : 'Edit Goal',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1A1A1A),
-                  )),
-                const SizedBox(height: 8),
-                Text('What are you saving for today?', 
-                  style: GoogleFonts.inter(color: Colors.grey, fontSize: 14)),
-                const SizedBox(height: 32),
-                _buildTextField(titleController, 'Goal Title', Icons.edit_rounded, primary),
-                const SizedBox(height: 20),
-                _buildTextField(targetController, 'Target Amount', Icons.attach_money_rounded, primary, isNumber: true),
-                const SizedBox(height: 24),
-                Text('Category', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: categories.map((cat) {
-                      bool isSelected = selectedCategory == cat;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: GestureDetector(
-                          onTap: () => setState(() => selectedCategory = cat),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: isSelected ? primary : Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: isSelected ? primary : const Color(0xFFF1F1F1)),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(cat, 
-                              style: GoogleFonts.inter(
-                                color: isSelected ? Colors.white : Colors.grey[700],
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                fontSize: 13,
-                              )),
-                          ),
-                        ),
-                      );
-                    }).toList(),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 18),
+                _field(titleController, 'Goal title'),
+                const SizedBox(height: 12),
+                _field(targetController, 'Target amount', isNumber: true),
+                const SizedBox(height: 12),
+                _field(currentController, 'Current savings', isNumber: true),
+                const SizedBox(height: 12),
+                _field(dateController, 'Target date (YYYY-MM-DD)'),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: categories.map((item) {
+                    final selected = item == category;
+                    return ChoiceChip(
+                      label: Text(item),
+                      selected: selected,
+                      onSelected: (_) => setModalState(() => category = item),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
-                  height: 60,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      elevation: 0,
-                    ),
                     onPressed: () async {
-                      if (firestoreService != null && titleController.text.isNotEmpty) {
-                        await firestoreService.addSavingGoal(SavingGoal(
-                          id: '',
-                          title: titleController.text,
-                          targetAmount: double.tryParse(targetController.text) ?? 0,
-                          currentAmount: 0,
-                          targetDate: DateTime.now().add(const Duration(days: 365)),
-                          category: selectedCategory,
-                        ));
+                      final targetDate =
+                          DateTime.tryParse(dateController.text.trim()) ??
+                          DateTime.now().add(const Duration(days: 180));
+                      final data = {
+                        'title': titleController.text.trim(),
+                        'targetAmount':
+                            double.tryParse(targetController.text.trim()) ?? 0,
+                        'currentAmount':
+                            double.tryParse(currentController.text.trim()) ?? 0,
+                        'targetDate': targetDate,
+                        'category': category,
+                      };
+
+                      if (existingGoal == null) {
+                        await firestoreService.addSavingGoal(
+                          SavingGoal(
+                            id: '',
+                            title: data['title']! as String,
+                            targetAmount: data['targetAmount']! as double,
+                            currentAmount: data['currentAmount']! as double,
+                            targetDate: data['targetDate']! as DateTime,
+                            category: data['category']! as String,
+                          ),
+                        );
+                      } else {
+                        await firestoreService
+                            .updateSavingGoal(existingGoal.id, {
+                              'title': data['title'],
+                              'targetAmount': data['targetAmount'],
+                              'currentAmount': data['currentAmount'],
+                              'targetDate': data['targetDate'],
+                              'category': data['category'],
+                            });
                       }
-                      if (context.mounted) Navigator.pop(context);
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                      }
                     },
-                    child: Text('Launch Goal', 
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      )),
+                    child: Text(
+                      existingGoal == null ? 'Save Goal' : 'Update Goal',
+                    ),
                   ),
                 ),
               ],
             ),
           );
-        }
-      ),
-    );
-  }
+        },
+      );
+    },
+  );
+}
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, Color primary, {bool isNumber = false}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBFBFE),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF1F1F1)),
-      ),
-      child: TextField(
+Future<void> _showContributionDialog(
+  BuildContext context,
+  FirestoreService firestoreService,
+  SavingGoal goal,
+) async {
+  final controller = TextEditingController();
+  await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Add contribution to ${goal.title}'),
+      content: TextField(
         controller: controller,
-        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-        style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 16),
-        decoration: InputDecoration(
-          hintText: label,
-          hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 16),
-          prefixIcon: Icon(icon, color: primary, size: 22),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        ),
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(labelText: 'Amount'),
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            await firestoreService.addContribution(
+              goal.id,
+              double.tryParse(controller.text.trim()) ?? 0,
+            );
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _field(
+  TextEditingController controller,
+  String label, {
+  bool isNumber = false,
+}) {
+  return TextField(
+    controller: controller,
+    keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+    decoration: InputDecoration(labelText: label),
+  );
 }

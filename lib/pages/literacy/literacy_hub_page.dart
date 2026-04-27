@@ -1,51 +1,101 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
-class LiteracyHubPage extends StatefulWidget {
+import '../../data/demo_finance_data.dart';
+import '../../models/lesson.dart';
+import '../../services/auth_service.dart';
+
+class LiteracyHubPage extends StatelessWidget {
   const LiteracyHubPage({super.key});
 
   @override
-  State<LiteracyHubPage> createState() => _LiteracyHubPageState();
-}
-
-class _LiteracyHubPageState extends State<LiteracyHubPage> {
-  final Color primaryColor = const Color(0xFF2E3192);
-  final Color secondaryColor = const Color(0xFF1BFFFF);
-  final Color darkColor = const Color(0xFF1A1A1A);
-  final Color cardColor = Colors.white;
-
-  @override
   Widget build(BuildContext context) {
+    final authService = context.watch<AuthService>();
+    final firestoreService = authService.firestoreService;
+    const primaryColor = Color(0xFF2E3192);
+    const secondaryColor = Color(0xFF1BFFFF);
+    const darkColor = Color(0xFF1A1A1A);
+
     return Scaffold(
       backgroundColor: const Color(0xFFFBFBFE),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildSliverAppBar(),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          SliverAppBar(
+            expandedHeight: 180,
+            pinned: true,
+            backgroundColor: primaryColor,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  _buildProgressDashboard(),
-                  const SizedBox(height: 40),
-                  _buildSectionHeader('Explore Topics', 'Broaden your knowledge'),
-                  const SizedBox(height: 20),
-                  _buildCategoryScroll(),
-                  const SizedBox(height: 40),
-                  _buildSectionHeader('Featured Course', 'Recommended for you'),
-                  const SizedBox(height: 20),
-                  _buildFeaturedCard(),
-                  const SizedBox(height: 40),
-                  _buildSectionHeader('Bite-sized Lessons', '5-10 min reads'),
-                  const SizedBox(height: 20),
-                  _buildLessonList(),
-                  const SizedBox(height: 40),
-                  _buildCommunityCard(),
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [primaryColor, Color(0xFF1B1B4D)],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: -50,
+                    top: -20,
+                    child: Container(
+                      width: 200,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: secondaryColor.withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Financial Literacy Hub',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Original courses, saved lesson progress, and working quizzes.',
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildOverviewCard(firestoreService),
+                const SizedBox(height: 28),
+                _buildCategoryRow(darkColor),
+                const SizedBox(height: 28),
+                ...DemoFinanceData.courses.map(
+                  (course) => Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: _CourseCard(course: course),
+                  ),
+                ),
+              ]),
             ),
           ),
         ],
@@ -53,347 +103,645 @@ class _LiteracyHubPageState extends State<LiteracyHubPage> {
     );
   }
 
-  Widget _buildSliverAppBar() {
-    return SliverAppBar(
-      expandedHeight: 180,
-      floating: false,
-      pinned: true,
-      backgroundColor: primaryColor,
-      elevation: 0,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [primaryColor, const Color(0xFF1B1B4D)],
-                ),
-              ),
+  Widget _buildOverviewCard(dynamic firestoreService) {
+    final totalLessons = DemoFinanceData.courses.fold<int>(
+      0,
+      (sum, course) => sum + course.lessons.length,
+    );
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: firestoreService == null
+          ? Future.value(const [])
+          : Future.wait(
+              DemoFinanceData.courses.map((course) async {
+                final progress = await firestoreService
+                    .getCourseProgress(course.id)
+                    .first;
+                final completedIds = List<String>.from(
+                  progress['completedLessonIds'] ?? const [],
+                );
+                return {
+                  'completed': completedIds.length,
+                  'xp': completedIds.length * 45,
+                };
+              }),
             ),
-            Positioned(
-              right: -50,
-              top: -20,
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: secondaryColor.withValues(alpha: 0.1),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context, snapshot) {
+        final values = snapshot.data ?? const [];
+        final completed = values.fold<int>(
+          0,
+          (sum, item) => sum + (item['completed'] as int? ?? 0),
+        );
+        final xp = values.fold<int>(
+          0,
+          (sum, item) => sum + (item['xp'] as int? ?? 0),
+        );
+        final progress = totalLessons == 0 ? 0.0 : completed / totalLessons;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF131525),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Financial Mastery',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'LEARNING PROGRESS',
+                        style: GoogleFonts.inter(
+                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${(progress * 100).round()}% complete',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 24,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Elevate your wealth with expert knowledge.',
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 16,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1BFFFF).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$xp XP',
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF1BFFFF),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 18),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 10,
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  color: const Color(0xFF1BFFFF),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '$completed of $totalLessons lessons completed across ${DemoFinanceData.courses.length} original courses.',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 14,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryRow(Color darkColor) {
+    final categories = DemoFinanceData.courses
+        .map((course) => course.category)
+        .toSet()
+        .toList();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories
+            .map(
+              (category) => Container(
+                margin: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFF1F1F1)),
+                ),
+                child: Text(
+                  category,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    color: darkColor,
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _CourseCard extends StatelessWidget {
+  const _CourseCard({required this.course});
+
+  final LessonCourse course;
+
+  @override
+  Widget build(BuildContext context) {
+    final firestoreService = context.watch<AuthService>().firestoreService;
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: firestoreService?.getCourseProgress(course.id),
+      builder: (context, progressSnapshot) {
+        final progress = progressSnapshot.data ?? const {};
+        final completedLessonIds = List<String>.from(
+          progress['completedLessonIds'] ?? const [],
+        );
+        final courseProgress = course.lessons.isEmpty
+            ? 0.0
+            : completedLessonIds.length / course.lessons.length;
+
+        return StreamBuilder<Map<String, dynamic>>(
+          stream: firestoreService?.getQuizScore(course.id, course.quiz.id),
+          builder: (context, quizSnapshot) {
+            final quizScore = quizSnapshot.data ?? const {};
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFF1F1F1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
+                    child: Image.network(
+                      course.coverImageUrl,
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEEF2FF),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                course.category,
+                                style: GoogleFonts.inter(
+                                  color: const Color(0xFF2E3192),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.star_rounded,
+                              color: Colors.amber[700],
+                              size: 18,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              course.rating.toStringAsFixed(1),
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          course.title,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1A1A1A),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          course.subtitle,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            color: Colors.grey[700],
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          course.description,
+                          style: GoogleFonts.inter(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: courseProgress,
+                            minHeight: 8,
+                            backgroundColor: const Color(0xFFF3F4F6),
+                            color: const Color(0xFF2E3192),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _StatPill(label: '${course.durationMinutes} min'),
+                            const SizedBox(width: 8),
+                            _StatPill(
+                              label: '${course.lessons.length} lessons',
+                            ),
+                            const SizedBox(width: 8),
+                            _StatPill(label: '${course.xpReward} XP'),
+                          ],
+                        ),
+                        if (quizScore.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Latest quiz score: ${quizScore['score'] ?? 0}/${quizScore['total'] ?? 0}',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF059669),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        ...course.lessons.map(
+                          (lesson) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _LessonTile(
+                              course: course,
+                              lesson: lesson,
+                              completed: completedLessonIds.contains(lesson.id),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: firestoreService == null
+                                ? null
+                                : () => showDialog(
+                                    context: context,
+                                    builder: (_) => _QuizDialog(course: course),
+                                  ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E3192),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: Text(
+                              'Take Quiz',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _LessonTile extends StatelessWidget {
+  const _LessonTile({
+    required this.course,
+    required this.lesson,
+    required this.completed,
+  });
+
+  final LessonCourse course;
+  final Lesson lesson;
+  final bool completed;
+
+  @override
+  Widget build(BuildContext context) {
+    final firestoreService = context.read<AuthService>().firestoreService;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFBFF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF2FF),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            DemoFinanceData.courseIcon(lesson.icon),
+            color: const Color(0xFF2E3192),
+          ),
+        ),
+        title: Text(
+          lesson.title,
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            lesson.description,
+            style: GoogleFonts.inter(height: 1.4),
+          ),
+        ),
+        trailing: Checkbox(
+          value: completed,
+          onChanged: firestoreService == null
+              ? null
+              : (value) async {
+                  await firestoreService.setLessonCompleted(
+                    course.id,
+                    lesson.id,
+                    value ?? false,
+                  );
+                },
+        ),
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _LessonDetailSheet(
+            course: course,
+            lesson: lesson,
+            completed: completed,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LessonDetailSheet extends StatelessWidget {
+  const _LessonDetailSheet({
+    required this.course,
+    required this.lesson,
+    required this.completed,
+  });
+
+  final LessonCourse course;
+  final Lesson lesson;
+  final bool completed;
+
+  @override
+  Widget build(BuildContext context) {
+    final firestoreService = context.read<AuthService>().firestoreService;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              lesson.title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              lesson.description,
+              style: GoogleFonts.inter(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              lesson.content,
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                height: 1.6,
+                color: const Color(0xFF334155),
+              ),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: firestoreService == null
+                    ? null
+                    : () async {
+                        await firestoreService.setLessonCompleted(
+                          course.id,
+                          lesson.id,
+                          !completed,
+                        );
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                child: Text(completed ? 'Mark Incomplete' : 'Mark Complete'),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuizDialog extends StatefulWidget {
+  const _QuizDialog({required this.course});
+
+  final LessonCourse course;
+
+  @override
+  State<_QuizDialog> createState() => _QuizDialogState();
+}
+
+class _QuizDialogState extends State<_QuizDialog> {
+  final Map<String, int> _answers = {};
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.course.quiz.title,
+        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+      ),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: widget.course.quiz.questions.map((question) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      question.prompt,
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 10),
+                    RadioGroup<int>(
+                      groupValue: _answers[question.id],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _answers[question.id] = value);
+                        }
+                      },
+                      child: Column(
+                        children: List.generate(question.options.length, (
+                          index,
+                        ) {
+                          return RadioListTile<int>(
+                            value: index,
+                            title: Text(
+                              question.options[index],
+                              style: GoogleFonts.inter(fontSize: 14),
+                            ),
+                            contentPadding: EdgeInsets.zero,
+                          );
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
       actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.search_rounded, color: Colors.white),
-              onPressed: () {},
-            ),
-          ),
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : _submitQuiz,
+          child: Text(_isSaving ? 'Saving...' : 'Submit Quiz'),
         ),
       ],
     );
   }
 
-  Widget _buildProgressDashboard() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: darkColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: darkColor.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
-        ],
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('LEARNING LEVEL', 
-                    style: GoogleFonts.inter(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
-                  const SizedBox(height: 4),
-                  Text('Executive', 
-                    style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: secondaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: secondaryColor.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.auto_awesome, color: secondaryColor, size: 14),
-                    const SizedBox(width: 6),
-                    Text('1,240 XP', style: GoogleFonts.inter(color: secondaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Stack(
-            children: [
-              Container(
-                height: 8,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-              ),
-              FractionallySizedBox(
-                widthFactor: 0.7,
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [secondaryColor, primaryColor]),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('70% to Level 5', style: GoogleFonts.inter(color: Colors.grey, fontSize: 12)),
-              Text('Next: Visionary', style: GoogleFonts.inter(color: Colors.grey, fontSize: 12)),
-            ],
-          ),
-        ],
-      ),
+  Future<void> _submitQuiz() async {
+    final firestoreService = context.read<AuthService>().firestoreService;
+    if (firestoreService == null) {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    var score = 0;
+    for (final question in widget.course.quiz.questions) {
+      if (_answers[question.id] == question.correctIndex) {
+        score++;
+      }
+    }
+
+    await firestoreService.saveQuizSubmission(
+      widget.course.id,
+      widget.course.quiz.id,
+      score,
+      widget.course.quiz.questions.length,
+      _answers,
     );
-  }
 
-  Widget _buildSectionHeader(String title, String subtitle) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, 
-          style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: darkColor)),
-        const SizedBox(height: 4),
-        Text(subtitle, 
-          style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[600])),
-      ],
-    );
-  }
-
-  Widget _buildCategoryScroll() {
-    final categories = [
-      {'name': 'Investing', 'icon': Icons.trending_up, 'color': const Color(0xFFE8F5E9)},
-      {'name': 'Crypto', 'icon': Icons.currency_bitcoin, 'color': const Color(0xFFFFF3E0)},
-      {'name': 'Real Estate', 'icon': Icons.home_work_rounded, 'color': const Color(0xFFE3F2FD)},
-      {'name': 'Taxes', 'icon': Icons.receipt_long, 'color': const Color(0xFFF3E5F5)},
-    ];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: categories.map((cat) {
-          return Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cat['color'] as Color,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              children: [
-                Icon(cat['icon'] as IconData, color: darkColor.withOpacity(0.7)),
-                const SizedBox(height: 12),
-                Text(cat['name'] as String, 
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: darkColor)),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildFeaturedCard() {
-    return Container(
-      height: 240,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        image: const DecorationImage(
-          image: NetworkImage('https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=800&auto=format&fit=crop'),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [
-              Colors.black.withOpacity(0.9),
-              Colors.transparent,
-            ],
+    if (mounted) {
+      Navigator.pop(context);
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Quiz Saved'),
+          content: Text(
+            'You scored $score/${widget.course.quiz.questions.length}.',
           ),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: secondaryColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text('NEW', 
-                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.black)),
-            ),
-            const SizedBox(height: 12),
-            Text('Advanced Portfolio Diversification', 
-              style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 16),
-                const SizedBox(width: 4),
-                Text('4.9 (1.2k reviews)', style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
-                const Spacer(),
-                Text('45 min', style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
-              ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
             ),
           ],
         ),
-      ),
-    );
+      );
+    }
   }
+}
 
-  Widget _buildLessonList() {
-    return Column(
-      children: [
-        _buildLessonItem('The 50/30/20 Rule', 'Budgeting basics', '8 min', Icons.pie_chart_rounded),
-        const SizedBox(height: 16),
-        _buildLessonItem('Understanding ETFs', 'Investment vehicles', '12 min', Icons.layers_rounded),
-        const SizedBox(height: 16),
-        _buildLessonItem('Credit Score Secrets', 'Debt management', '10 min', Icons.credit_score_rounded),
-      ],
-    );
-  }
+class _StatPill extends StatelessWidget {
+  const _StatPill({required this.label});
 
-  Widget _buildLessonItem(String title, String category, String time, IconData icon) {
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF1F1F1)),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: primaryColor, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16, color: darkColor)),
-                Text('$category • $time', style: GoogleFonts.inter(color: Colors.grey, fontSize: 13)),
-              ],
-            ),
-          ),
-          Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey[300], size: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommunityCard() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [primaryColor, const Color(0xFF6A11CB)]),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          const Icon(Icons.groups_rounded, color: Colors.white, size: 40),
-          const SizedBox(height: 16),
-          Text('Join the FinEase Circle', 
-            style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('Connect with 10k+ learners and experts.', 
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(color: Colors.white.withOpacity(0.8), fontSize: 14)),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            child: Text('Enter Community', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-          ),
-        ],
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          color: const Color(0xFF334155),
+        ),
       ),
     );
   }
