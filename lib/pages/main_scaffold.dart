@@ -24,20 +24,13 @@ class _MainScaffoldState extends State<MainScaffold> {
     ProfilePage(),
   ];
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
+  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: _buildPremiumNavBar(),
     );
   }
@@ -52,15 +45,13 @@ class _MainScaffoldState extends State<MainScaffold> {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: Colors.white.withOpacity(0.3),
-                width: 1.5,
-              ),
+                  color: Colors.white.withValues(alpha: 0.3), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF2E3192).withOpacity(0.08),
+                  color: const Color(0xFF2E3192).withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -84,7 +75,9 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _selectedIndex == index;
-    final color = isSelected ? const Color(0xFF2E3192) : const Color(0xFF94A3B8);
+    final color = isSelected
+        ? const Color(0xFF2E3192)
+        : const Color(0xFF94A3B8);
 
     return GestureDetector(
       onTap: () => _onItemTapped(index),
@@ -94,24 +87,23 @@ class _MainScaffoldState extends State<MainScaffold> {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2E3192).withOpacity(0.08) : Colors.transparent,
+          color: isSelected
+              ? const Color(0xFF2E3192).withValues(alpha: 0.08)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 26,
-            ),
+            Icon(icon, color: color, size: 26),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 color: color,
                 fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight:
+                    isSelected ? FontWeight.w700 : FontWeight.w500,
                 fontFamily: 'Plus Jakarta Sans',
               ),
             ),
