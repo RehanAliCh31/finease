@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#d3e4fe",
+                    "surface-container-high": "#dce9ff",
+                    "on-tertiary": "#ffffff",
+                    "secondary": "#006a66",
+                    "on-secondary-container": "#00716d",
+                    "primary": "#15157d",
+                    "surface-container-low": "#eff4ff",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#d3e4fe",
+                    "on-secondary-fixed": "#00201e",
+                    "secondary-container": "#29fcf3",
+                    "error-container": "#ffdad6",
+                    "outline": "#777683",
+                    "background": "#f8f9ff",
+                    "on-tertiary-container": "#f19160",
+                    "on-secondary-fixed-variant": "#00504d",
+                    "inverse-primary": "#c0c1ff",
+                    "surface": "#f8f9ff",
+                    "surface-bright": "#f8f9ff",
+                    "on-tertiary-fixed": "#341100",
+                    "on-tertiary-fixed-variant": "#773207",
+                    "tertiary-fixed": "#ffdbcb",
+                    "tertiary-fixed-dim": "#ffb692",
+                    "tertiary-container": "#6c2a00",
+                    "primary-container": "#2e3192",
+                    "primary-fixed": "#e1e0ff",
+                    "surface-tint": "#4f54b4",
+                    "on-surface-variant": "#464652",
+                    "outline-variant": "#c7c5d4",
+                    "on-secondary": "#ffffff",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-error-container": "#93000a",
+                    "inverse-surface": "#213145",
+                    "error": "#ba1a1a",
+                    "on-surface": "#0b1c30",
+                    "on-primary-fixed": "#04006d",
+                    "on-error": "#ffffff",
+                    "primary-fixed-dim": "#c0c1ff",
+                    "on-primary-fixed-variant": "#373a9b",
+                    "on-primary-container": "#9da1ff",
+                    "on-background": "#0b1c30",
+                    "tertiary": "#491a00",
+                    "secondary-fixed-dim": "#00ddd6",
+                    "secondary-fixed": "#29fcf3",
+                    "surface-dim": "#cbdbf5",
+                    "surface-container": "#e5eeff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "8px",
+                    "margin": "20px",
+                    "sm": "16px",
+                    "md": "24px",
+                    "gutter": "16px",
+                    "lg": "32px",
+                    "xl": "48px",
+                    "base": "4px"
+            },
+            "fontFamily": {
+                    "caption-xs": ["Inter"],
+                    "headline-md": ["Plus Jakarta Sans"],
+                    "label-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "title-sm": ["Plus Jakarta Sans"],
+                    "display-lg": ["Plus Jakarta Sans"]
+            },
+            "fontSize": {
+                    "caption-xs": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                    "headline-md": ["32px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "label-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "title-sm": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-mesh {
+            background-color: #f8f9ff;
+            background-image: radial-gradient(at 0% 0%, rgba(46, 49, 146, 0.05) 0px, transparent 50%),
+                              radial-gradient(at 100% 0%, rgba(41, 252, 243, 0.05) 0px, transparent 50%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="sticky top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm shadow-indigo-900/5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container border border-outline-variant">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Close-up professional portrait of a smiling young man in a light blue shirt with soft studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1GpIEVcQbxP7TuLU-q6pPtmn1eIVBDA6MP9I_w8b8ZpnTJ4JsCmOrk-zzPjIBdI6Bp3xv929f59iYannGT2819Ep-2OXS7uMcEM9OjvS34kSE4aUPx7XvjKArtjK0r-MSb_0VOL2_4-N4Mgr3zo3m1y5cieuw8S_FdTo5c3DtDpo4Wop9yAWz3uiu7fa4WqtiaCb4n7ZuSg_si3wgyWikcOPfU3Z4nNsZO9mKlkD0wT5_2v_cjPwTPevXY0oLjadkKm1JnL9c_I6I"/>
+</div>
+<h1 class="text-xl font-bold text-indigo-900 font-headline-md tracking-tight">FinEdge</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-50 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<main class="max-w-5xl mx-auto px-margin pt-md flex flex-col gap-lg bg-mesh">
+<!-- Hero: Points & Level -->
+<section class="relative overflow-hidden bg-primary-container rounded-xl p-lg text-on-primary-container shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-md">
+<div class="relative z-10 flex flex-col gap-xs">
+<span class="text-on-primary-container/80 font-label-sm uppercase tracking-widest">Current Balance</span>
+<div class="flex items-baseline gap-xs">
+<span class="font-display-lg text-white">12,450</span>
+<span class="font-title-sm text-secondary-fixed">PTS</span>
+</div>
+<div class="flex items-center gap-sm mt-xs">
+<div class="px-sm py-base bg-white/10 rounded-full flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-label-sm">Gold Member</span>
+</div>
+<span class="font-caption-xs text-white/60">Top 5% this month</span>
+</div>
+</div>
+<div class="relative z-10 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-md w-full md:max-w-xs">
+<div class="flex justify-between items-end mb-xs">
+<span class="font-label-sm text-white">Level 14</span>
+<span class="font-caption-xs text-white/60">1,550 pts to Level 15</span>
+</div>
+<div class="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+<div class="h-full bg-secondary-fixed shadow-[0_0_15px_rgba(41,252,243,0.5)]" style="width: 72%"></div>
+</div>
+<div class="mt-sm flex justify-between">
+<span class="text-xs text-white/40">10k</span>
+<span class="text-xs text-white/40">15k</span>
+</div>
+</div>
+<!-- Background Decoration -->
+<div class="absolute -right-16 -top-16 w-64 h-64 bg-secondary/20 rounded-full blur-3xl"></div>
+<div class="absolute -left-16 -bottom-16 w-48 h-48 bg-primary/40 rounded-full blur-3xl"></div>
+</section>
+<!-- Bento Grid: Challenges & Badges -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-md">
+<!-- Daily Missions -->
+<div class="md:col-span-7 flex flex-col gap-md">
+<div class="flex justify-between items-center px-base">
+<h2 class="font-title-sm text-indigo-900">Active Challenges</h2>
+<button class="text-primary font-label-sm hover:underline">View All</button>
+</div>
+<div class="space-y-sm">
+<!-- Challenge Item -->
+<div class="bg-surface-container-lowest border border-slate-200 p-md rounded-xl flex items-center justify-between hover:shadow-md transition-shadow group">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+</div>
+<div>
+<h3 class="font-label-sm text-indigo-900">Complete a lesson</h3>
+<p class="text-caption-xs text-slate-500">Read 'The Art of Compound Interest'</p>
+</div>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="text-secondary font-bold font-label-sm">+250 PTS</span>
+<button class="px-sm py-1 bg-primary text-white text-xs rounded-full font-bold">Start</button>
+</div>
+</div>
+<!-- Challenge Item -->
+<div class="bg-surface-container-lowest border border-slate-200 p-md rounded-xl flex items-center justify-between hover:shadow-md transition-shadow group">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined" data-icon="savings">savings</span>
+</div>
+<div>
+<h3 class="font-label-sm text-indigo-900">Weekly Saver</h3>
+<p class="text-caption-xs text-slate-500">Deposit at least $10 to your vault</p>
+</div>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="text-secondary font-bold font-label-sm">+500 PTS</span>
+<div class="w-24 h-1 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-secondary" style="width: 40%"></div>
+</div>
+</div>
+</div>
+<!-- Challenge Item -->
+<div class="bg-surface-container-lowest border border-slate-200 p-md rounded-xl flex items-center justify-between hover:shadow-md transition-shadow group opacity-70">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-lg bg-secondary text-white flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div>
+<h3 class="font-label-sm text-indigo-900">Daily Login</h3>
+<p class="text-caption-xs text-slate-500">Come back tomorrow for your streak</p>
+</div>
+</div>
+<span class="text-slate-400 font-label-sm">Claimed</span>
+</div>
+</div>
+</div>
+<!-- Achievement Badges -->
+<div class="md:col-span-5 bg-surface-container-low/50 border border-indigo-100 rounded-xl p-md flex flex-col gap-md">
+<div class="flex justify-between items-center">
+<h2 class="font-title-sm text-indigo-900">Milestones</h2>
+<span class="text-caption-xs font-bold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded">8 / 24</span>
+</div>
+<div class="grid grid-cols-3 gap-md">
+<!-- Badge -->
+<div class="flex flex-col items-center gap-xs text-center group cursor-pointer">
+<div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-100 to-white border-2 border-indigo-200 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-indigo-900 text-3xl" data-icon="account_balance">account_balance</span>
+</div>
+<span class="font-caption-xs font-bold text-indigo-900 leading-tight">Budget Master</span>
+</div>
+<!-- Badge -->
+<div class="flex flex-col items-center gap-xs text-center group cursor-pointer">
+<div class="w-16 h-16 rounded-full bg-gradient-to-br from-secondary-container/20 to-white border-2 border-secondary-container flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-secondary text-3xl" data-icon="rocket_launch">rocket_launch</span>
+</div>
+<span class="font-caption-xs font-bold text-indigo-900 leading-tight">Early Saver</span>
+</div>
+<!-- Badge -->
+<div class="flex flex-col items-center gap-xs text-center group cursor-pointer">
+<div class="w-16 h-16 rounded-full bg-gradient-to-br from-orange-100 to-white border-2 border-orange-200 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-orange-600 text-3xl" data-icon="local_fire_department">local_fire_department</span>
+</div>
+<span class="font-caption-xs font-bold text-indigo-900 leading-tight">7-Day Streak</span>
+</div>
+<!-- Locked Badge -->
+<div class="flex flex-col items-center gap-xs text-center opacity-40">
+<div class="w-16 h-16 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400 text-3xl" data-icon="lock">lock</span>
+</div>
+<span class="font-caption-xs font-bold text-slate-500 leading-tight">Investor</span>
+</div>
+<!-- Locked Badge -->
+<div class="flex flex-col items-center gap-xs text-center opacity-40">
+<div class="w-16 h-16 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400 text-3xl" data-icon="workspace_premium">workspace_premium</span>
+</div>
+<span class="font-caption-xs font-bold text-slate-500 leading-tight">Whale</span>
+</div>
+<!-- Locked Badge -->
+<div class="flex flex-col items-center gap-xs text-center opacity-40">
+<div class="w-16 h-16 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400 text-3xl" data-icon="diamond">diamond</span>
+</div>
+<span class="font-caption-xs font-bold text-slate-500 leading-tight">Elite</span>
+</div>
+</div>
+<div class="mt-auto pt-md border-t border-indigo-100">
+<p class="text-caption-xs text-slate-500 text-center italic">"Consistency is the key to financial freedom."</p>
+</div>
+</div>
+</div>
+<!-- Rewards Marketplace Teaser -->
+<section class="bg-surface-container-highest/30 border border-surface-variant rounded-xl overflow-hidden p-md flex flex-col md:flex-row items-center gap-md">
+<div class="w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-white rounded-lg p-2 shadow-sm border border-slate-200 overflow-hidden">
+<img alt="Gift card visual" class="w-full h-full object-cover rounded" data-alt="Wrapped gift box with elegant blue ribbon on a clean white surface with soft shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9AF-4r2HOpPN3UBA0sotE263Y7-5J5s0KZQv1wE3XHNCqnxsa8C_P2ozuUvNJVjLktsYBN2b9eKcNvxUZqhwAbgoQyxzXgB5llAHjnTF8e2r3Tl87iLdfYp9HGOaNOz0EikNKKOclZOwKozjo-f1fv77Tw2aUW9S09_-ND8OoLL9NfN0QNFQYQIKBx_qwMsRbt1GURmxDWHAoLa_2mbd7IJt-pmrb1K72fIV4Lh-YdwqFuSTLLi5yhw-6Q8fSeMVtAtg9Hn7NpP8r"/>
+</div>
+<div class="flex-grow text-center md:text-left">
+<h3 class="font-title-sm text-indigo-900">Exchange Points for Perks</h3>
+<p class="text-body-md text-slate-600 mt-base">Convert your hard-earned points into gift cards, fee-free months, or charity donations.</p>
+</div>
+<button class="w-full md:w-auto px-lg py-sm bg-primary text-white rounded-lg font-bold hover:bg-indigo-800 transition-colors active:scale-95">
+                Go to Market
+            </button>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-2 pb-safe bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(46,49,146,0.05)]">
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-1.5 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="text-[11px] font-medium font-sans">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-indigo-50 text-indigo-900 rounded-2xl px-4 py-1.5 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="workspace_premium">workspace_premium</span>
+<span class="text-[11px] font-medium font-sans">Rewards</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-1.5 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+<span class="text-[11px] font-medium font-sans">Market</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-1.5 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="admin_panel_settings">admin_panel_settings</span>
+<span class="text-[11px] font-medium font-sans">Admin</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-1.5 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[11px] font-medium font-sans">Profile</span>
+</a>
+</nav>
+</body></html>
