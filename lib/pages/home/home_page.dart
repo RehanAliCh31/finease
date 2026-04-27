@@ -9,18 +9,23 @@ import '../chatbot/chatbot_page.dart';
 import '../loans/loan_simulator_page.dart';
 import '../welfare/welfare_programs_page.dart';
 import '../forum/community_forum_page.dart';
+import '../rewards_screen.dart';
+import '../marketplace_screen.dart';
+import '../admin/admin_dashboard_screen.dart';
+import '../user_profile_screen.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
-  final String _profileImageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuBPLeW6cibJTqudsCzS2Ql69cVkmZpts5-djYjsJ2pmGffAh8kSWY0QTpHIUiTj-1yim0D9OqG_lQFpvcLx-Ob4XpAOsBrv24TSvAVUz8LAiW6f4IdM2L8xG3dNn9Dy-DQshp-mJrd2TjnobaPHzNKqR7jQ5S05IFcP2bDC51dtw6ne35dpjAjiclWqrJGU7dpKOX8d__S86OE5LwJupNraYqI3NPI19BqwM-hePGywFAC51DrH6DVN0wKKN7qSq-jMeMzJPcr7-AbO";
+  final String _profileImageUrl =
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBPLeW6cibJTqudsCzS2Ql69cVkmZpts5-djYjsJ2pmGffAh8kSWY0QTpHIUiTj-1yim0D9OqG_lQFpvcLx-Ob4XpAOsBrv24TSvAVUz8LAiW6f4IdM2L8xG3dNn9Dy-DQshp-mJrd2TjnobaPHzNKqR7jQ5S05IFcP2bDC51dtw6ne35dpjAjiclWqrJGU7dpKOX8d__S86OE5LwJupNraYqI3NPI19BqwM-hePGywFAC51DrH6DVN0wKKN7qSq-jMeMzJPcr7-AbO";
 
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final firestoreService = authService.firestoreService;
     final theme = Theme.of(context);
-    
+
     const Color primaryColor = Color(0xFF2E3192);
     const Color secondaryColor = Color(0xFF1BFFFF);
     const Color surfaceColor = Color(0xFFF8F9FF);
@@ -40,6 +45,10 @@ class HomePage extends StatelessWidget {
                   _buildBalanceCard(context, primaryColor, secondaryColor),
                   const SizedBox(height: 32),
                   _buildQuickActions(context),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader('FinEdge Hub', () {}),
+                  const SizedBox(height: 16),
+                  _buildFinEdgeActions(context),
                   const SizedBox(height: 32),
                   _buildSectionHeader('Recent Transactions', () {}),
                   const SizedBox(height: 16),
@@ -47,14 +56,18 @@ class HomePage extends StatelessWidget {
                     StreamBuilder<List<FinancialTransaction>>(
                       stream: firestoreService.getTransactions(),
                       builder: (context, snapshot) {
-                        if (snapshot.hasError) return Text('Error: ${snapshot.error}');
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: Padding(
-                            padding: EdgeInsets.all(20.0),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ));
+                        if (snapshot.hasError)
+                          return Text('Error: ${snapshot.error}');
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
                         }
-                        
+
                         final transactions = snapshot.data ?? [];
                         if (transactions.isEmpty) {
                           return _buildEmptyState();
@@ -66,7 +79,10 @@ class HomePage extends StatelessWidget {
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: transactions.length,
                           itemBuilder: (context, index) {
-                            return _buildTransactionItem(transactions[index], theme);
+                            return _buildTransactionItem(
+                              transactions[index],
+                              theme,
+                            );
                           },
                         );
                       },
@@ -86,7 +102,9 @@ class HomePage extends StatelessWidget {
           onPressed: () => _showAddTransactionDialog(context, firestoreService),
           backgroundColor: primaryColor,
           elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
         ),
       ),
@@ -113,7 +131,7 @@ class HomePage extends StatelessWidget {
                         color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
-                      )
+                      ),
                     ],
                   ),
                   child: ClipRRect(
@@ -153,7 +171,10 @@ class HomePage extends StatelessWidget {
               ),
               child: IconButton(
                 onPressed: () {},
-                icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F172A)),
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Color(0xFF0F172A),
+                ),
                 visualDensity: VisualDensity.compact,
               ),
             ),
@@ -163,7 +184,11 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildBalanceCard(BuildContext context, Color primaryColor, Color secondaryColor) {
+  Widget _buildBalanceCard(
+    BuildContext context,
+    Color primaryColor,
+    Color secondaryColor,
+  ) {
     return Container(
       height: 200,
       width: double.infinity,
@@ -228,9 +253,21 @@ class HomePage extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildBalanceStat('Income', '+\$4,250.00', const Color(0xFF10B981)),
-                    Container(width: 1, height: 24, color: Colors.white.withValues(alpha: 0.2)),
-                    _buildBalanceStat('Expenses', '-\$1,120.00', Colors.orangeAccent),
+                    _buildBalanceStat(
+                      'Income',
+                      '+\$4,250.00',
+                      const Color(0xFF10B981),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 24,
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                    _buildBalanceStat(
+                      'Expenses',
+                      '-\$1,120.00',
+                      Colors.orangeAccent,
+                    ),
                   ],
                 ),
               ],
@@ -270,23 +307,133 @@ class HomePage extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildActionItem(Icons.auto_awesome, 'FinEase AI', const Color(0xFFEEF2FF), const Color(0xFF4F46E5), () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatbotPage()));
-        }),
-        _buildActionItem(Icons.calculate_rounded, 'Loans', const Color(0xFFECFDF5), const Color(0xFF059669), () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const LoanSimulatorPage()));
-        }),
-        _buildActionItem(Icons.volunteer_activism_rounded, 'Welfare', const Color(0xFFFFF7ED), const Color(0xFFD97706), () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const WelfareProgramsPage()));
-        }),
-        _buildActionItem(Icons.forum_rounded, 'Forum', const Color(0xFFF1F5F9), const Color(0xFF475569), () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityForumPage()));
-        }),
+        _buildActionItem(
+          Icons.auto_awesome,
+          'FinEase AI',
+          const Color(0xFFEEF2FF),
+          const Color(0xFF4F46E5),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ChatbotPage()),
+            );
+          },
+        ),
+        _buildActionItem(
+          Icons.calculate_rounded,
+          'Loans',
+          const Color(0xFFECFDF5),
+          const Color(0xFF059669),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const LoanSimulatorPage(),
+              ),
+            );
+          },
+        ),
+        _buildActionItem(
+          Icons.volunteer_activism_rounded,
+          'Welfare',
+          const Color(0xFFFFF7ED),
+          const Color(0xFFD97706),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const WelfareProgramsPage(),
+              ),
+            );
+          },
+        ),
+        _buildActionItem(
+          Icons.forum_rounded,
+          'Forum',
+          const Color(0xFFF1F5F9),
+          const Color(0xFF475569),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CommunityForumPage(),
+              ),
+            );
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildActionItem(IconData icon, String label, Color bgColor, Color iconColor, VoidCallback onTap) {
+  Widget _buildFinEdgeActions(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildActionItem(
+          Icons.workspace_premium_rounded,
+          'Rewards',
+          const Color(0xFFF8F9FF),
+          const Color(0xFF2E3192),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RewardsScreen()),
+            );
+          },
+        ),
+        _buildActionItem(
+          Icons.storefront_rounded,
+          'Market',
+          const Color(0xFFECFDF5),
+          const Color(0xFF006A66),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MarketplaceScreen(),
+              ),
+            );
+          },
+        ),
+        _buildActionItem(
+          Icons.admin_panel_settings_rounded,
+          'Admin',
+          const Color(0xFFFFF1F2),
+          const Color(0xFFBA1A1A),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminDashboardScreen(),
+              ),
+            );
+          },
+        ),
+        _buildActionItem(
+          Icons.person_rounded,
+          'Profile',
+          const Color(0xFFEEF2FF),
+          const Color(0xFF4F54B4),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const UserProfileScreen(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionItem(
+    IconData icon,
+    String label,
+    Color bgColor,
+    Color iconColor,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -303,7 +450,7 @@ class HomePage extends StatelessWidget {
                   color: iconColor.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
-                )
+                ),
               ],
             ),
             child: Icon(icon, color: iconColor, size: 28),
@@ -351,8 +498,12 @@ class HomePage extends StatelessWidget {
 
   Widget _buildTransactionItem(FinancialTransaction t, ThemeData theme) {
     final isIncome = t.type == 'income';
-    final amountColor = isIncome ? const Color(0xFF059669) : const Color(0xFFE11D48);
-    final bgColor = isIncome ? const Color(0xFFECFDF5) : const Color(0xFFFFF1F2);
+    final amountColor = isIncome
+        ? const Color(0xFF059669)
+        : const Color(0xFFE11D48);
+    final bgColor = isIncome
+        ? const Color(0xFFECFDF5)
+        : const Color(0xFFFFF1F2);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -366,7 +517,7 @@ class HomePage extends StatelessWidget {
             color: Colors.black.withOpacity(0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Row(
@@ -379,7 +530,9 @@ class HomePage extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
-              isIncome ? Icons.keyboard_double_arrow_down_rounded : Icons.keyboard_double_arrow_up_rounded,
+              isIncome
+                  ? Icons.keyboard_double_arrow_down_rounded
+                  : Icons.keyboard_double_arrow_up_rounded,
               color: amountColor,
               size: 24,
             ),
@@ -442,7 +595,10 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  void _showAddTransactionDialog(BuildContext context, dynamic firestoreService) {
+  void _showAddTransactionDialog(
+    BuildContext context,
+    dynamic firestoreService,
+  ) {
     final titleController = TextEditingController();
     final amountController = TextEditingController();
     String type = 'expense';
@@ -547,26 +703,33 @@ class HomePage extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () async {
                     if (firestoreService != null) {
-                      await firestoreService.addTransaction(FinancialTransaction(
-                        id: '',
-                        title: titleController.text,
-                        amount: double.tryParse(amountController.text) ?? 0,
-                        date: DateTime.now(),
-                        category: 'General',
-                        type: type,
-                      ));
+                      await firestoreService.addTransaction(
+                        FinancialTransaction(
+                          id: '',
+                          title: titleController.text,
+                          amount: double.tryParse(amountController.text) ?? 0,
+                          date: DateTime.now(),
+                          category: 'General',
+                          type: type,
+                        ),
+                      );
                     }
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2E3192),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     elevation: 0,
                   ),
                   child: Text(
                     'Add Transaction',
-                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -577,7 +740,12 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildTypeButton(String label, bool isSelected, Color color, VoidCallback onTap) {
+  Widget _buildTypeButton(
+    String label,
+    bool isSelected,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
