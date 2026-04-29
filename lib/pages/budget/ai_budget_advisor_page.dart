@@ -433,7 +433,7 @@ class _SectionTitle extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        if (action != null) action!,
+        action ?? const SizedBox.shrink(),
       ],
     );
   }

@@ -35,6 +35,8 @@ class _LoanSimulatorPageState extends State<LoanSimulatorPage> {
 
   double get _totalInterest => (_emi * _tenure) - _amount;
   double get _totalPayment => _emi * _tenure;
+  double get _recommendedIncome => _emi / 0.3;
+  double get _loanToCostRatio => _totalPayment / _amount;
 
   Future<void> _getAIInsight() async {
     setState(() {
@@ -147,6 +149,28 @@ Give 3 concise bullet points in PKR.''';
               ),
             ),
             const SizedBox(height: 24),
+            _SimCard(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _miniMetric(
+                      'Suggested income',
+                      CurrencyUtils.format(_recommendedIncome, compact: true),
+                      AppTheme.success,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _miniMetric(
+                      'Total cost ratio',
+                      '${_loanToCostRatio.toStringAsFixed(2)}x',
+                      AppTheme.warning,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             _SimCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,6 +391,11 @@ Give 3 concise bullet points in PKR.''';
                     CurrencyUtils.format(_totalPayment),
                     highlight: true,
                   ),
+                  _row(
+                    context,
+                    'Suggested Monthly Income',
+                    CurrencyUtils.format(_recommendedIncome),
+                  ),
                 ],
               ),
             ),
@@ -477,6 +506,36 @@ Give 3 concise bullet points in PKR.''';
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: highlight ? AppTheme.primary : AppTheme.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniMetric(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: color,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],

@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import '../../data/demo_finance_data.dart';
 import '../../models/saving_goal.dart';
 import '../../models/transaction.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
+import '../budget/ai_budget_advisor_page.dart';
+import '../chatbot/chatbot_page.dart';
 import '../forum/community_forum_page.dart';
 import '../literacy/literacy_hub_page.dart';
+import '../loans/loan_simulator_page.dart';
+import '../marketplace/marketplace_screen.dart';
 import '../notifications/notifications_page.dart';
-import '../rewards/rewards_screen.dart';
 import '../savings/savings_tracker_page.dart';
 import '../transactions/add_transaction_page.dart';
 import '../transactions/all_transactions_page.dart';
@@ -25,10 +27,6 @@ class HomePage extends StatelessWidget {
     final authService = context.watch<AuthService>();
     final firestoreService = authService.firestoreService;
     final user = authService.user;
-    final displayName =
-        user?.displayName?.split(' ').first ??
-        user?.email?.split('@').first ??
-        'User';
     final photoUrl = user?.photoURL;
 
     return Scaffold(
@@ -41,7 +39,7 @@ class HomePage extends StatelessWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: _TopBar(displayName: displayName, photoUrl: photoUrl),
+                child: _TopBar(photoUrl: photoUrl),
               ),
             ),
             SliverPadding(
@@ -73,12 +71,84 @@ class HomePage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
               sliver: SliverToBoxAdapter(
                 child: _SectionHeader(
-                  title: 'Explore FinEase',
-                  actionLabel: 'See rewards',
+                  title: 'Core Tools',
+                  actionLabel: 'Open marketplace',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const RewardsScreen(),
+                      builder: (context) => const MarketplaceScreen(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: _FeatureGrid(
+                  items: [
+                    _FeatureItem(
+                      label: 'Marketplace',
+                      icon: Icons.storefront_rounded,
+                      color: const Color(0xFF2E3192),
+                      background: const Color(0xFFEEF2FF),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MarketplaceScreen(),
+                        ),
+                      ),
+                    ),
+                    _FeatureItem(
+                      label: 'Budget',
+                      icon: Icons.account_balance_wallet_rounded,
+                      color: const Color(0xFF0EA5A4),
+                      background: const Color(0xFFECFEFF),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AIBudgetAdvisorPage(),
+                        ),
+                      ),
+                    ),
+                    _FeatureItem(
+                      label: 'Loans',
+                      icon: Icons.calculate_rounded,
+                      color: const Color(0xFFD97706),
+                      background: const Color(0xFFFFF7ED),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoanSimulatorPage(),
+                        ),
+                      ),
+                    ),
+                    _FeatureItem(
+                      label: 'Chatbot',
+                      icon: Icons.smart_toy_rounded,
+                      color: const Color(0xFF475569),
+                      background: const Color(0xFFF1F5F9),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChatbotPage(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: _SectionHeader(
+                  title: 'Explore FinEase',
+                  actionLabel: 'See all activity',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AllTransactionsPage(),
                     ),
                   ),
                 ),
@@ -173,26 +243,11 @@ class HomePage extends StatelessWidget {
                                 0,
                                 (sum, goal) => sum + goal.currentAmount,
                               );
-                              return FutureBuilder<List<int>>(
-                                future: Future.wait(
-                                  DemoFinanceData.courses.map((course) async {
-                                    final progress = await firestoreService
-                                        .getCourseProgress(course.id)
-                                        .first;
-                                    final completed = List<String>.from(
-                                      progress['completedLessonIds'] ??
-                                          const [],
-                                    );
-                                    return completed.length;
-                                  }),
-                                ),
+                              return FutureBuilder<int>(
+                                future: _completedLessonCount(firestoreService),
                                 builder: (context, lessonSnapshot) {
                                   final completedLessons =
-                                      (lessonSnapshot.data ?? const <int>[])
-                                          .fold<int>(
-                                            0,
-                                            (sum, value) => sum + value,
-                                          );
+                                      lessonSnapshot.data ?? 0;
                                   return _ProgressPanel(
                                     totalSaved: saved,
                                     goalCount: goals.length,
@@ -269,93 +324,132 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+
+  Future<int> _completedLessonCount(dynamic firestoreService) async {
+    const courseIds = [
+      'budget-foundations',
+      'smart-investing',
+      'credit-and-debt',
+      'pakistan-finance-playbook',
+    ];
+    var total = 0;
+    for (final courseId in courseIds) {
+      final progress = await firestoreService.getCourseProgress(courseId).first;
+      final completed = List<String>.from(
+        progress['completedLessonIds'] ?? const [],
+      );
+      total += completed.length;
+    }
+    return total;
+  }
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.displayName, required this.photoUrl});
+  const _TopBar({required this.photoUrl});
 
-  final String displayName;
   final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
+    final firestoreService = context.watch<AuthService>().firestoreService;
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: firestoreService?.getUserProfile(),
+      builder: (context, snapshot) {
+        final profile = snapshot.data ?? const {};
+        final name = (profile['fullName'] as String?)?.split(' ').first ??
+            context.watch<AuthService>().user?.displayName?.split(' ').first ??
+            context.watch<AuthService>().user?.email?.split('@').first ??
+            'User';
+        final role = profile['role'] == 'admin'
+            ? 'Administrator'
+            : (profile['isDemoAccount'] == true ? 'Demo account' : 'Your finance space');
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: AppTheme.softShadow,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: photoUrl != null
-                    ? Image.network(
-                        photoUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const CircleAvatar(
-                              backgroundColor: AppTheme.primary,
-                              child: Icon(
-                                Icons.person_rounded,
-                                color: Colors.white,
-                              ),
-                            ),
-                      )
-                    : const CircleAvatar(
-                        backgroundColor: AppTheme.primary,
-                        child: Icon(Icons.person_rounded, color: Colors.white),
-                      ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Text(
-                  'Welcome back,',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: AppTheme.softShadow,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: photoUrl != null
+                        ? Image.network(
+                            photoUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const CircleAvatar(
+                                  backgroundColor: AppTheme.primary,
+                                  child: Icon(
+                                    Icons.person_rounded,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                          )
+                        : const CircleAvatar(
+                            backgroundColor: AppTheme.primary,
+                            child: Icon(Icons.person_rounded, color: Colors.white),
+                          ),
                   ),
                 ),
-                Text(
-                  displayName,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 17,
-                    color: const Color(0xFF0F172A),
-                    fontWeight: FontWeight.w700,
-                  ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back,',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      name,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 17,
+                        color: const Color(0xFF0F172A),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      role,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+            IconButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotificationsPage()),
+              ),
+              icon: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
           ],
-        ),
-        IconButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const NotificationsPage()),
-          ),
-          icon: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Icon(
-              Icons.notifications_none_rounded,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

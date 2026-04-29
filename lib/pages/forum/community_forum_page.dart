@@ -240,8 +240,6 @@ class _PostCard extends StatefulWidget {
 }
 
 class _PostCardState extends State<_PostCard> {
-  bool _liked = false;
-
   static const Map<String, Color> _tagColors = {
     'Savings': Color(0xFF06C270),
     'Loans': Color(0xFF2E3192),
@@ -254,11 +252,12 @@ class _PostCardState extends State<_PostCard> {
   @override
   Widget build(BuildContext context) {
     final authService = context.watch<AuthService>();
+    final firestoreService = authService.firestoreService;
     final user = authService.user;
     final data = widget.data;
     final category = data['category'] ?? 'General';
     final tagColor = _tagColors[category] ?? AppTheme.primary;
-    final likes = (data['likes'] ?? 0) + (_liked ? 1 : 0);
+    final likes = data['likes'] ?? 0;
     final comments = data['comments'] ?? 0;
     final avatar = data['authorAvatar'] as String?;
     final savedDoc = user == null
@@ -269,170 +268,185 @@ class _PostCardState extends State<_PostCard> {
               .collection('saved_posts')
               .doc(widget.docId);
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return StreamBuilder<bool>(
+      stream: firestoreService?.isForumPostLiked(widget.docId),
+      initialData: false,
+      builder: (context, likedSnapshot) {
+        final isLiked = likedSnapshot.data ?? false;
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.border),
+            boxShadow: AppTheme.softShadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                backgroundImage: (avatar != null && avatar.isNotEmpty)
-                    ? NetworkImage(avatar)
-                    : null,
-                child: (avatar == null || avatar.isEmpty)
-                    ? Text(
-                        (data['authorName'] ?? 'A')[0].toUpperCase(),
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                    backgroundImage: (avatar != null && avatar.isNotEmpty)
+                        ? NetworkImage(avatar)
+                        : null,
+                    child: (avatar == null || avatar.isEmpty)
+                        ? Text(
+                            (data['authorName'] ?? 'A')[0].toUpperCase(),
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primary,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data['authorName'] ?? 'Anonymous',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['authorName'] ?? 'Anonymous',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
+                        Text(
+                          _timeAgo(data['createdAt']),
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      _timeAgo(data['createdAt']),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: tagColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      category,
                       style: GoogleFonts.inter(
                         fontSize: 11,
-                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        color: tagColor,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: tagColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  category,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: tagColor,
                   ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                data['title'] ?? '',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
                 ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                data['content'] ?? '',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Divider(color: AppTheme.border, thickness: 1, height: 1),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: firestoreService == null
+                        ? null
+                        : () => firestoreService.toggleForumLike(
+                              widget.docId,
+                              !isLiked,
+                            ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+                          size: 18,
+                          color: isLiked
+                              ? AppTheme.primary
+                              : AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$likes',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isLiked
+                                ? AppTheme.primary
+                                : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  GestureDetector(
+                    onTap: () => _openComments(context),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 18,
+                          color: AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$comments',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  if (savedDoc != null) ...[
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: savedDoc.snapshots(),
+                      builder: (context, snapshot) {
+                        final isSaved = snapshot.data?.exists ?? false;
+                        return IconButton(
+                          onPressed: () => _toggleSave(savedDoc, isSaved),
+                          icon: Icon(
+                            isSaved
+                                ? Icons.bookmark_rounded
+                                : Icons.bookmark_border_rounded,
+                            color: isSaved
+                                ? AppTheme.primary
+                                : AppTheme.textSecondary,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            data['title'] ?? '',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            data['content'] ?? '',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: AppTheme.textSecondary,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Divider(color: AppTheme.border, thickness: 1, height: 1),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => setState(() => _liked = !_liked),
-                child: Row(
-                  children: [
-                    Icon(
-                      _liked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-                      size: 18,
-                      color: _liked ? AppTheme.primary : AppTheme.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$likes',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _liked
-                            ? AppTheme.primary
-                            : AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              GestureDetector(
-                onTap: () => _openComments(context),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      size: 18,
-                      color: AppTheme.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$comments',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              if (savedDoc != null) ...[
-                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                  stream: savedDoc.snapshots(),
-                  builder: (context, snapshot) {
-                    final isSaved = snapshot.data?.exists ?? false;
-                    return IconButton(
-                      onPressed: () => _toggleSave(savedDoc, isSaved),
-                      icon: Icon(
-                        isSaved
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_border_rounded,
-                        color: isSaved
-                            ? AppTheme.primary
-                            : AppTheme.textSecondary,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

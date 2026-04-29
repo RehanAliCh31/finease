@@ -4,7 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../../models/saving_goal.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
+import '../admin/admin_dashboard_screen.dart';
+import '../profile/about_page.dart';
+import '../settings/settings_screen.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -14,7 +18,6 @@ class ProfilePage extends StatelessWidget {
     final authService = context.watch<AuthService>();
     final firestoreService = authService.firestoreService;
     final user = authService.user;
-    const primaryColor = Color(0xFF2E3192);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
@@ -23,14 +26,14 @@ class ProfilePage extends StatelessWidget {
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: primaryColor,
+            backgroundColor: AppTheme.primary,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [primaryColor, Color(0xFF1D2671)],
+                    colors: [AppTheme.primary, Color(0xFF1D2671)],
                   ),
                 ),
                 child: SafeArea(
@@ -45,24 +48,61 @@ class ProfilePage extends StatelessWidget {
                           child: Icon(
                             Icons.person_rounded,
                             size: 48,
-                            color: primaryColor,
+                            color: AppTheme.primary,
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          user?.email?.split('@').first.toUpperCase() ?? 'USER',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          user?.email ?? '',
-                          style: GoogleFonts.inter(
-                            color: Colors.white.withValues(alpha: 0.74),
-                          ),
+                        StreamBuilder<Map<String, dynamic>>(
+                          stream: firestoreService?.getUserProfile(),
+                          builder: (context, snapshot) {
+                            final profile = snapshot.data ?? const {};
+                            final name = profile['fullName'] as String? ??
+                                user?.displayName ??
+                                user?.email?.split('@').first ??
+                                'User';
+                            final role = profile['role'] as String? ?? 'user';
+                            return Column(
+                              children: [
+                                Text(
+                                  name,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  user?.email ?? '',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white.withValues(alpha: 0.74),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    role == 'admin'
+                                        ? 'Admin account'
+                                        : (profile['isDemoAccount'] == true
+                                            ? 'Demo account'
+                                            : 'Personal account'),
+                                    style: GoogleFonts.inter(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -156,6 +196,50 @@ class ProfilePage extends StatelessWidget {
                         ),
                         const Divider(height: 1),
                         ListTile(
+                          leading: const Icon(Icons.settings_outlined),
+                          title: const Text('Settings'),
+                          subtitle: const Text(
+                            'Notifications, security, language, and app preferences',
+                          ),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsScreen(),
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.info_outline_rounded),
+                          title: const Text('About FinEase'),
+                          subtitle: const Text(
+                            'App overview, features, and developer details',
+                          ),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AboutPage(),
+                            ),
+                          ),
+                        ),
+                        if (authService.isAdmin) ...[
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.admin_panel_settings_outlined),
+                            title: const Text('Admin Panel'),
+                            subtitle: const Text(
+                              'Moderation, metrics, and operational controls',
+                            ),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AdminDashboardScreen(),
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Divider(height: 1),
+                        ListTile(
                           leading: const Icon(Icons.shield_outlined),
                           title: const Text('Security'),
                           subtitle: const Text(
@@ -168,6 +252,37 @@ class ProfilePage extends StatelessWidget {
                           title: const Text('Learning Progress'),
                           subtitle: const Text(
                             'Course progress and quiz scores sync to your profile',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Launch readiness',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          authService.isDemoAccount
+                              ? 'You are in the presentation account. Create a personal account to store your own transactions, budgets, savings goals, forum activity, and quiz progress in Firebase.'
+                              : 'Your account stores transactions, budgets, savings goals, literacy progress, and community activity directly in Firebase.',
+                          style: GoogleFonts.inter(
+                            color: Colors.grey[700],
+                            height: 1.5,
                           ),
                         ),
                       ],

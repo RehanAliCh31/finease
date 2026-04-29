@@ -7,6 +7,7 @@ import '../../models/saving_goal.dart';
 import '../../services/ai_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../utils/currency_utils.dart';
 
 class SavingsTrackerPage extends StatelessWidget {
   const SavingsTrackerPage({super.key});
@@ -36,6 +37,12 @@ class SavingsTrackerPage extends StatelessWidget {
             (sum, goal) => sum + goal.targetAmount,
           );
           final progress = totalTarget == 0 ? 0.0 : totalSaved / totalTarget;
+          final monthlyTarget = goals.isEmpty
+              ? 0.0
+              : goals.fold<double>(0, (sum, goal) {
+                  final days = goal.daysLeft <= 0 ? 1 : goal.daysLeft;
+                  return sum + (goal.remaining / days) * 30;
+                });
           final aiService = AIService();
 
           return CustomScrollView(
@@ -82,6 +89,8 @@ class SavingsTrackerPage extends StatelessWidget {
                       totalSaved: totalSaved,
                       totalTarget: totalTarget,
                       progress: progress.clamp(0.0, 1.0),
+                      monthlyTarget: monthlyTarget,
+                      goalCount: goals.length,
                     ),
                     const SizedBox(height: 24),
                     FutureBuilder<String>(
@@ -173,11 +182,15 @@ class _SummaryCard extends StatelessWidget {
     required this.totalSaved,
     required this.totalTarget,
     required this.progress,
+    required this.monthlyTarget,
+    required this.goalCount,
   });
 
   final double totalSaved;
   final double totalTarget;
   final double progress;
+  final double monthlyTarget;
+  final int goalCount;
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +212,7 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '\$${totalSaved.toStringAsFixed(0)}',
+            CurrencyUtils.format(totalSaved),
             style: GoogleFonts.plusJakartaSans(
               color: Colors.white,
               fontSize: 36,
@@ -218,10 +231,25 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '${(progress * 100).round()}% of \$${totalTarget.toStringAsFixed(0)} total targets funded.',
+            '${(progress * 100).round()}% of ${CurrencyUtils.format(totalTarget)} total targets funded.',
             style: GoogleFonts.inter(
               color: Colors.white.withValues(alpha: 0.7),
             ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryPill(label: 'Active goals', value: '$goalCount'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _SummaryPill(
+                  label: 'Suggested monthly',
+                  value: CurrencyUtils.format(monthlyTarget, compact: true),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -361,7 +389,7 @@ class _GoalCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '\$${goal.currentAmount.toStringAsFixed(0)} saved',
+                '${CurrencyUtils.format(goal.currentAmount)} saved',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -369,7 +397,7 @@ class _GoalCard extends StatelessWidget {
                 ),
               ),
               Text(
-                'Target \$${goal.targetAmount.toStringAsFixed(0)}',
+                'Target ${CurrencyUtils.format(goal.targetAmount)}',
                 style: GoogleFonts.inter(
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFF334155),
@@ -427,7 +455,7 @@ class _GoalCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Savings growth: +\$${monthlyGrowth.toStringAsFixed(0)} from recent contributions',
+                    'Savings growth: +${CurrencyUtils.format(monthlyGrowth)} from recent contributions',
                     style: GoogleFonts.inter(
                       color: const Color(0xFF059669),
                       fontWeight: FontWeight.w700,
@@ -465,7 +493,7 @@ class _GoalCard extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                '+\$${(item['amount'] as double).toStringAsFixed(0)}',
+                                '+${CurrencyUtils.format(item['amount'] as double)}',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontWeight: FontWeight.w800,
                                   color: const Color(0xFF059669),
@@ -691,7 +719,7 @@ Future<void> _showContributionDialog(
       content: TextField(
         controller: controller,
         keyboardType: TextInputType.number,
-        decoration: const InputDecoration(labelText: 'Amount'),
+        decoration: const InputDecoration(labelText: 'Amount in PKR'),
       ),
       actions: [
         TextButton(
@@ -725,4 +753,42 @@ Widget _field(
     keyboardType: isNumber ? TextInputType.number : TextInputType.text,
     decoration: InputDecoration(labelText: label),
   );
+}
+
+class _SummaryPill extends StatelessWidget {
+  const _SummaryPill({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

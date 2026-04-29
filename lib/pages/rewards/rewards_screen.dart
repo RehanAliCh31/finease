@@ -240,9 +240,9 @@ class RewardsScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 28),
-                      // Exchange Points for Perks
+                      // Digital milestones
                       const Text(
-                        'Exchange Points for Perks',
+                        'Digital Milestones',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -252,7 +252,7 @@ class RewardsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Convert your hard-earned points into gift cards, fee-free months, or charity donations.',
+                        'Points stay inside FinEase for engagement, learning, and streaks. They are not redeemable for gift cards, cash, or external perks.',
                         style: TextStyle(
                           color: Color(0xFF777683),
                           fontSize: 13,
@@ -263,35 +263,35 @@ class RewardsScreen extends StatelessWidget {
                       _perkCard(
                         context,
                         userId,
-                        '\$10 Gift Card',
-                        'Amazon or Google Play',
+                        'Budget Builder',
+                        'Create your first complete monthly budget',
                         500,
-                        Icons.card_giftcard_rounded,
+                        Icons.account_balance_wallet_rounded,
                         const Color(0xFF2E3192),
                       ),
                       _perkCard(
                         context,
                         userId,
-                        'Fee-Free Month',
-                        'Waive your next monthly fee',
+                        'Savings Streak',
+                        'Contribute to your savings goals consistently',
                         800,
-                        Icons.percent_rounded,
+                        Icons.savings_rounded,
                         const Color(0xFF006A66),
                       ),
                       _perkCard(
                         context,
                         userId,
-                        'Charity Donation',
-                        '\$5 donated on your behalf',
+                        'Forum Helper',
+                        'Support other users with helpful replies',
                         300,
-                        Icons.favorite_rounded,
+                        Icons.forum_rounded,
                         const Color(0xFFBA1A1A),
                       ),
                       _perkCard(
                         context,
                         userId,
-                        'Premium Upgrade',
-                        '1 month FinEdge Pro access',
+                        'Learning Champion',
+                        'Finish literacy courses and quizzes',
                         1200,
                         Icons.workspace_premium_rounded,
                         const Color(0xFF4F54B4),
@@ -475,7 +475,7 @@ class RewardsScreen extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     backgroundColor: Color(0xFF006A66),
-                    content: Text('Perk redeemed! 🎉'),
+                    content: Text('Milestone acknowledged in-app.'),
                   ),
                 );
               } catch (e) {

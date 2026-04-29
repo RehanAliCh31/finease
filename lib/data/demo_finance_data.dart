@@ -62,6 +62,69 @@ class QuizQuestion {
 }
 
 class DemoFinanceData {
+  static const List<Map<String, dynamic>> marketplacePartners = [
+    {
+      'id': 'jubilee-insurance',
+      'name': 'Jubilee Health Secure',
+      'description':
+          'Affordable health protection plans for families, freelancers, and salaried professionals across Pakistan.',
+      'category': 'Insurance',
+      'badge': 'Verified',
+      'ctaLabel': 'Explore Cover',
+      'colorHex': 0xFF2E3192,
+      'iconName': 'shield',
+      'priority': 1,
+    },
+    {
+      'id': 'hbl-microfinance',
+      'name': 'HBL Microfinance Support',
+      'description':
+          'Microfinance options for women-led households, shopkeepers, and first-time business borrowers.',
+      'category': 'Loans',
+      'badge': 'Popular',
+      'ctaLabel': 'Check Options',
+      'colorHex': 0xFF0EA5A4,
+      'iconName': 'bank',
+      'priority': 2,
+    },
+    {
+      'id': 'rozee-careers',
+      'name': 'Career Growth Network',
+      'description':
+          'Find verified roles, freelance gigs, and upskilling opportunities that improve monthly cash flow.',
+      'category': 'Jobs',
+      'badge': 'New',
+      'ctaLabel': 'View Roles',
+      'colorHex': 0xFF059669,
+      'iconName': 'briefcase',
+      'priority': 3,
+    },
+    {
+      'id': 'solar-installments',
+      'name': 'Solar Installment Partners',
+      'description':
+          'Compare installment-based solar solutions to lower electricity costs and protect your household budget.',
+      'category': 'Utilities',
+      'badge': 'Save More',
+      'ctaLabel': 'Compare Plans',
+      'colorHex': 0xFFD97706,
+      'iconName': 'sun',
+      'priority': 4,
+    },
+    {
+      'id': 'education-aid',
+      'name': 'Education & Scholarship Desk',
+      'description':
+          'Student financing, scholarships, and training programs designed for Pakistani learners and early professionals.',
+      'category': 'Education',
+      'badge': 'Featured',
+      'ctaLabel': 'See Programs',
+      'colorHex': 0xFF7C3AED,
+      'iconName': 'school',
+      'priority': 5,
+    },
+  ];
+
   static List<FinancialTransaction> sampleTransactions() {
     final now = DateTime.now();
     return [

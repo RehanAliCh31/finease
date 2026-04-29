@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
+import '../../app_constants.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 import 'signup_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -19,10 +21,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _enableBiometricLogin = true;
-
-  final Color primaryColor = const Color(0xFF2E3192);
-  final Color secondaryColor = const Color(0xFF1BFFFF);
-  final Color darkColor = const Color(0xFF1A1A1A);
 
   @override
   void dispose() {
@@ -43,12 +41,12 @@ class _LoginPageState extends State<LoginPage> {
           Positioned(
             top: -100,
             right: -100,
-            child: Container(
+                child: Container(
               width: 300,
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primaryColor.withValues(alpha: 0.05),
+                color: AppTheme.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -60,7 +58,7 @@ class _LoginPageState extends State<LoginPage> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: secondaryColor.withValues(alpha: 0.1),
+                color: AppTheme.secondary.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -68,14 +66,14 @@ class _LoginPageState extends State<LoginPage> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 40),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [primaryColor, secondaryColor],
+                        colors: [AppTheme.primary, AppTheme.secondary],
                       ),
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -85,19 +83,31 @@ class _LoginPageState extends State<LoginPage> {
                       size: 32,
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  Text(
+                    AppConstants.appName,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.primary,
+                    ),
+                  ),
                   const SizedBox(height: 32),
                   Text(
                     'Welcome back',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      color: darkColor,
+                      color: const Color(0xFF1A1A1A),
                       letterSpacing: -1,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Securely access your financial world with password and biometric unlock.',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       color: Colors.grey[600],
@@ -105,7 +115,10 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 48),
-                  _buildLabel('Email Address'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildLabel('Email Address'),
+                  ),
                   const SizedBox(height: 12),
                   _buildTextField(
                     controller: _emailController,
@@ -113,7 +126,10 @@ class _LoginPageState extends State<LoginPage> {
                     icon: Icons.alternate_email_rounded,
                   ),
                   const SizedBox(height: 24),
-                  _buildLabel('Password'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildLabel('Password'),
+                  ),
                   const SizedBox(height: 12),
                   _buildTextField(
                     controller: _passwordController,
@@ -132,7 +148,7 @@ class _LoginPageState extends State<LoginPage> {
                       'Enable Touch ID / Face ID after login',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600,
-                        color: darkColor,
+                        color: const Color(0xFF1A1A1A),
                         fontSize: 14,
                       ),
                     ),
@@ -146,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
                     value: _enableBiometricLogin,
                     onChanged: (value) =>
                         setState(() => _enableBiometricLogin = value),
-                    activeThumbColor: primaryColor,
+                    activeThumbColor: AppTheme.primary,
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(),
@@ -193,11 +209,39 @@ class _LoginPageState extends State<LoginPage> {
                                 'Create an account',
                                 style: GoogleFonts.inter(
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF00B09B),
+                                  color: AppTheme.primary,
                                 ),
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FE),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                'Presentation demo account',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                AppConstants.demoEmail,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 32),
                         Row(
@@ -236,7 +280,7 @@ class _LoginPageState extends State<LoginPage> {
       style: GoogleFonts.plusJakartaSans(
         fontSize: 14,
         fontWeight: FontWeight.bold,
-        color: darkColor,
+        color: const Color(0xFF1A1A1A),
       ),
     );
   }
@@ -258,7 +302,7 @@ class _LoginPageState extends State<LoginPage> {
       child: TextField(
         controller: controller,
         obscureText: isPassword && !isPasswordVisible,
-        style: GoogleFonts.inter(fontSize: 15, color: darkColor),
+        style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF1A1A1A)),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.inter(color: Colors.grey[400]),
@@ -288,12 +332,12 @@ class _LoginPageState extends State<LoginPage> {
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [primaryColor, primaryColor.withValues(alpha: 0.8)],
+          colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withValues(alpha: 0.3),
+            color: AppTheme.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -346,7 +390,7 @@ class _LoginPageState extends State<LoginPage> {
             padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
             child: Row(
               children: [
-                Icon(Icons.fingerprint_rounded, color: primaryColor, size: 28),
+                Icon(Icons.fingerprint_rounded, color: AppTheme.primary, size: 28),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -357,7 +401,7 @@ class _LoginPageState extends State<LoginPage> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: darkColor,
+                          color: const Color(0xFF1A1A1A),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -427,6 +471,17 @@ class _LoginPageState extends State<LoginPage> {
         await authService.enableBiometricLogin(
           email: _emailController.text.trim(),
           password: _passwordController.text,
+        );
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              authService.isDemoAccount
+                  ? 'Signed in to the demo account.'
+                  : 'Welcome back to ${AppConstants.appName}.',
+            ),
+          ),
         );
       }
     } catch (e) {

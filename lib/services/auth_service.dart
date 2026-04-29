@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../app_constants.dart';
 import 'firestore_service.dart';
 
 class AuthService extends ChangeNotifier {
@@ -18,13 +19,14 @@ class AuthService extends ChangeNotifier {
   FirestoreService? get firestoreService => _firestoreService;
   bool get isBiometricEnabled => _isBiometricEnabled;
   List<BiometricType> get availableBiometrics => _availableBiometrics;
+  bool get isAdmin => _user?.email == AppConstants.adminEmail;
+  bool get isDemoAccount => _user?.email == AppConstants.demoEmail;
 
   AuthService() {
     _auth.authStateChanges().listen((User? user) {
       _user = user;
       if (user != null) {
         _firestoreService = FirestoreService(uid: user.uid);
-        _firestoreService!.ensureSeedData();
       } else {
         _firestoreService = null;
       }
@@ -55,15 +57,29 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<void> signUpWithEmail(String email, String password) async {
+  Future<void> signUpWithEmail(
+    String email,
+    String password, {
+    String? fullName,
+  }) async {
     try {
-      await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      await credential.user?.updateDisplayName(fullName ?? email.split('@').first);
       await _firestoreService?.saveUserProfile({
-        'fullName': email.split('@').first,
+        'fullName': fullName ?? email.split('@').first,
         'email': email,
+        'role': 'user',
+        'isDemoAccount': false,
+        'currencyCode': AppConstants.currencyCode,
+        'country': AppConstants.countryName,
+        'memberSince': DateTime.now().year.toString(),
+        'pushAlerts': true,
+        'monthlyReports': true,
+        'biometricLogin': false,
+        'language': 'English (Pakistan)',
       });
     } catch (e) {
       if (kDebugMode) {
@@ -88,10 +104,15 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
+    final isSupported = await canUseBiometrics();
+    if (!isSupported) {
+      throw Exception('Biometric authentication is not available on this device.');
+    }
     await _secureStorage.write(key: 'biometric_email', value: email);
     await _secureStorage.write(key: 'biometric_password', value: password);
     await _secureStorage.write(key: 'biometric_enabled', value: 'true');
     _isBiometricEnabled = true;
+    await _firestoreService?.saveUserProfile({'biometricLogin': true});
     notifyListeners();
   }
 
@@ -100,6 +121,7 @@ class AuthService extends ChangeNotifier {
     await _secureStorage.delete(key: 'biometric_password');
     await _secureStorage.write(key: 'biometric_enabled', value: 'false');
     _isBiometricEnabled = false;
+    await _firestoreService?.saveUserProfile({'biometricLogin': false});
     notifyListeners();
   }
 

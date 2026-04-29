@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../data/demo_finance_data.dart';
 import '../models/budget_plan.dart';
 import '../models/saving_goal.dart';
 import '../models/transaction.dart';
@@ -9,57 +8,6 @@ class FirestoreService {
   final String uid;
 
   FirestoreService({required this.uid});
-
-  Future<void> ensureSeedData() async {
-    final userRef = _db.collection('users').doc(uid);
-    final transactionsRef = userRef.collection('transactions');
-    final goalsRef = userRef.collection('saving_goals');
-    final budgetsRef = userRef.collection('budget_plans');
-    final profileRef = userRef;
-
-    final existingTransactions = await transactionsRef.limit(1).get();
-    if (existingTransactions.docs.isEmpty) {
-      final batch = _db.batch();
-      for (final transaction in DemoFinanceData.sampleTransactions()) {
-        final doc = transactionsRef.doc();
-        batch.set(doc, transaction.toMap());
-      }
-      await batch.commit();
-    }
-
-    final existingGoals = await goalsRef.limit(1).get();
-    if (existingGoals.docs.isEmpty) {
-      final batch = _db.batch();
-      for (final goal in DemoFinanceData.sampleGoals()) {
-        final doc = goalsRef.doc();
-        final map = goal.toMap();
-        map['createdAt'] = FieldValue.serverTimestamp();
-        batch.set(doc, map);
-      }
-      await batch.commit();
-    }
-
-    final existingBudgets = await budgetsRef.limit(1).get();
-    if (existingBudgets.docs.isEmpty) {
-      final batch = _db.batch();
-      for (final budget in DemoFinanceData.sampleBudgetPlans()) {
-        final doc = budgetsRef.doc();
-        final map = budget.toMap();
-        map['createdAt'] = FieldValue.serverTimestamp();
-        batch.set(doc, map);
-      }
-      await batch.commit();
-    }
-
-    final profile = await profileRef.get();
-    if (!profile.exists ||
-        !(profile.data()?.containsKey('fullName') ?? false)) {
-      await profileRef.set(
-        DemoFinanceData.sampleProfile,
-        SetOptions(merge: true),
-      );
-    }
-  }
 
   // --------------- Transactions ---------------
 
@@ -346,5 +294,44 @@ class FirestoreService {
         .doc(uid)
         .snapshots()
         .map((doc) => doc.data() ?? {});
+  }
+
+  Stream<List<Map<String, dynamic>>> getMarketplacePartners() {
+    return _db
+        .collection('marketplace_partners')
+        .orderBy('priority')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList(),
+        );
+  }
+
+  Future<void> toggleForumLike(String postId, bool liked) async {
+    final postRef = _db.collection('forum_posts').doc(postId);
+    final likeRef = postRef.collection('likes').doc(uid);
+
+    if (liked) {
+      await likeRef.set({
+        'userId': uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await postRef.set({'likes': FieldValue.increment(1)}, SetOptions(merge: true));
+      return;
+    }
+
+    await likeRef.delete();
+    await postRef.set({'likes': FieldValue.increment(-1)}, SetOptions(merge: true));
+  }
+
+  Stream<bool> isForumPostLiked(String postId) {
+    return _db
+        .collection('forum_posts')
+        .doc(postId)
+        .collection('likes')
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.exists);
   }
 }

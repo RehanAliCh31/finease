@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../../app_constants.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -18,10 +20,6 @@ class _SignupPageState extends State<SignupPage> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _enableBiometricLogin = true;
-
-  final Color primaryColor = const Color(0xFF2E3192);
-  final Color secondaryColor = const Color(0xFF1BFFFF);
-  final Color darkColor = const Color(0xFF1A1A1A);
 
   @override
   void dispose() {
@@ -45,7 +43,7 @@ class _SignupPageState extends State<SignupPage> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primaryColor.withValues(alpha: 0.05),
+                color: AppTheme.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -57,7 +55,7 @@ class _SignupPageState extends State<SignupPage> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: secondaryColor.withValues(alpha: 0.1),
+                color: AppTheme.secondary.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -75,7 +73,7 @@ class _SignupPageState extends State<SignupPage> {
                         onPressed: () => Navigator.pop(context),
                         icon: Icon(
                           Icons.arrow_back_ios_new_rounded,
-                          color: darkColor,
+                          color: const Color(0xFF1A1A1A),
                           size: 20,
                         ),
                       ),
@@ -95,7 +93,7 @@ class _SignupPageState extends State<SignupPage> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [secondaryColor, primaryColor],
+                              colors: [AppTheme.secondary, AppTheme.primary],
                             ),
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -105,23 +103,40 @@ class _SignupPageState extends State<SignupPage> {
                             size: 32,
                           ),
                         ),
+                        const SizedBox(height: 20),
+                        Center(
+                          child: Text(
+                            AppConstants.appName,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 32),
-                        Text(
-                          'Create Account',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: darkColor,
-                            letterSpacing: -1,
+                        Center(
+                          child: Text(
+                            'Create Account',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF1A1A1A),
+                              letterSpacing: -1,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Create your FinEase profile and unlock Touch ID / Face ID after setup.',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                            height: 1.5,
+                        Center(
+                          child: Text(
+                            'Create your FinEase profile and unlock Touch ID / Face ID after setup.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              height: 1.5,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 40),
@@ -160,7 +175,7 @@ class _SignupPageState extends State<SignupPage> {
                             'Enable Touch ID / Face ID',
                             style: GoogleFonts.inter(
                               fontWeight: FontWeight.w600,
-                              color: darkColor,
+                              color: const Color(0xFF1A1A1A),
                               fontSize: 14,
                             ),
                           ),
@@ -174,7 +189,7 @@ class _SignupPageState extends State<SignupPage> {
                           value: _enableBiometricLogin,
                           onChanged: (value) =>
                               setState(() => _enableBiometricLogin = value),
-                          activeThumbColor: primaryColor,
+                          activeThumbColor: AppTheme.primary,
                         ),
                         const SizedBox(height: 22),
                         _buildSignupButton(),
@@ -197,7 +212,7 @@ class _SignupPageState extends State<SignupPage> {
                                       'Login',
                                       style: GoogleFonts.inter(
                                         fontWeight: FontWeight.bold,
-                                        color: primaryColor,
+                                        color: AppTheme.primary,
                                       ),
                                     ),
                                   ),
@@ -243,7 +258,7 @@ class _SignupPageState extends State<SignupPage> {
       style: GoogleFonts.plusJakartaSans(
         fontSize: 14,
         fontWeight: FontWeight.bold,
-        color: darkColor,
+        color: const Color(0xFF1A1A1A),
       ),
     );
   }
@@ -265,7 +280,7 @@ class _SignupPageState extends State<SignupPage> {
       child: TextField(
         controller: controller,
         obscureText: isPassword && !isPasswordVisible,
-        style: GoogleFonts.inter(fontSize: 15, color: darkColor),
+        style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF1A1A1A)),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.inter(color: Colors.grey[400]),
@@ -295,12 +310,12 @@ class _SignupPageState extends State<SignupPage> {
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [primaryColor, primaryColor.withValues(alpha: 0.8)],
+          colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withValues(alpha: 0.3),
+            color: AppTheme.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -350,6 +365,7 @@ class _SignupPageState extends State<SignupPage> {
       await authService.signUpWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
+        fullName: _nameController.text.trim(),
       );
       await authService.firestoreService?.saveUserProfile({
         'fullName': _nameController.text.trim(),

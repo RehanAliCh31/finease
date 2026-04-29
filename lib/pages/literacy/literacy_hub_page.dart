@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -612,9 +614,40 @@ class _QuizDialog extends StatefulWidget {
 class _QuizDialogState extends State<_QuizDialog> {
   final Map<String, int> _answers = {};
   bool _isSaving = false;
+  Timer? _timer;
+  static const int _quizDurationSeconds = 120;
+  int _remainingSeconds = _quizDurationSeconds;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_remainingSeconds <= 1) {
+        timer.cancel();
+        _submitQuiz(autoSubmitted: true);
+        return;
+      }
+      setState(() => _remainingSeconds--);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final totalQuestions = widget.course.quiz.questions.length;
+    final answeredCount = _answers.length;
+    final answerProgress = totalQuestions == 0 ? 0.0 : answeredCount / totalQuestions;
+    final timerProgress = _remainingSeconds / _quizDurationSeconds;
+
     return AlertDialog(
       title: Text(
         widget.course.quiz.title,
@@ -626,43 +659,89 @@ class _QuizDialogState extends State<_QuizDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: widget.course.quiz.questions.map((question) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      question.prompt,
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 10),
-                    RadioGroup<int>(
-                      groupValue: _answers[question.id],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _answers[question.id] = value);
-                        }
-                      },
-                      child: Column(
-                        children: List.generate(question.options.length, (
-                          index,
-                        ) {
-                          return RadioListTile<int>(
-                            value: index,
-                            title: Text(
-                              question.options[index],
-                              style: GoogleFonts.inter(fontSize: 14),
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          );
-                        }),
-                      ),
-                    ),
-                  ],
+            children: [
+              Text(
+                'Answered $answeredCount of $totalQuestions',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF475569),
+                  fontWeight: FontWeight.w600,
                 ),
-              );
-            }).toList(),
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: answerProgress,
+                  minHeight: 8,
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  color: const Color(0xFF2E3192),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF2E3192)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Time left: ${(_remainingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF2E3192),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: timerProgress.clamp(0.0, 1.0),
+                  minHeight: 8,
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  color: _remainingSeconds <= 20
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF0EA5A4),
+                ),
+              ),
+              const SizedBox(height: 18),
+              ...widget.course.quiz.questions.map((question) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        question.prompt,
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 10),
+                      RadioGroup<int>(
+                        groupValue: _answers[question.id],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _answers[question.id] = value);
+                          }
+                        },
+                        child: Column(
+                          children: List.generate(question.options.length, (
+                            index,
+                          ) {
+                            return RadioListTile<int>(
+                              value: index,
+                              title: Text(
+                                question.options[index],
+                                style: GoogleFonts.inter(fontSize: 14),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                            );
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ),
         ),
       ),
@@ -679,12 +758,13 @@ class _QuizDialogState extends State<_QuizDialog> {
     );
   }
 
-  Future<void> _submitQuiz() async {
+  Future<void> _submitQuiz({bool autoSubmitted = false}) async {
     final firestoreService = context.read<AuthService>().firestoreService;
-    if (firestoreService == null) {
+    if (firestoreService == null || _isSaving) {
       return;
     }
 
+    _timer?.cancel();
     setState(() => _isSaving = true);
     var score = 0;
     for (final question in widget.course.quiz.questions) {
@@ -706,7 +786,7 @@ class _QuizDialogState extends State<_QuizDialog> {
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Quiz Saved'),
+          title: Text(autoSubmitted ? 'Time is up' : 'Quiz Saved'),
           content: Text(
             'You scored $score/${widget.course.quiz.questions.length}.',
           ),

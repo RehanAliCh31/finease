@@ -1,127 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+
+import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
+
   @override
   State<MarketplaceScreen> createState() => _MarketplaceScreenState();
 }
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
-  String _cat = 'All';
-
-  final _partners = [
-    {
-      'name': 'SecureLife Micro-Insurance',
-      'desc':
-          'Comprehensive health and accidental coverage for gig workers and small families. Low premiums with instant claim settlement.',
-      'icon': Icons.health_and_safety_rounded,
-      'color': const Color(0xFF2E3192),
-      'tag': 'Insurance',
-      'badge': 'Popular',
-    },
-    {
-      'name': 'SwiftHire Platform',
-      'desc':
-          'Connect with top-tier employers seeking specialized talent. Exclusive placement services for FinEdge users.',
-      'icon': Icons.work_rounded,
-      'color': const Color(0xFF006A66),
-      'tag': 'Jobs',
-      'badge': 'New',
-    },
-    {
-      'name': 'WellnessPlus Vouchers',
-      'desc':
-          'Get up to 40% discount on health checkups, medicine, and wellness kits with our network of 500+ clinics.',
-      'icon': Icons.spa_rounded,
-      'color': const Color(0xFF4CAF50),
-      'tag': 'All',
-      'badge': '40% Off',
-    },
-    {
-      'name': 'GrowthPath SMB Grants',
-      'desc':
-          'Access non-repayable grants from \$1,000 to \$10,000 for verified businesses. Unlocking potential for entrepreneurs.',
-      'icon': Icons.trending_up_rounded,
-      'color': const Color(0xFFFF9800),
-      'tag': 'All',
-      'badge': '',
-    },
-    {
-      'name': 'EduLoan & Scholarships',
-      'desc':
-          'Flexible student loans with a 6-month grace period after graduation. Funding your future.',
-      'icon': Icons.school_rounded,
-      'color': const Color(0xFF9C27B0),
-      'tag': 'All',
-      'badge': '',
-    },
-    {
-      'name': 'EcoGreen Equipment',
-      'desc':
-          'Affordable solar installations and energy-efficient tools for sustainable small business growth.',
-      'icon': Icons.eco_rounded,
-      'color': const Color(0xFF388E3C),
-      'tag': 'All',
-      'badge': 'Eco',
-    },
-    {
-      'name': 'LegalShield Pro',
-      'desc':
-          'Expert legal consultation for contracts, property, and dispute resolution at discounted rates.',
-      'icon': Icons.gavel_rounded,
-      'color': const Color(0xFF795548),
-      'tag': 'All',
-      'badge': '',
-    },
-  ];
+  String _category = 'All';
 
   @override
   Widget build(BuildContext context) {
-    final cats = ['All', 'Insurance', 'Jobs'];
-    final filtered = _cat == 'All'
-        ? _partners
-        : _partners.where((p) => p['tag'] == _cat).toList();
+    final firestoreService = context.watch<AuthService>().firestoreService;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
+      backgroundColor: AppTheme.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 130,
+            expandedHeight: 150,
             pinned: true,
             automaticallyImplyLeading: true,
-            backgroundColor: const Color(0xFF15157D),
+            backgroundColor: AppTheme.primary,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF15157D), Color(0xFF2E3192)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
+                decoration: const BoxDecoration(gradient: AppTheme.cardGradient),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
                         Text(
                           'Partner Marketplace',
-                          style: TextStyle(
+                          style: GoogleFonts.plusJakartaSans(
                             color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Text(
-                          'Empowering your journey with a curated ecosystem of financial security, growth, and wellness solutions.',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            fontFamily: 'Inter',
+                          'Browse trusted services, financing options, and growth partners sourced for Pakistani users.',
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            height: 1.5,
                           ),
                         ),
                       ],
@@ -132,109 +62,94 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: cats.map((c) {
-                    final sel = _cat == c;
-                    return GestureDetector(
-                      onTap: () => setState(() => _cat = c),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 8,
+            child: firestoreService == null
+                ? const SizedBox.shrink()
+                : StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: firestoreService.getMarketplacePartners(),
+                    builder: (context, snapshot) {
+                      final partners = snapshot.data ?? const [];
+                      final categories = {
+                        'All',
+                        ...partners.map((partner) => partner['category'] as String? ?? 'General'),
+                      }.toList();
+                      final filtered = _category == 'All'
+                          ? partners
+                          : partners
+                              .where((partner) => partner['category'] == _category)
+                              .toList();
+
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                        child: Column(
+                          children: [
+                            SizedBox(
+                              height: 46,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: categories.length,
+                                separatorBuilder: (_, index) => const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  final value = categories[index];
+                                  final selected = value == _category;
+                                  return ChoiceChip(
+                                    label: Text(value),
+                                    selected: selected,
+                                    onSelected: (_) => setState(() => _category = value),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            _TrustBanner(count: filtered.length),
+                            const SizedBox(height: 16),
+                            if (filtered.isEmpty)
+                              const _EmptyMarketplace()
+                            else
+                              ...filtered.map((partner) => _PartnerCard(partner: partner)),
+                          ],
                         ),
-                        decoration: BoxDecoration(
-                          color: sel ? const Color(0xFF2E3192) : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: sel
-                                ? const Color(0xFF2E3192)
-                                : const Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        child: Text(
-                          c == 'All' ? 'All Services' : c,
-                          style: TextStyle(
-                            color: sel ? Colors.white : const Color(0xFF0B1C30),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (ctx, i) => _card(filtered[i]),
-                childCount: filtered.length,
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF15157D), Color(0xFF2E3192)],
+                      );
+                    },
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.verified_user_rounded,
-                        color: Color(0xFF00F2EA),
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'The FinEdge Guarantee',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              fontFamily: 'Plus Jakarta Sans',
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Every partner undergoes a rigorous 12-point vetting process. We ensure high-quality service, fair pricing, and data security.',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrustBanner extends StatelessWidget {
+  const _TrustBanner({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.verified_user_rounded, color: AppTheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '$count verified opportunities currently available. Finease highlights practical services that can support income, protection, financing, and financial stability.',
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                height: 1.5,
               ),
             ),
           ),
@@ -242,15 +157,27 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       ),
     );
   }
+}
 
-  Widget _card(Map<String, dynamic> p) {
+class _PartnerCard extends StatelessWidget {
+  const _PartnerCard({required this.partner});
+
+  final Map<String, dynamic> partner;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Color(
+      (partner['colorHex'] as int?) ?? AppTheme.primary.toARGB32(),
+    );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: AppTheme.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,79 +187,117 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: (p['color'] as Color).withValues(alpha: 0.1),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  p['icon'] as IconData,
-                  color: p['color'] as Color,
-                  size: 22,
-                ),
+                child: Icon(_iconFor(partner['iconName'] as String?), color: color),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  p['name'] as String,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: Color(0xFF0B1C30),
-                    fontFamily: 'Plus Jakarta Sans',
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      partner['name'] as String? ?? 'Partner',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      partner['category'] as String? ?? 'General',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if ((p['badge'] as String).isNotEmpty)
+              if ((partner['badge'] as String?)?.isNotEmpty ?? false)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5EEFF),
-                    borderRadius: BorderRadius.circular(20),
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    p['badge'] as String,
-                    style: const TextStyle(
-                      color: Color(0xFF2E3192),
+                    partner['badge'] as String,
+                    style: GoogleFonts.inter(
+                      color: color,
+                      fontWeight: FontWeight.w700,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
-            p['desc'] as String,
-            style: const TextStyle(
-              color: Color(0xFF464652),
-              fontSize: 13,
-              fontFamily: 'Inter',
-              height: 1.5,
-            ),
+            partner['description'] as String? ?? '',
+            style: GoogleFonts.inter(color: AppTheme.textSecondary, height: 1.5),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E3192),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              onPressed: () {},
-              child: const Text(
-                'Learn More',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
-              ),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${partner['name']} is available for onboarding integration.',
+                    ),
+                  ),
+                );
+              },
+              child: Text(partner['ctaLabel'] as String? ?? 'Learn More'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconFor(String? name) {
+    switch (name) {
+      case 'shield':
+        return Icons.shield_rounded;
+      case 'bank':
+        return Icons.account_balance_rounded;
+      case 'briefcase':
+        return Icons.work_rounded;
+      case 'sun':
+        return Icons.solar_power_rounded;
+      case 'school':
+        return Icons.school_rounded;
+      default:
+        return Icons.storefront_rounded;
+    }
+  }
+}
+
+class _EmptyMarketplace extends StatelessWidget {
+  const _EmptyMarketplace();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.storefront_rounded, size: 56, color: AppTheme.primary),
+          const SizedBox(height: 12),
+          Text(
+            'No partners in this category yet.',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
             ),
           ),
         ],
