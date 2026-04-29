@@ -46,7 +46,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
     super.initState();
     final envKey = dotenv.env['GEMINI_API_KEY'] ?? '';
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       apiKey: envKey,
       systemInstruction: Content.system(
         'You are FinEase AI, a friendly financial coach for users in Pakistan. '

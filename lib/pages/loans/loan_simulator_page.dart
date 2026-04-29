@@ -45,7 +45,7 @@ class _LoanSimulatorPageState extends State<LoanSimulatorPage> {
     });
     try {
       final key = dotenv.env['GEMINI_API_KEY'] ?? '';
-      final model = GenerativeModel(model: 'gemini-2.0-flash', apiKey: key);
+      final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: key);
       final prompt =
           '''Analyze this loan for a user in Pakistan: Amount ${CurrencyUtils.format(_amount)}, markup ${_rate.toStringAsFixed(1)}% annually, tenure ${_tenure.toInt()} months.
 EMI: ${CurrencyUtils.format(_emi)}/month, Total interest: ${CurrencyUtils.format(_totalInterest)}.
