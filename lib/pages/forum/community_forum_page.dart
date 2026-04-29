@@ -192,7 +192,9 @@ class _PostsList extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final docs = snapshot.data?.docs ?? [];
+        final docs = (snapshot.data?.docs ?? [])
+            .where((doc) => doc.data()['moderationStatus'] != 'removed')
+            .toList();
         if (docs.isEmpty) {
           return Center(
             child: Column(
@@ -373,13 +375,15 @@ class _PostCardState extends State<_PostCard> {
                     onTap: firestoreService == null
                         ? null
                         : () => firestoreService.toggleForumLike(
-                              widget.docId,
-                              !isLiked,
-                            ),
+                            widget.docId,
+                            !isLiked,
+                          ),
                     child: Row(
                       children: [
                         Icon(
-                          isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+                          isLiked
+                              ? Icons.thumb_up_rounded
+                              : Icons.thumb_up_outlined,
                           size: 18,
                           color: isLiked
                               ? AppTheme.primary

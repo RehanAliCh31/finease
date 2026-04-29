@@ -304,6 +304,11 @@ class FirestoreService {
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => {'id': doc.id, ...doc.data()})
+              .where(
+                (partner) =>
+                    (partner['status'] ?? 'active') == 'active' &&
+                    (partner['approved'] ?? true) == true,
+              )
               .toList(),
         );
   }
@@ -317,12 +322,16 @@ class FirestoreService {
         'userId': uid,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      await postRef.set({'likes': FieldValue.increment(1)}, SetOptions(merge: true));
+      await postRef.set({
+        'likes': FieldValue.increment(1),
+      }, SetOptions(merge: true));
       return;
     }
 
     await likeRef.delete();
-    await postRef.set({'likes': FieldValue.increment(-1)}, SetOptions(merge: true));
+    await postRef.set({
+      'likes': FieldValue.increment(-1),
+    }, SetOptions(merge: true));
   }
 
   Stream<bool> isForumPostLiked(String postId) {

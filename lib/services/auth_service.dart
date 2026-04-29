@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
@@ -48,7 +49,24 @@ class AuthService extends ChangeNotifier {
 
   Future<void> signInWithEmail(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final uid = credential.user?.uid;
+      if (uid != null && email != AppConstants.adminEmail) {
+        final profile = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+        if (profile.data()?['accountStatus'] == 'suspended') {
+          await _auth.signOut();
+          throw FirebaseAuthException(
+            code: 'account-suspended',
+            message: 'This account has been suspended by FinEase admin.',
+          );
+        }
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error signing in with email: $e');
@@ -67,7 +85,9 @@ class AuthService extends ChangeNotifier {
         email: email,
         password: password,
       );
-      await credential.user?.updateDisplayName(fullName ?? email.split('@').first);
+      await credential.user?.updateDisplayName(
+        fullName ?? email.split('@').first,
+      );
       await _firestoreService?.saveUserProfile({
         'fullName': fullName ?? email.split('@').first,
         'email': email,
@@ -106,7 +126,9 @@ class AuthService extends ChangeNotifier {
   }) async {
     final isSupported = await canUseBiometrics();
     if (!isSupported) {
-      throw Exception('Biometric authentication is not available on this device.');
+      throw Exception(
+        'Biometric authentication is not available on this device.',
+      );
     }
     await _secureStorage.write(key: 'biometric_email', value: email);
     await _secureStorage.write(key: 'biometric_password', value: password);

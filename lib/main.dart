@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/auth_service.dart';
 import 'services/bootstrap_service.dart';
 import 'pages/auth/login_page.dart';
+import 'pages/admin/admin_dashboard_screen.dart';
 import 'pages/main_scaffold.dart';
 import 'theme/app_theme.dart';
 
@@ -45,6 +46,8 @@ class AuthWrapper extends StatelessWidget {
 
     if (authService.user == null) {
       return const LoginPage();
+    } else if (authService.isAdmin) {
+      return const AdminDashboardScreen();
     } else {
       return const MainScaffold();
     }
