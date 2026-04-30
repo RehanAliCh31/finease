@@ -37,6 +37,7 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
         backgroundColor: AppTheme.background,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          color: Colors.white,
           onPressed: () => Navigator.pop(context),
         ),
       ),

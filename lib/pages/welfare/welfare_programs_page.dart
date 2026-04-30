@@ -118,6 +118,7 @@ class _WelfareProgramsPageState extends State<WelfareProgramsPage> {
         backgroundColor: AppTheme.background,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          color: Colors.white,
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(

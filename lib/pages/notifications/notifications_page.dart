@@ -58,6 +58,7 @@ class NotificationsPage extends StatelessWidget {
         backgroundColor: AppTheme.background,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          color: Colors.white,
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
