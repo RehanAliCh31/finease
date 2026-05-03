@@ -102,7 +102,7 @@ ${goals.map((goal) => '${goal.title}: ${CurrencyUtils.format(goal.currentAmount)
 Act as a conservative personal finance coach.
 Return exactly 3 bullet points with beginner-friendly investment or savings opportunities.
 Mention risk briefly and keep each bullet below 24 words.
-Total saved: \$${totalSaved.toStringAsFixed(0)}
+Total saved: PKR${totalSaved.toStringAsFixed(0)}
 Goals: ${goals.map((goal) => goal.title).join(', ')}
 ''';
 
@@ -113,7 +113,7 @@ Goals: ${goals.map((goal) => goal.title).join(', ')}
     final remaining = goal.remaining;
     final daysLeft = goal.daysLeft <= 0 ? 1 : goal.daysLeft;
     final fallback =
-        'Save about \$${(remaining / daysLeft).toStringAsFixed(2)} per day for ${goal.title}, and automate the transfer right after payday.';
+        'Save about PKR${(remaining / daysLeft).toStringAsFixed(2)} per day for ${goal.title}, and automate the transfer right after payday.';
 
     if (!_useRealAI) {
       return fallback;
@@ -124,7 +124,7 @@ Goals: ${goals.map((goal) => goal.title).join(', ')}
 Give one practical sentence under 28 words to improve this savings goal.
 Goal: ${goal.title}
 Progress: ${(goal.progress * 100).round()}%
-Remaining: \$${remaining.toStringAsFixed(0)}
+Remaining: PKR${remaining.toStringAsFixed(0)}
 Days left: $daysLeft
 ''';
 

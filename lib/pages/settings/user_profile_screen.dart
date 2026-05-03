@@ -144,7 +144,7 @@ class UserProfileScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  '\$${_formatNum(netWorth)}',
+                                  'PKR${_formatNum(netWorth)}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 30,

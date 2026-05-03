@@ -129,7 +129,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            '\$',
+                            'PKR',
                             style: GoogleFonts.plusJakartaSans(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 32,

@@ -161,7 +161,7 @@ class RewardsScreen extends StatelessWidget {
                       ),
                       _challengeCard(
                         'Weekly Saver',
-                        'Deposit at least \$10 to your vault',
+                        'Deposit at least 3000 PKR to your vault',
                         Icons.savings_rounded,
                         200,
                         0.6,

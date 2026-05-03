@@ -13,7 +13,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _pushAlerts = true;
   bool _monthlyReports = true;
   bool _biometric = false;
-  bool _darkTheme = false;
+  // bool _darkTheme = false;
   String _language = 'English (US)';
 
   @override
@@ -34,7 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _pushAlerts = d['pushAlerts'] ?? true;
         _monthlyReports = d['monthlyReports'] ?? true;
         _biometric = d['biometricLogin'] ?? false;
-        _darkTheme = d['darkTheme'] ?? false;
+        // _darkTheme = d['darkTheme'] ?? false;
         _language = d['language'] ?? 'English (US)';
       });
     }
@@ -103,14 +103,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
-                              'Premium Member since 2023',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
+                            // const Text(
+                            //   'Premium Member since 2023',
+                            //   style: TextStyle(
+                            //     color: Colors.white70,
+                            //     fontSize: 12,
+                            //     fontFamily: 'Inter',
+                            //   ),
+                            // ),
                             const SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -123,15 +123,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ).withValues(alpha: 0.25),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Text(
-                                'Pro Member',
-                                style: TextStyle(
-                                  color: Color(0xFF00F2EA),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
+                              // child: const Text(
+                              //   'Pro Member',
+                              //   style: TextStyle(
+                              //     color: Color(0xFF00F2EA),
+                              //     fontWeight: FontWeight.bold,
+                              //     fontSize: 11,
+                              //     fontFamily: 'Inter',
+                              //   ),
+                              // ),
                             ),
                           ],
                         ),
@@ -214,20 +214,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
-                  _sectionHeader('Theme Selection'),
-                  _tile(
-                    Icons.dark_mode_rounded,
-                    'Dark Theme',
-                    trailing: Switch(
-                      value: _darkTheme,
-                      onChanged: (v) {
-                        setState(() => _darkTheme = v);
-                        _save('darkTheme', v);
-                      },
-                      activeThumbColor: const Color(0xFF00F2EA),
-                    ),
-                  ),
+                  // const SizedBox(height: 20),
+                  // _sectionHeader('Theme Selection'),
+                  // _tile(
+                  //   Icons.dark_mode_rounded,
+                  //   'Dark Theme',
+                  //   trailing: Switch(
+                  //     value: _darkTheme,
+                  //     onChanged: (v) {
+                  //       setState(() => _darkTheme = v);
+                  //       _save('darkTheme', v);
+                  //     },
+                  //     activeThumbColor: const Color(0xFF00F2EA),
+                  //   ),
+                  // ),
 
                   const SizedBox(height: 20),
                   _sectionHeader('Danger Zone'),

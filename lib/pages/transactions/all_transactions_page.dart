@@ -173,7 +173,7 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                                   ),
                                 ),
                                 Text(
-                                  '${isIncome ? '+' : '-'}\$${t.amount.toStringAsFixed(2)}',
+                                  '${isIncome ? '+' : '-'}PKR${t.amount.toStringAsFixed(2)}',
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
