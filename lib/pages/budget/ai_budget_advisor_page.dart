@@ -71,15 +71,48 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'AI Budget Advisor',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
+                                Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => Navigator.pop(context),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.12,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                          ),
+                                        ),
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.arrow_back_ios_new_rounded,
+                                            size: 18,
+                                          ),
+                                          color: Colors.white,
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Text(
+                                      'AI Budget Advisor',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                                 Text(
                                   'Create your own budgets, track actual spending, and get AI recommendations in PKR.',
                                   style: GoogleFonts.inter(

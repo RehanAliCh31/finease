@@ -13,14 +13,29 @@ import '../forum/community_forum_page.dart';
 import '../literacy/literacy_hub_page.dart';
 import '../loans/loan_simulator_page.dart';
 import '../marketplace/marketplace_screen.dart';
-import '../notifications/notifications_page.dart';
 import '../savings/savings_tracker_page.dart';
 import '../transactions/add_transaction_page.dart';
 import '../transactions/all_transactions_page.dart';
 import '../welfare/welfare_programs_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final GlobalKey<RefreshIndicatorState> _refreshKey =
+      GlobalKey<RefreshIndicatorState>();
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    setState(() => _isRefreshing = true);
+    // Small delay to let streams re-emit
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) setState(() => _isRefreshing = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +48,23 @@ class HomePage extends StatelessWidget {
       backgroundColor: const Color(0xFFF8F9FF),
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          key: _refreshKey,
+          onRefresh: _handleRefresh,
+          color: AppTheme.primary,
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: _TopBar(photoUrl: photoUrl),
+                child: _TopBar(
+                  photoUrl: photoUrl,
+                  isRefreshing: _isRefreshing,
+                  onRefresh: () => _refreshKey.currentState?.show(),
+                ),
               ),
             ),
             SliverPadding(
@@ -72,11 +97,11 @@ class HomePage extends StatelessWidget {
               sliver: SliverToBoxAdapter(
                 child: _SectionHeader(
                   title: 'Core Tools',
-                  actionLabel: 'Open marketplace',
+                  actionLabel: 'Open Budget Planer',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const MarketplaceScreen(),
+                      builder: (context) => const AIBudgetAdvisorPage(),
                     ),
                   ),
                 ),
@@ -144,11 +169,11 @@ class HomePage extends StatelessWidget {
               sliver: SliverToBoxAdapter(
                 child: _SectionHeader(
                   title: 'Explore FinEase',
-                  actionLabel: 'See all activity',
+                  actionLabel: 'Open Savings Plan',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AllTransactionsPage(),
+                      builder: (context) => const SavingsTrackerPage(),
                     ),
                   ),
                 ),
@@ -216,13 +241,8 @@ class HomePage extends StatelessWidget {
               sliver: SliverToBoxAdapter(
                 child: _SectionHeader(
                   title: 'Your Progress',
-                  actionLabel: 'All activity',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AllTransactionsPage(),
-                    ),
-                  ),
+                  actionLabel: '',
+                  onTap: () {},
                 ),
               ),
             ),
@@ -292,8 +312,10 @@ class HomePage extends StatelessWidget {
                         }
                         return SliverList(
                           delegate: SliverChildBuilderDelegate(
-                            (context, index) =>
-                                _TransactionTile(txn: txns[index]),
+                            (context, index) => _DismissibleTransactionTile(
+                              txn: txns[index],
+                              firestoreService: firestoreService,
+                            ),
                             childCount: txns.length,
                           ),
                         );
@@ -302,6 +324,7 @@ class HomePage extends StatelessWidget {
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
+        ),
         ),
       ),
       floatingActionButton: Container(
@@ -345,9 +368,15 @@ class HomePage extends StatelessWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.photoUrl});
+  const _TopBar({
+    required this.photoUrl,
+    required this.isRefreshing,
+    required this.onRefresh,
+  });
 
   final String? photoUrl;
+  final bool isRefreshing;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -356,13 +385,16 @@ class _TopBar extends StatelessWidget {
       stream: firestoreService?.getUserProfile(),
       builder: (context, snapshot) {
         final profile = snapshot.data ?? const {};
-        final name = (profile['fullName'] as String?)?.split(' ').first ??
+        final name =
+            (profile['fullName'] as String?)?.split(' ').first ??
             context.watch<AuthService>().user?.displayName?.split(' ').first ??
             context.watch<AuthService>().user?.email?.split('@').first ??
             'User';
         final role = profile['role'] == 'admin'
             ? 'Administrator'
-            : (profile['isDemoAccount'] == true ? 'Demo account' : 'Your finance space');
+            : (profile['isDemoAccount'] == true
+                  ? 'Demo account'
+                  : 'Your finance space');
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -394,7 +426,10 @@ class _TopBar extends StatelessWidget {
                           )
                         : const CircleAvatar(
                             backgroundColor: AppTheme.primary,
-                            child: Icon(Icons.person_rounded, color: Colors.white),
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: Colors.white,
+                            ),
                           ),
                   ),
                 ),
@@ -429,22 +464,30 @@ class _TopBar extends StatelessWidget {
                 ),
               ],
             ),
-            IconButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const NotificationsPage()),
-              ),
-              icon: Container(
+            GestureDetector(
+              onTap: onRefresh,
+              child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: AppTheme.softShadow,
                 ),
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF0F172A),
-                ),
+                child: isRefreshing
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primary,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.refresh_rounded,
+                        color: Color(0xFF0F172A),
+                        size: 22,
+                      ),
               ),
             ),
           ],
@@ -857,6 +900,76 @@ class _EmptyState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DismissibleTransactionTile extends StatelessWidget {
+  const _DismissibleTransactionTile({
+    required this.txn,
+    required this.firestoreService,
+  });
+
+  final FinancialTransaction txn;
+  final dynamic firestoreService;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: Key(txn.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE11D48),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        alignment: Alignment.centerRight,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text(
+              'Delete',
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.delete_outline_rounded, color: Colors.white),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return true;
+      },
+      onDismissed: (direction) {
+        firestoreService.deleteTransaction(txn.id);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '"${txn.title}" deleted',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'UNDO',
+              textColor: const Color(0xFF00F2EA),
+              onPressed: () {
+                firestoreService.addTransaction(txn);
+              },
+            ),
+          ),
+        );
+      },
+      child: _TransactionTile(txn: txn),
     );
   }
 }

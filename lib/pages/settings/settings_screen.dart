@@ -10,11 +10,11 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-  bool _pushAlerts = true;
-  bool _monthlyReports = true;
+  // bool _pushAlerts = true;
+  // bool _monthlyReports = true;
   bool _biometric = false;
   // bool _darkTheme = false;
-  String _language = 'English (US)';
+  // String _language = 'English (US)';
 
   @override
   void initState() {
@@ -31,11 +31,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (doc.exists) {
       final d = doc.data()!;
       setState(() {
-        _pushAlerts = d['pushAlerts'] ?? true;
-        _monthlyReports = d['monthlyReports'] ?? true;
+        // _pushAlerts = d['pushAlerts'] ?? true;
+        // _monthlyReports = d['monthlyReports'] ?? true;
         _biometric = d['biometricLogin'] ?? false;
         // _darkTheme = d['darkTheme'] ?? false;
-        _language = d['language'] ?? 'English (US)';
+        // _language = d['language'] ?? 'English (US)';
       });
     }
   }
@@ -154,6 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Icons.lock_outline_rounded,
                     'Change Password',
                     subtitle: 'Update your login credentials',
+                    onTap: () => _showChangePasswordDialog(context),
                   ),
                   _tile(
                     Icons.fingerprint_rounded,
@@ -167,52 +168,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       activeThumbColor: const Color(0xFF00F2EA),
                     ),
                   ),
-                  _tile(
-                    Icons.security_rounded,
-                    'Two-Factor Authentication',
-                    subtitle: 'Add an extra layer of security',
-                  ),
 
+                  // _tile(
+                  //   Icons.security_rounded,
+                  //   'Two-Factor Authentication',
+                  //   subtitle: 'Add an extra layer of security',
+                  // ),
                   const SizedBox(height: 20),
-                  _sectionHeader('Notifications'),
-                  _tile(
-                    Icons.notifications_active_rounded,
-                    'Push Alerts',
-                    subtitle: 'Real-time spending updates',
-                    trailing: Switch(
-                      value: _pushAlerts,
-                      onChanged: (v) {
-                        setState(() => _pushAlerts = v);
-                        _save('pushAlerts', v);
-                      },
-                      activeThumbColor: const Color(0xFF00F2EA),
-                    ),
-                  ),
-                  _tile(
-                    Icons.bar_chart_rounded,
-                    'Monthly Reports',
-                    subtitle: 'Detailed expense analysis',
-                    trailing: Switch(
-                      value: _monthlyReports,
-                      onChanged: (v) {
-                        setState(() => _monthlyReports = v);
-                        _save('monthlyReports', v);
-                      },
-                      activeThumbColor: const Color(0xFF00F2EA),
-                    ),
-                  ),
 
+                  // _sectionHeader('Notifications'),
+                  // _tile(
+                  //   Icons.notifications_active_rounded,
+                  //   'Push Alerts',
+                  //   subtitle: 'Real-time spending updates',
+                  //   trailing: Switch(
+                  //     value: _pushAlerts,
+                  //     onChanged: (v) {
+                  //       setState(() => _pushAlerts = v);
+                  //       _save('pushAlerts', v);
+                  //     },
+                  //     activeThumbColor: const Color(0xFF00F2EA),
+                  //   ),
+                  // ),
+                  // _tile(
+                  //   Icons.bar_chart_rounded,
+                  //   'Monthly Reports',
+                  //   subtitle: 'Detailed expense analysis',
+                  //   trailing: Switch(
+                  //     value: _monthlyReports,
+                  //     onChanged: (v) {
+                  //       setState(() => _monthlyReports = v);
+                  //       _save('monthlyReports', v);
+                  //     },
+                  //     activeThumbColor: const Color(0xFF00F2EA),
+                  //   ),
+                  // ),
                   const SizedBox(height: 20),
-                  _sectionHeader('Language'),
-                  _tile(
-                    Icons.language_rounded,
-                    _language,
-                    subtitle: 'App display language',
-                    trailing: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Color(0xFFC7C5D4),
-                    ),
-                  ),
+                  // _sectionHeader('Language'),
+                  // _tile(
+                  //   Icons.language_rounded,
+                  //   _language,
+                  //   subtitle: 'App display language',
+                  //   trailing: const Icon(
+                  //     Icons.chevron_right_rounded,
+                  //     color: Color(0xFFC7C5D4),
+                  //   ),
+                  // ),
 
                   // const SizedBox(height: 20),
                   // _sectionHeader('Theme Selection'),
@@ -228,7 +229,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   //     activeThumbColor: const Color(0xFF00F2EA),
                   //   ),
                   // ),
-
                   const SizedBox(height: 20),
                   _sectionHeader('Danger Zone'),
                   Container(
@@ -343,6 +343,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String title, {
     String? subtitle,
     Widget? trailing,
+    VoidCallback? onTap,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -381,7 +382,148 @@ class _SettingsScreenState extends State<SettingsScreen> {
         trailing:
             trailing ??
             const Icon(Icons.chevron_right_rounded, color: Color(0xFFC7C5D4)),
-        onTap: () {},
+        onTap: onTap ?? () {},
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    final currentPwCtrl = TextEditingController();
+    final newPwCtrl = TextEditingController();
+    final confirmPwCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool loading = false;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.lock_outline_rounded, color: Color(0xFF2E3192)),
+                SizedBox(width: 10),
+                Text('Change Password',
+                    style: TextStyle(fontFamily: 'Plus Jakarta Sans', fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: currentPwCtrl,
+                      obscureText: obscureCurrent,
+                      decoration: InputDecoration(
+                        labelText: 'Current Password',
+                        prefixIcon: const Icon(Icons.lock_rounded, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureCurrent ? Icons.visibility_off : Icons.visibility, size: 20),
+                          onPressed: () => setDialogState(() => obscureCurrent = !obscureCurrent),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: newPwCtrl,
+                      obscureText: obscureNew,
+                      decoration: InputDecoration(
+                        labelText: 'New Password',
+                        prefixIcon: const Icon(Icons.lock_open_rounded, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureNew ? Icons.visibility_off : Icons.visibility, size: 20),
+                          onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (v.length < 6) return 'Min 6 characters';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: confirmPwCtrl,
+                      obscureText: obscureConfirm,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm New Password',
+                        prefixIcon: const Icon(Icons.check_circle_outline, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility, size: 20),
+                          onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) {
+                        if (v != newPwCtrl.text) return 'Passwords do not match';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: loading ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E3192),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: loading
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) return;
+                        setDialogState(() => loading = true);
+                        try {
+                          final user = FirebaseAuth.instance.currentUser!;
+                          final cred = EmailAuthProvider.credential(
+                            email: user.email!,
+                            password: currentPwCtrl.text,
+                          );
+                          await user.reauthenticateWithCredential(cred);
+                          await user.updatePassword(newPwCtrl.text);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Password updated successfully'),
+                                backgroundColor: Color(0xFF2E7D32),
+                              ),
+                            );
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          setDialogState(() => loading = false);
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text(e.message ?? 'Failed to update password'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                child: loading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Update', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

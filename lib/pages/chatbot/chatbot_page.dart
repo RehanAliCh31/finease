@@ -143,7 +143,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
             ? null
             : IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                color: Colors.white,
+                color: Colors.black,
                 onPressed: () => Navigator.pop(context),
               ),
         title: Row(

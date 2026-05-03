@@ -79,7 +79,7 @@ class AppTheme {
         backgroundColor: surface,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: primary),
+        iconTheme: const IconThemeData(color: Colors.white),
         titleTextStyle: GoogleFonts.plusJakartaSans(
           color: textPrimary,
           fontSize: 20,

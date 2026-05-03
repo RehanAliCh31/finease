@@ -56,7 +56,8 @@ class ProfilePage extends StatelessWidget {
                           stream: firestoreService?.getUserProfile(),
                           builder: (context, snapshot) {
                             final profile = snapshot.data ?? const {};
-                            final name = profile['fullName'] as String? ??
+                            final name =
+                                profile['fullName'] as String? ??
                                 user?.displayName ??
                                 user?.email?.split('@').first ??
                                 'User';
@@ -92,8 +93,8 @@ class ProfilePage extends StatelessWidget {
                                     role == 'admin'
                                         ? 'Admin account'
                                         : (profile['isDemoAccount'] == true
-                                            ? 'Demo account'
-                                            : 'Personal account'),
+                                              ? 'Demo account'
+                                              : 'Personal account'),
                                     style: GoogleFonts.inter(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
@@ -225,7 +226,9 @@ class ProfilePage extends StatelessWidget {
                         if (authService.isAdmin) ...[
                           const Divider(height: 1),
                           ListTile(
-                            leading: const Icon(Icons.admin_panel_settings_outlined),
+                            leading: const Icon(
+                              Icons.admin_panel_settings_outlined,
+                            ),
                             title: const Text('Admin Panel'),
                             subtitle: const Text(
                               'Moderation, metrics, and operational controls',
@@ -233,27 +236,28 @@ class ProfilePage extends StatelessWidget {
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const AdminDashboardScreen(),
+                                builder: (context) =>
+                                    const AdminDashboardScreen(),
                               ),
                             ),
                           ),
                         ],
                         const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.shield_outlined),
-                          title: const Text('Security'),
-                          subtitle: const Text(
-                            'Firebase authentication with secure local storage',
-                          ),
-                        ),
+                        // ListTile(
+                        //   leading: const Icon(Icons.shield_outlined),
+                        //   title: const Text('Security'),
+                        //   subtitle: const Text(
+                        //     'Firebase authentication with secure local storage',
+                        //   ),
+                        // ),
                         const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.school_rounded),
-                          title: const Text('Learning Progress'),
-                          subtitle: const Text(
-                            'Course progress and quiz scores sync to your profile',
-                          ),
-                        ),
+                        // ListTile(
+                        //   leading: const Icon(Icons.school_rounded),
+                        //   title: const Text('Learning Progress'),
+                        //   subtitle: const Text(
+                        //     'Course progress and quiz scores sync to your profile',
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),
