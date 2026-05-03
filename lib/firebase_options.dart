@@ -17,10 +17,7 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -59,4 +56,15 @@ class DefaultFirebaseOptions {
     storageBucket: 'finease-27a62.firebasestorage.app',
     iosBundleId: 'com.example.finease',
   );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyCADdOvp2Mi5Qvx8mBx1dGPiiAM1H8gEZ0',
+    appId: '1:469405287112:web:31f0a27f66ec71586edbfd',
+    messagingSenderId: '469405287112',
+    projectId: 'finease-27a62',
+    authDomain: 'finease-27a62.firebaseapp.com',
+    storageBucket: 'finease-27a62.firebasestorage.app',
+    measurementId: 'G-91Y4CJ3MKB',
+  );
+
 }

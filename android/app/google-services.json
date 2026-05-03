@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "469405287112",
+    "project_id": "finease-27a62",
+    "storage_bucket": "finease-27a62.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469405287112:android:e7e92e9be42eb1166edbfd",
+        "android_client_info": {
+          "package_name": "com.android.application"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACyhJV14oEAFAUs7caEnBWzO6VqS_kknM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469405287112:android:46263ac3d93253fc6edbfd",
+        "android_client_info": {
+          "package_name": "com.example.finease"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACyhJV14oEAFAUs7caEnBWzO6VqS_kknM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469405287112:android:61cd1c5ffb9f9fd56edbfd",
+        "android_client_info": {
+          "package_name": "com.example.untitled2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACyhJV14oEAFAUs7caEnBWzO6VqS_kknM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
