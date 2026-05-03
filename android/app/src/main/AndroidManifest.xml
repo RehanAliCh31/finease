@@ -4,7 +4,9 @@
     <application
         android:label="finease"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/backup_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -9,7 +9,12 @@ import 'firestore_service.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
+    aOptions: AndroidOptions.biometric(
+      enforceBiometrics: false, // gracefully degrades if device has no biometrics
+      biometricPromptTitle: 'Authenticate to access FinEase',
+    ),
+  );
   final LocalAuthentication _localAuth = LocalAuthentication();
   User? _user;
   FirestoreService? _firestoreService;
@@ -186,11 +191,11 @@ class AuthService extends ChangeNotifier {
     }
 
     final didAuthenticate = await _localAuth.authenticate(
-      localizedReason:
-          'Authenticate with Touch ID or Face ID to unlock FinEase',
-      biometricOnly: true,
-      persistAcrossBackgrounding: true,
+      localizedReason: 'Authenticate with Touch ID or Face ID to unlock FinEase',
+      biometricOnly: true, 
+      persistAcrossBackgrounding: true, 
     );
+
 
     if (!didAuthenticate) {
       return false;
