@@ -12,7 +12,7 @@ class AIService {
           ? apiKey!.trim()
           : dotenv.env['GEMINI_API_KEY']?.trim() ?? '' {
     _useRealAI = _apiKey.isNotEmpty;
-    _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _apiKey);
+    _model = GenerativeModel(model: 'gemini-2.0-pro', apiKey: _apiKey);
   }
 
   final String _apiKey;

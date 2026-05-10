@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
-
-import '../../app_constants.dart';
+import 'package:local_auth/local_auth.dart';
 import '../../services/auth_service.dart';
-import '../../theme/app_theme.dart';
 import 'signup_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -15,257 +13,483 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passFocus = FocusNode();
+  final LocalAuthentication _localAuth = LocalAuthentication();
+
   bool _isLoading = false;
-  bool _isPasswordVisible = false;
-  bool _enableBiometricLogin = true;
+  bool _showPass = false;
+  bool _emailTouched = false;
+  bool _passTouched = false;
+
+  // Track failed attempts to prevent brute-force
+  int _failedAttempts = 0;
+  bool _isLockedOut = false;
+  DateTime? _lockoutEnd;
+
+  late AnimationController _shakeCtrl;
+  late Animation<double> _shakeAnim;
+
+  static const Color _primary = Color(0xFF2E3192);
+  static const Color _dark = Color(0xFF1A1A1A);
+  static const Color _error = Color(0xFFEF4444);
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500));
+    _shakeAnim = Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(parent: _shakeCtrl, curve: Curves.elasticIn));
+  }
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    _emailFocus.dispose();
+    _passFocus.dispose();
+    _shakeCtrl.dispose();
     super.dispose();
+  }
+
+  // ── Validators ──────────────────────────────────────────────────────────────
+  String? _validateEmail(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Email address is required';
+    final emailRegex = RegExp(
+        r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(v.trim())) {
+      return 'Enter a valid email address (e.g. name@example.com)';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? v) {
+    if (v == null || v.isEmpty) return 'Password is required';
+    if (v.length < 6) return 'Password must be at least 6 characters';
+    return null;
+  }
+
+  // ── Lockout check ────────────────────────────────────────────────────────────
+  bool get _isCurrentlyLockedOut {
+    if (!_isLockedOut) return false;
+    if (_lockoutEnd != null && DateTime.now().isAfter(_lockoutEnd!)) {
+      _isLockedOut = false;
+      _failedAttempts = 0;
+      return false;
+    }
+    return true;
+  }
+
+  String get _lockoutRemaining {
+    if (_lockoutEnd == null) return '';
+    final remaining = _lockoutEnd!.difference(DateTime.now()).inSeconds;
+    return '${remaining}s';
+  }
+
+  // ── Login Logic ─────────────────────────────────────────────────────────────
+  Future<void> _login() async {
+    setState(() {
+      _emailTouched = true;
+      _passTouched = true;
+    });
+
+    if (_isCurrentlyLockedOut) {
+      _showSnack(
+          '🔒 Too many failed attempts. Try again in $_lockoutRemaining.',
+          isError: true);
+      HapticFeedback.heavyImpact();
+      return;
+    }
+
+    if (!_formKey.currentState!.validate()) {
+      _shakeCtrl.forward(from: 0);
+      HapticFeedback.mediumImpact();
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await Provider.of<AuthService>(context, listen: false)
+          .signInWithEmail(_emailCtrl.text.trim(), _passCtrl.text);
+      // Reset on success
+      _failedAttempts = 0;
+    } on Exception catch (e) {
+      if (mounted) {
+        _failedAttempts++;
+        // Lock out after 5 failed attempts for 30 seconds
+        if (_failedAttempts >= 5) {
+          setState(() {
+            _isLockedOut = true;
+            _lockoutEnd = DateTime.now().add(const Duration(seconds: 30));
+          });
+          _showSnack(
+              '🔒 Account temporarily locked after $_failedAttempts failed attempts. Wait 30s.',
+              isError: true);
+        } else {
+          _shakeCtrl.forward(from: 0);
+          HapticFeedback.heavyImpact();
+          _showSnack(_friendlyError(e.toString()), isError: true);
+          // Show remaining attempts warning
+          if (_failedAttempts >= 3) {
+            _showSnack(
+                '⚠️ Warning: ${5 - _failedAttempts} attempt(s) remaining before lockout.',
+                isError: true);
+          }
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _friendlyError(String raw) {
+    if (raw.contains('user-not-found') || raw.contains('invalid-credential')) {
+      return 'No account found with this email. Check your details or sign up.';
+    }
+    if (raw.contains('wrong-password') || raw.contains('invalid-credential')) {
+      return 'Incorrect password. Please try again.';
+    }
+    if (raw.contains('too-many-requests')) {
+      return 'Too many login attempts. Please wait and try again.';
+    }
+    if (raw.contains('user-disabled')) {
+      return 'This account has been disabled. Contact support.';
+    }
+    if (raw.contains('network')) {
+      return 'No internet connection. Please check your network.';
+    }
+    return 'Login failed. Please check your credentials and try again.';
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        Icon(
+            isError
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            color: Colors.white,
+            size: 18),
+        const SizedBox(width: 10),
+        Expanded(child: Text(msg, style: GoogleFonts.inter(fontSize: 12))),
+      ]),
+      backgroundColor: isError ? _error : const Color(0xFF10B981),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 4),
+    ));
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || _validateEmail(email) != null) {
+      _showSnack(
+          'Enter a valid email above first, then tap Forgot Password.',
+          isError: true);
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Reset Password',
+            style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800, fontSize: 18)),
+        content: Text(
+            'A secure password reset link will be sent to:\n\n$email',
+            style: GoogleFonts.inter(fontSize: 13, height: 1.6)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: GoogleFonts.inter(color: Colors.grey[600])),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await Provider.of<AuthService>(context, listen: false)
+                    .sendPasswordResetEmail(email);
+                _showSnack('✅ Reset email sent to $email. Check your inbox.');
+              } catch (_) {
+                _showSnack(
+                    'Could not send reset email. Verify the address and try again.',
+                    isError: true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12))),
+            child: Text('Send Reset Link',
+                style: GoogleFonts.inter(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _biometricLogin() async {
+    try {
+      final canAuth = await _localAuth.canCheckBiometrics ||
+          await _localAuth.isDeviceSupported();
+      if (!canAuth) {
+        _showSnack('Biometric authentication not available on this device.',
+            isError: true);
+        return;
+      }
+      final didAuth = await _localAuth.authenticate(
+        localizedReason: 'Authenticate to login to FinEase',
+      );
+      if (didAuth && mounted) {
+        _showSnack('✅ Biometric authentication successful!');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Biometric authentication failed: ${e.toString()}',
+            isError: true);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authService = context.watch<AuthService>();
-    final biometricLabel = _biometricLabel(authService.availableBiometrics);
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
+          // Background blobs
           Positioned(
             top: -100,
             right: -100,
-                child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.primary.withValues(alpha: 0.05),
-              ),
-            ),
+            child: _bgCircle(300, _primary.withOpacity(0.05)),
           ),
           Positioned(
             bottom: -50,
             left: -50,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.secondary.withValues(alpha: 0.1),
-              ),
-            ),
+            child: _bgCircle(200, const Color(0xFF1BFFFF).withOpacity(0.08)),
           ),
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 40),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppTheme.primary, AppTheme.secondary],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 28.0, vertical: 40.0),
+              child: Form(
+                key: _formKey,
+                child: AnimatedBuilder(
+                  animation: _shakeAnim,
+                  builder: (context, child) => Transform.translate(
+                    offset: Offset(
+                        _shakeCtrl.isAnimating
+                            ? 8 *
+                                (0.5 - _shakeAnim.value).abs() *
+                                (_shakeAnim.value > 0.5 ? 1 : -1)
+                            : 0,
+                        0),
+                    child: child,
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    AppConstants.appName,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Text(
-                    'Welcome back',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1A1A1A),
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Securely access your financial world with password and biometric unlock.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 48),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildLabel('Email Address'),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTextField(
-                    controller: _emailController,
-                    hint: 'name@example.com',
-                    icon: Icons.alternate_email_rounded,
-                  ),
-                  const SizedBox(height: 24),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildLabel('Password'),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTextField(
-                    controller: _passwordController,
-                    hint: 'Enter your password',
-                    icon: Icons.lock_outline_rounded,
-                    isPassword: true,
-                    isPasswordVisible: _isPasswordVisible,
-                    onTogglePassword: () => setState(
-                      () => _isPasswordVisible = !_isPasswordVisible,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'Enable Touch ID / Face ID after login',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1A1A1A),
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Credentials are stored securely on this device.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    value: _enableBiometricLogin,
-                    onChanged: (value) =>
-                        setState(() => _enableBiometricLogin = value),
-                    activeThumbColor: AppTheme.primary,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildLoginButton(),
-                  const SizedBox(height: 32),
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'QUICK ACCESS',
+                      const SizedBox(height: 30),
+                      // Logo
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                              colors: [_primary, Color(0xFF1565C0)]),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                                color: _primary.withOpacity(0.35),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10))
+                          ],
+                        ),
+                        child: const Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: Colors.white,
+                            size: 32),
+                      ),
+                      const SizedBox(height: 28),
+                      Text('Welcome back',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.grey[400],
-                            letterSpacing: 1.5,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              color: _dark,
+                              letterSpacing: -1)),
+                      const SizedBox(height: 6),
+                      Text(
+                          'Securely access your financial world.',
+                          style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              height: 1.5)),
+
+                      // Lockout warning banner
+                      if (_isCurrentlyLockedOut) ...[
+                        const SizedBox(height: 20),
+                        _buildLockoutBanner(),
+                      ],
+
+                      const SizedBox(height: 36),
+
+                      // ── Email ──
+                      _fieldLabel('Email Address'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _emailCtrl,
+                        focusNode: _emailFocus,
+                        keyboardType: TextInputType.emailAddress,
+                        style: GoogleFonts.inter(fontSize: 15, color: _dark),
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator:
+                            _emailTouched ? _validateEmail : null,
+                        onChanged: (_) =>
+                            setState(() => _emailTouched = true),
+                        onFieldSubmitted: (_) =>
+                            FocusScope.of(context).requestFocus(_passFocus),
+                        textInputAction: TextInputAction.next,
+                        decoration: _fieldDeco(
+                            'name@example.com',
+                            Icons.alternate_email_rounded),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── Password ──
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _fieldLabel('Password'),
+                          TextButton(
+                            onPressed: _forgotPassword,
+                            style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap),
+                            child: Text('Forgot Password?',
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: _primary)),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _passCtrl,
+                        focusNode: _passFocus,
+                        obscureText: !_showPass,
+                        style: GoogleFonts.inter(fontSize: 15, color: _dark),
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator:
+                            _passTouched ? _validatePassword : null,
+                        onChanged: (_) =>
+                            setState(() => _passTouched = true),
+                        onFieldSubmitted: (_) => _login(),
+                        textInputAction: TextInputAction.done,
+                        decoration: _fieldDeco(
+                            '••••••••',
+                            Icons.lock_outline_rounded,
+                            suffix: IconButton(
+                              icon: Icon(
+                                  _showPass
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey[400],
+                                  size: 20),
+                              onPressed: () =>
+                                  setState(() => _showPass = !_showPass),
+                            )),
+                      ),
+
+                      // Failed attempts indicator
+                      if (_failedAttempts > 0 && _failedAttempts < 5) ...[
+                        const SizedBox(height: 8),
+                        _buildAttemptsWarning(),
+                      ],
+
+                      const SizedBox(height: 32),
+
+                      // ── Login Button ──
+                      _buildLoginButton(),
+                      const SizedBox(height: 28),
+
+                      // ── Divider ──
+                      Row(
+                        children: [
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text('OR QUICK ACCESS',
+                                style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.grey[400],
+                                    letterSpacing: 1.5)),
+                          ),
+                          const Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // ── Biometric Buttons ──
+                      Row(
+                        children: [
+                          Expanded(
+                              child: _buildBioButton(
+                                  Icons.fingerprint_rounded, 'Touch ID')),
+                          const SizedBox(width: 16),
+                          Expanded(
+                              child: _buildBioButton(
+                                  Icons.face_unlock_rounded, 'Face ID')),
+                        ],
+                      ),
+                      const SizedBox(height: 40),
+
+                      // ── Sign Up Link ──
+                      Center(
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('New to FinEase? ',
+                                    style: GoogleFonts.inter(
+                                        color: Colors.grey[600],
+                                        fontSize: 13)),
+                                GestureDetector(
+                                  onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              const SignupPage())),
+                                  child: Text('Create an account',
+                                      style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.bold,
+                                          color: _primary,
+                                          fontSize: 13)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 28),
+                            _buildSecurityBadges(),
+                          ],
                         ),
                       ),
-                      const Expanded(child: Divider()),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  _buildBiometricButton(biometricLabel),
-                  const SizedBox(height: 48),
-                  Center(
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'New to FinEase? ',
-                              style: GoogleFonts.inter(color: Colors.grey[600]),
-                            ),
-                            GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const SignupPage(),
-                                ),
-                              ),
-                              child: Text(
-                                'Create an account',
-                                style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8F9FE),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                'Presentation demo account',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                AppConstants.demoEmail,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.shield_rounded,
-                              size: 14,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '256-bit encryption and secure device storage',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -274,55 +498,91 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Text(
-      text,
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  Widget _bgCircle(double size, Color color) => Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color));
+
+  Widget _fieldLabel(String text) => Text(text,
       style: GoogleFonts.plusJakartaSans(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: const Color(0xFF1A1A1A),
+          fontSize: 13, fontWeight: FontWeight.w700, color: _dark));
+
+  InputDecoration _fieldDeco(String hint, IconData icon, {Widget? suffix}) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 14),
+        prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
+        suffixIcon: suffix,
+        filled: true,
+        fillColor: const Color(0xFFF8F9FE),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _primary, width: 1.5)),
+        errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _error, width: 1.2)),
+        focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _error, width: 1.5)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        errorStyle: GoogleFonts.inter(fontSize: 11, color: _error),
+      );
+
+  Widget _buildLockoutBanner() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _error.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _error.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_rounded, color: _error, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Account temporarily locked. Try again in $_lockoutRemaining.',
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: _error, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-    bool isPasswordVisible = false,
-    VoidCallback? onTogglePassword,
-  }) {
+  Widget _buildAttemptsWarning() {
+    final remaining = 5 - _failedAttempts;
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FE),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F1F1)),
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFED7AA)),
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword && !isPasswordVisible,
-        style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF1A1A1A)),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: GoogleFonts.inter(color: Colors.grey[400]),
-          prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
-          suffixIcon: isPassword
-              ? IconButton(
-                  icon: Icon(
-                    isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey[400],
-                    size: 20,
-                  ),
-                  onPressed: onTogglePassword,
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: Color(0xFFF97316), size: 16),
+          const SizedBox(width: 8),
+          Text(
+            '$remaining attempt${remaining == 1 ? '' : 's'} remaining before lockout',
+            style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF92400E),
+                fontWeight: FontWeight.w600),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -331,181 +591,105 @@ class _LoginPageState extends State<LoginPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.8)],
-        ),
+        gradient: const LinearGradient(
+            colors: [_primary, Color(0xFF1565C0)]),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
+              color: _primary.withOpacity(0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 8))
         ],
       ),
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _login,
+        onPressed: _isLoading || _isCurrentlyLockedOut ? null : _login,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+              borderRadius: BorderRadius.circular(16)),
         ),
         child: _isLoading
             ? const SizedBox(
-                height: 24,
-                width: 24,
+                height: 22,
+                width: 22,
                 child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : Text(
-                'Login to Account',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+                    color: Colors.white, strokeWidth: 2.5))
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.lock_open_rounded,
+                      color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Login to Account',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
+                ],
               ),
       ),
     );
   }
 
-  Widget _buildBiometricButton(String biometricLabel) {
+  Widget _buildBioButton(IconData icon, String label) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F1F1)),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4))
+        ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _isLoading ? null : _authenticateWithBiometrics,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-            child: Row(
-              children: [
-                Icon(Icons.fingerprint_rounded, color: AppTheme.primary, size: 28),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        biometricLabel,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1A1A1A),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Use saved credentials after biometric verification.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: Colors.grey[400],
-                ),
-              ],
-            ),
+      child: InkWell(
+        onTap: _biometricLogin,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: [
+              Icon(icon, color: _dark, size: 28),
+              const SizedBox(height: 8),
+              Text(label,
+                  style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _dark)),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Future<void> _authenticateWithBiometrics() async {
-    setState(() => _isLoading = true);
-    try {
-      final authService = context.read<AuthService>();
-      final didLogin = await authService.authenticateWithBiometrics();
-      if (!didLogin && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Biometric login is unavailable until you sign in once and enable it.',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  Widget _buildSecurityBadges() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _badge(Icons.shield_rounded, '256-bit AES'),
+        const SizedBox(width: 20),
+        _badge(Icons.lock_clock_rounded, 'Auto Lockout'),
+        const SizedBox(width: 20),
+        _badge(Icons.verified_user_rounded, 'Secure'),
+      ],
+    );
   }
 
-  Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      final authService = context.read<AuthService>();
-      await authService.signInWithEmail(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
-      if (_enableBiometricLogin && await authService.canUseBiometrics()) {
-        await authService.enableBiometricLogin(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              authService.isDemoAccount
-                  ? 'Signed in to the demo account.'
-                  : 'Welcome back to ${AppConstants.appName}.',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  String _biometricLabel(List<BiometricType> biometrics) {
-    if (biometrics.contains(BiometricType.face)) {
-      return 'Face ID Login';
-    }
-    if (biometrics.contains(BiometricType.fingerprint) ||
-        biometrics.contains(BiometricType.strong) ||
-        biometrics.contains(BiometricType.weak)) {
-      return 'Touch ID Login';
-    }
-    return 'Biometric Login';
+  Widget _badge(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: Colors.grey[400]),
+        const SizedBox(width: 5),
+        Text(label,
+            style: GoogleFonts.inter(
+                fontSize: 11, color: Colors.grey[400])),
+      ],
+    );
   }
 }
