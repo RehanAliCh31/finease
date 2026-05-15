@@ -2,10 +2,9 @@ import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 
+import '../../services/ai_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
 
@@ -24,8 +23,10 @@ class _LoanSimulatorPageState extends State<LoanSimulatorPage> {
   double _tenure = 36;
   String? _aiInsight;
   bool _aiLoading = false;
+  final AIService _aiService = AIService();
 
   double get _emi {
+    if (_tenure <= 0) return 0;
     final r = (_rate / 12) / 100;
     if (r == 0) {
       return _amount / _tenure;
@@ -33,10 +34,11 @@ class _LoanSimulatorPageState extends State<LoanSimulatorPage> {
     return (_amount * r * pow(1 + r, _tenure)) / (pow(1 + r, _tenure) - 1);
   }
 
-  double get _totalInterest => (_emi * _tenure) - _amount;
-  double get _totalPayment => _emi * _tenure;
-  double get _recommendedIncome => _emi / 0.3;
-  double get _loanToCostRatio => _totalPayment / _amount;
+  double get _totalInterest =>
+      _tenure <= 0 ? 0 : ((_emi * _tenure) - _amount).clamp(0, double.infinity);
+  double get _totalPayment => _tenure <= 0 ? _amount : _emi * _tenure;
+  double get _recommendedIncome => _emi <= 0 ? 0 : _emi / 0.3;
+  double get _loanToCostRatio => _amount <= 0 ? 0 : _totalPayment / _amount;
 
   Future<void> _getAIInsight() async {
     setState(() {
@@ -44,23 +46,18 @@ class _LoanSimulatorPageState extends State<LoanSimulatorPage> {
       _aiInsight = null;
     });
     try {
-      final key = dotenv.env['GEMINI_API_KEY'] ?? '';
-      final model = GenerativeModel(model: 'gemini-2.0-pro', apiKey: key);
       final prompt =
-          '''Analyze this loan for a user in Pakistan: Amount ${CurrencyUtils.format(_amount)}, markup ${_rate.toStringAsFixed(1)}% annually, tenure ${_tenure.toInt()} months.
-EMI: ${CurrencyUtils.format(_emi)}/month, Total interest: ${CurrencyUtils.format(_totalInterest)}.
+          '''Analyze this loan for a user in Pakistan: Amount ${CurrencyUtils.exact(_amount)}, markup ${_rate.toStringAsFixed(1)}% annually, tenure ${_tenure.toInt()} months.
+EMI: ${CurrencyUtils.exact(_emi)}/month, Total interest: ${CurrencyUtils.exact(_totalInterest)}.
 Give 3 concise bullet points in PKR.''';
-      final response = await model.generateContent([Content.text(prompt)]);
+      final response = await _aiService.generalFinancialAnswer(prompt);
       setState(() {
-        _aiInsight = response.text;
+        _aiInsight = response;
         _aiLoading = false;
       });
-    } catch (_) {
+    } catch (error) {
       setState(() {
-        _aiInsight =
-            '- Your EMI of ${CurrencyUtils.format(_emi)} should ideally stay under 30% of monthly income.\n\n'
-            '- This loan costs ${CurrencyUtils.format(_totalInterest)} in total markup, so a shorter tenure can save meaningful money.\n\n'
-            '- Compare at least two lenders before applying, especially if your markup is above 18%.';
+        _aiInsight = 'AI is not running yet: $error';
         _aiLoading = false;
       });
     }
@@ -113,7 +110,7 @@ Give 3 concise bullet points in PKR.''';
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    CurrencyUtils.format(_emi),
+                    CurrencyUtils.exact(_emi),
                     style: GoogleFonts.plusJakartaSans(
                       color: Colors.white,
                       fontSize: 36,
@@ -130,20 +127,14 @@ Give 3 concise bullet points in PKR.''';
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      _statPill(
-                        'Principal',
-                        CurrencyUtils.format(_amount, compact: true),
-                      ),
+                      _statPill('Principal', CurrencyUtils.exact(_amount)),
                       const SizedBox(width: 12),
                       _statPill(
                         'Interest',
-                        CurrencyUtils.format(_totalInterest, compact: true),
+                        CurrencyUtils.exact(_totalInterest),
                       ),
                       const SizedBox(width: 12),
-                      _statPill(
-                        'Total',
-                        CurrencyUtils.format(_totalPayment, compact: true),
-                      ),
+                      _statPill('Total', CurrencyUtils.exact(_totalPayment)),
                     ],
                   ),
                 ],
@@ -156,7 +147,7 @@ Give 3 concise bullet points in PKR.''';
                   Expanded(
                     child: _miniMetric(
                       'Suggested income',
-                      CurrencyUtils.format(_recommendedIncome, compact: true),
+                      CurrencyUtils.exact(_recommendedIncome),
                       AppTheme.success,
                     ),
                   ),
@@ -190,7 +181,7 @@ Give 3 concise bullet points in PKR.''';
                     value: _amount,
                     min: 100000,
                     max: 5000000,
-                    display: CurrencyUtils.format(_amount, compact: true),
+                    display: CurrencyUtils.exact(_amount),
                     onChanged: (value) => setState(() => _amount = value),
                   ),
                   const SizedBox(height: 16),
@@ -206,7 +197,7 @@ Give 3 concise bullet points in PKR.''';
                   _Slider(
                     label: 'Tenure',
                     value: _tenure,
-                    min: 6,
+                    min: 0,
                     max: 120,
                     display: '${_tenure.toInt()} mo',
                     onChanged: (value) => setState(() => _tenure = value),
@@ -241,7 +232,7 @@ Give 3 concise bullet points in PKR.''';
                     child: BarChart(
                       BarChartData(
                         alignment: BarChartAlignment.spaceAround,
-                        maxY: _totalPayment,
+                        maxY: _totalPayment <= 0 ? 1 : _totalPayment,
                         barTouchData: BarTouchData(enabled: false),
                         titlesData: FlTitlesData(
                           show: true,
@@ -377,25 +368,25 @@ Give 3 concise bullet points in PKR.''';
                   _row(
                     context,
                     'Loan Amount',
-                    CurrencyUtils.format(_amount),
+                    CurrencyUtils.exact(_amount),
                     first: true,
                   ),
-                  _row(context, 'Monthly EMI', CurrencyUtils.format(_emi)),
+                  _row(context, 'Monthly EMI', CurrencyUtils.exact(_emi)),
                   _row(
                     context,
                     'Total Interest',
-                    CurrencyUtils.format(_totalInterest),
+                    CurrencyUtils.exact(_totalInterest),
                   ),
                   _row(
                     context,
                     'Total Payment',
-                    CurrencyUtils.format(_totalPayment),
+                    CurrencyUtils.exact(_totalPayment),
                     highlight: true,
                   ),
                   _row(
                     context,
                     'Suggested Monthly Income',
-                    CurrencyUtils.format(_recommendedIncome),
+                    CurrencyUtils.exact(_recommendedIncome),
                   ),
                 ],
               ),

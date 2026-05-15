@@ -1,12 +1,6 @@
 import 'package:intl/intl.dart';
 
 class CurrencyUtils {
-  static final NumberFormat _compactFormatter = NumberFormat.compactCurrency(
-    locale: 'en_PK',
-    symbol: 'PKR ',
-    decimalDigits: 1,
-  );
-
   static final NumberFormat _standardFormatter = NumberFormat.currency(
     locale: 'en_PK',
     symbol: 'PKR ',
@@ -14,8 +8,21 @@ class CurrencyUtils {
   );
 
   static String format(double value, {bool compact = false}) {
-    return compact
-        ? _compactFormatter.format(value)
-        : _standardFormatter.format(value);
+    return _standardFormatter.format(value);
+  }
+
+  static String number(num value) {
+    return NumberFormat.decimalPattern('en_PK').format(value);
+  }
+
+  static String exact(num value) {
+    if (!value.isFinite) {
+      return '0';
+    }
+    final normalized = value.abs() < 0.000001 ? 0 : value;
+    if (normalized % 1 == 0) {
+      return normalized.toStringAsFixed(0);
+    }
+    return normalized.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
   }
 }

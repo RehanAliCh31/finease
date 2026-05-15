@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/demo_finance_data.dart';
 import '../../models/lesson.dart';
@@ -97,6 +98,7 @@ class LiteracyHubPage extends StatelessWidget {
                     child: _CourseCard(course: course),
                   ),
                 ),
+                _buildCommunityCard(),
               ]),
             ),
           ),
@@ -253,6 +255,34 @@ class LiteracyHubPage extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildCommunityCard() {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Community Learning',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Discuss lessons, budgeting habits, and savings questions with other FinEase learners.',
+            style: GoogleFonts.inter(color: Colors.grey[700], height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CourseCard extends StatelessWidget {
@@ -334,6 +364,27 @@ class _CourseCard extends StatelessWidget {
                               course.rating.toStringAsFixed(1),
                               style: GoogleFonts.inter(
                                 fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    _openExternal(course.externalUrl),
+                                icon: const Icon(Icons.open_in_new_rounded),
+                                label: const Text('Course Link'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () => _openExternal(course.videoUrl),
+                                icon: const Icon(Icons.play_circle_outline),
+                                label: const Text('YouTube'),
                               ),
                             ),
                           ],
@@ -444,6 +495,10 @@ class _CourseCard extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _openExternal(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 }
 
@@ -645,7 +700,9 @@ class _QuizDialogState extends State<_QuizDialog> {
   Widget build(BuildContext context) {
     final totalQuestions = widget.course.quiz.questions.length;
     final answeredCount = _answers.length;
-    final answerProgress = totalQuestions == 0 ? 0.0 : answeredCount / totalQuestions;
+    final answerProgress = totalQuestions == 0
+        ? 0.0
+        : answeredCount / totalQuestions;
     final timerProgress = _remainingSeconds / _quizDurationSeconds;
 
     return AlertDialog(
@@ -680,7 +737,11 @@ class _QuizDialogState extends State<_QuizDialog> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF2E3192)),
+                  const Icon(
+                    Icons.timer_outlined,
+                    size: 18,
+                    color: Color(0xFF2E3192),
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Time left: ${(_remainingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}',
@@ -781,14 +842,45 @@ class _QuizDialogState extends State<_QuizDialog> {
       _answers,
     );
 
+    if (score == widget.course.quiz.questions.length) {
+      final title = switch (widget.course.id) {
+        'budget-foundations' => 'Budget Master',
+        'smart-investing' => 'Investment Beginner',
+        'credit-and-debt' => 'Amateur Finance Expert',
+        _ => 'Smart Saver',
+      };
+      await firestoreService.awardAchievement(widget.course.id, title);
+    }
+
     if (mounted) {
       Navigator.pop(context);
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
           title: Text(autoSubmitted ? 'Time is up' : 'Quiz Saved'),
-          content: Text(
-            'You scored $score/${widget.course.quiz.questions.length}.',
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'You scored $score/${widget.course.quiz.questions.length}.',
+                ),
+                const SizedBox(height: 12),
+                ...widget.course.quiz.questions.map((question) {
+                  final answer = _answers[question.id];
+                  final correct = answer == question.correctIndex;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      correct
+                          ? 'Correct: ${question.prompt}'
+                          : 'Correct answer: ${question.options[question.correctIndex]}\n${question.explanation}',
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
           actions: [
             TextButton(

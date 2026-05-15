@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/budget_plan.dart';
 import '../../models/saving_goal.dart';
 import '../../models/transaction.dart';
+import '../../app_constants.dart';
 import '../../services/ai_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
@@ -136,6 +137,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                                   onPressed: () => _showBudgetEditor(
                                     context,
                                     firestoreService,
+                                    budgets: budgets,
                                   ),
                                   icon: const Icon(Icons.add_rounded),
                                   label: const Text('Add Budget'),
@@ -147,6 +149,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                                   onCreate: () => _showBudgetEditor(
                                     context,
                                     firestoreService,
+                                    budgets: budgets,
                                   ),
                                 )
                               else
@@ -161,7 +164,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                                       onEdit: () => _showBudgetEditor(
                                         context,
                                         firestoreService,
-                                        budget: budget,
+                                        budgets: budgets,
                                       ),
                                       onDelete: () => firestoreService
                                           .deleteBudgetPlan(budget.id),
@@ -177,11 +180,13 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                                   monthlyTransactions,
                                 ),
                                 builder: (context, snapshot) {
+                                  final body = snapshot.hasError
+                                      ? 'AI is not running yet: ${snapshot.error}'
+                                      : snapshot.data ??
+                                            'Generating budget plan recommendations...';
                                   return _InsightCard(
                                     title: 'Budget Plan Coach',
-                                    body:
-                                        snapshot.data ??
-                                        'Generating budget plan recommendations...',
+                                    body: body,
                                     icon: Icons.auto_awesome_rounded,
                                     color: const Color(0xFF22D3EE),
                                   );
@@ -193,11 +198,13 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                                   monthlyTransactions,
                                 ),
                                 builder: (context, snapshot) {
+                                  final body = snapshot.hasError
+                                      ? 'AI is not running yet: ${snapshot.error}'
+                                      : snapshot.data ??
+                                            'Analyzing your transaction patterns...';
                                   return _InsightCard(
                                     title: 'Spending Pattern Insights',
-                                    body:
-                                        snapshot.data ??
-                                        'Analyzing your transaction patterns...',
+                                    body: body,
                                     icon: Icons.insights_rounded,
                                     color: const Color(0xFF818CF8),
                                   );
@@ -282,15 +289,15 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
   void _showBudgetEditor(
     BuildContext context,
     FirestoreService firestoreService, {
-    BudgetPlan? budget,
+    required List<BudgetPlan> budgets,
   }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _BudgetEditorSheet(
+      builder: (context) => _CategoryBudgetManagerSheet(
         firestoreService: firestoreService,
-        budget: budget,
+        budgets: budgets,
         monthKey: _monthKey,
       ),
     );
@@ -420,24 +427,15 @@ class _SummaryCard extends StatelessWidget {
             children: [
               _SummaryStat(
                 label: 'Budgeted',
-                value: CurrencyUtils.format(
-                  analytics.totalBudgeted,
-                  compact: true,
-                ),
+                value: CurrencyUtils.format(analytics.totalBudgeted),
               ),
               _SummaryStat(
                 label: 'Spent',
-                value: CurrencyUtils.format(
-                  analytics.totalSpent,
-                  compact: true,
-                ),
+                value: CurrencyUtils.format(analytics.totalSpent),
               ),
               _SummaryStat(
                 label: 'Income',
-                value: CurrencyUtils.format(
-                  analytics.totalIncome,
-                  compact: true,
-                ),
+                value: CurrencyUtils.format(analytics.totalIncome),
               ),
             ],
           ),
@@ -961,183 +959,526 @@ class _EmptyBudgetState extends StatelessWidget {
   }
 }
 
-class _BudgetEditorSheet extends StatefulWidget {
-  const _BudgetEditorSheet({
+class _CategoryBudgetManagerSheet extends StatefulWidget {
+  const _CategoryBudgetManagerSheet({
     required this.firestoreService,
     required this.monthKey,
-    this.budget,
+    required this.budgets,
   });
 
   final FirestoreService firestoreService;
-  final BudgetPlan? budget;
   final String monthKey;
+  final List<BudgetPlan> budgets;
 
   @override
-  State<_BudgetEditorSheet> createState() => _BudgetEditorSheetState();
+  State<_CategoryBudgetManagerSheet> createState() =>
+      _CategoryBudgetManagerSheetState();
 }
 
-class _BudgetEditorSheetState extends State<_BudgetEditorSheet> {
-  late final TextEditingController _titleController;
-  late final TextEditingController _amountController;
-  late final TextEditingController _notesController;
-  late String _category;
+class _CategoryBudgetManagerSheetState
+    extends State<_CategoryBudgetManagerSheet> {
+  final _inputs = <String, _CategoryBudgetInput>{};
+  final _incomeController = TextEditingController();
+  bool _incomeSeeded = false;
   bool _saving = false;
-
-  final _categories = const [
-    'Housing',
-    'Food',
-    'Transport',
-    'Utilities',
-    'Shopping',
-    'Health',
-    'Savings',
-    'General',
-  ];
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.budget?.title ?? '');
-    _amountController = TextEditingController(
-      text: widget.budget?.allocatedAmount.toStringAsFixed(0) ?? '',
-    );
-    _notesController = TextEditingController(text: widget.budget?.notes ?? '');
-    _category = widget.budget?.category ?? 'Food';
+    for (final category in AppConstants.budgetCategories) {
+      final existing = widget.budgets
+          .where((budget) => budget.category == category)
+          .cast<BudgetPlan?>()
+          .firstWhere((budget) => budget != null, orElse: () => null);
+      _inputs[category] = _CategoryBudgetInput(existing);
+    }
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _amountController.dispose();
-    _notesController.dispose();
+    _incomeController.dispose();
+    for (final input in _inputs.values) {
+      input.dispose();
+    }
     super.dispose();
+  }
+
+  double _totalAmount(double monthlyIncome) {
+    return _inputs.values.fold<double>(
+      0,
+      (total, input) => total + input.amount(monthlyIncome),
+    );
+  }
+
+  double _totalPercent() {
+    return _inputs.values.fold<double>(
+      0,
+      (total, input) => total + input.percent,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return Container(
-      padding: EdgeInsets.fromLTRB(24, 20, 24, bottomInset + 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.border,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              widget.budget == null ? 'Create Budget Plan' : 'Edit Budget Plan',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 18),
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Budget title'),
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _category,
-              items: _categories
-                  .map(
-                    (category) => DropdownMenuItem(
-                      value: category,
-                      child: Text(category),
+    return FutureBuilder<double>(
+      future: widget.firestoreService.monthlyIncomeForCurrentMonth(),
+      builder: (context, snapshot) {
+        if (!_incomeSeeded && snapshot.hasData) {
+          _incomeController.text = snapshot.data == null || snapshot.data == 0
+              ? ''
+              : snapshot.data!.toStringAsFixed(0);
+          _incomeSeeded = true;
+        }
+        final monthlyIncome =
+            double.tryParse(_incomeController.text.trim()) ??
+            snapshot.data ??
+            0;
+        final totalAmount = _totalAmount(monthlyIncome);
+        final totalPercent = _totalPercent();
+        final remaining = monthlyIncome - totalAmount;
+        final hasIncome = monthlyIncome > 0;
+        final hasError = !hasIncome || totalPercent > 100 || remaining < 0;
+
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, bottomInset + 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _category = value);
-                }
-              },
-              decoration: const InputDecoration(labelText: 'Category'),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Allocated amount in PKR',
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Category Budgeting',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Allocate monthly income manually or by percentage. Totals update instantly.',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _BudgetTotalsPanel(
+                    monthlyIncome: monthlyIncome,
+                    totalAmount: totalAmount,
+                    totalPercent: totalPercent,
+                    remaining: remaining,
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _incomeController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Monthly salary / income',
+                      prefixText: 'PKR ',
+                    ),
+                  ),
+                  if (hasError) ...[
+                    const SizedBox(height: 12),
+                    _ValidationBanner(
+                      message: !hasIncome
+                          ? 'Add monthly income first. Budget percentages are calculated only from monthly income.'
+                          : totalPercent > 100
+                          ? 'Total percentage cannot exceed 100%.'
+                          : 'Allocated budget cannot exceed monthly income.',
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  ...AppConstants.budgetCategories.map(
+                    (category) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _CategoryBudgetRow(
+                        category: category,
+                        input: _inputs[category]!,
+                        monthlyIncome: monthlyIncome,
+                        onChanged: () => setState(() {}),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saving || hasError
+                          ? null
+                          : () => _save(monthlyIncome: monthlyIncome),
+                      child: Text(
+                        _saving ? 'Saving...' : 'Save Category Budgets',
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Notes',
-                hintText: 'What should this budget cover?',
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _save,
-                child: Text(_saving ? 'Saving...' : 'Save Budget Plan'),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Future<void> _save() async {
-    final title = _titleController.text.trim();
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
-
-    if (title.isEmpty || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a title and valid budget amount.')),
-      );
+  Future<void> _save({
+    required double monthlyIncome,
+    bool allowSavingsAdjustment = false,
+  }) async {
+    final totalAmount = _totalAmount(monthlyIncome);
+    final totalPercent = _totalPercent();
+    if (monthlyIncome <= 0) {
+      _showError('Monthly income is required before creating budgets.');
+      return;
+    }
+    if (totalPercent > 100) {
+      _showError('Total budget percentage cannot exceed 100%.');
+      return;
+    }
+    if (totalAmount > monthlyIncome) {
+      _showError('Total allocated budget cannot exceed monthly income.');
       return;
     }
 
     setState(() => _saving = true);
+    try {
+      await widget.firestoreService.saveUserProfile({
+        'monthlyIncome': monthlyIncome,
+      });
+      final existingByCategory = {
+        for (final budget in widget.budgets) budget.category: budget,
+      };
 
-    final data = {
-      'title': title,
-      'category': _category,
-      'allocatedAmount': amount,
-      'notes': _notesController.text.trim(),
-      'monthKey': widget.monthKey,
-    };
+      for (final category in AppConstants.budgetCategories) {
+        final input = _inputs[category]!;
+        final amount = input.amount(monthlyIncome);
+        final existing = existingByCategory[category];
+        if (amount <= 0) {
+          if (existing != null) {
+            await widget.firestoreService.deleteBudgetPlan(existing.id);
+          }
+          continue;
+        }
 
-    if (widget.budget == null) {
-      await widget.firestoreService.addBudgetPlan(
-        BudgetPlan(
-          id: '',
-          title: title,
-          category: _category,
-          allocatedAmount: amount,
-          notes: _notesController.text.trim(),
-          monthKey: widget.monthKey,
-          createdAt: DateTime.now(),
-        ),
-      );
-    } else {
-      await widget.firestoreService.updateBudgetPlan(widget.budget!.id, data);
-    }
+        final data = {
+          'title': category,
+          'category': category,
+          'allocatedAmount': amount,
+          'allocationMode': input.mode,
+          'allocationPercent': input.mode == 'percent' ? input.percent : null,
+          'notes': input.mode == 'percent'
+              ? '${input.percent.toStringAsFixed(2)}% of monthly income'
+              : 'Manual category allocation',
+          'monthKey': widget.monthKey,
+        };
 
-    if (mounted) {
+        if (existing == null) {
+          await widget.firestoreService.addBudgetPlan(
+            BudgetPlan(
+              id: '',
+              title: category,
+              category: category,
+              allocatedAmount: amount,
+              notes: data['notes'] as String,
+              monthKey: widget.monthKey,
+              createdAt: DateTime.now(),
+              allocationMode: input.mode,
+              allocationPercent: input.mode == 'percent' ? input.percent : null,
+            ),
+            allowSavingsAdjustment: allowSavingsAdjustment,
+          );
+        } else {
+          await widget.firestoreService.updateBudgetPlan(
+            existing.id,
+            data,
+            allowSavingsAdjustment: allowSavingsAdjustment,
+          );
+        }
+      }
+
+      if (!mounted) return;
       Navigator.pop(context);
+    } on SavingsUsageRequiredException catch (error) {
+      if (!mounted) return;
+      final approved = await _confirmSavingsUse(error.requiredAmount);
+      if (approved == true) {
+        await _save(monthlyIncome: monthlyIncome, allowSavingsAdjustment: true);
+      } else if (mounted) {
+        setState(() => _saving = false);
+      }
+    } on FinanceValidationException catch (error) {
+      if (mounted) {
+        _showError(error.message);
+        setState(() => _saving = false);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showError('Could not save budgets. Please check your connection.');
+        setState(() => _saving = false);
+      }
     }
+  }
+
+  Future<bool?> _confirmSavingsUse(double amount) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Use savings for allocation?'),
+        content: Text(
+          'This budget increase needs PKR ${amount.toStringAsFixed(0)} from savings. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Use Savings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppTheme.error),
+    );
+  }
+}
+
+class _CategoryBudgetInput {
+  _CategoryBudgetInput(BudgetPlan? budget)
+    : mode = budget?.allocationMode ?? 'manual',
+      amountController = TextEditingController(
+        text: budget == null || budget.allocatedAmount == 0
+            ? ''
+            : budget.allocatedAmount.toStringAsFixed(0),
+      ),
+      percentController = TextEditingController(
+        text: budget?.allocationPercent == null
+            ? ''
+            : budget!.allocationPercent!.toStringAsFixed(2),
+      );
+
+  String mode;
+  final TextEditingController amountController;
+  final TextEditingController percentController;
+
+  double get percent {
+    final value = double.tryParse(percentController.text.trim()) ?? 0;
+    return value.isFinite && value > 0 ? value : 0;
+  }
+
+  double amount(double monthlyIncome) {
+    if (mode == 'percent') {
+      if (monthlyIncome <= 0) return 0;
+      return monthlyIncome * (percent / 100);
+    }
+    final value = double.tryParse(amountController.text.trim()) ?? 0;
+    return value.isFinite && value > 0 ? value : 0;
+  }
+
+  void dispose() {
+    amountController.dispose();
+    percentController.dispose();
+  }
+}
+
+class _BudgetTotalsPanel extends StatelessWidget {
+  const _BudgetTotalsPanel({
+    required this.monthlyIncome,
+    required this.totalAmount,
+    required this.totalPercent,
+    required this.remaining,
+  });
+
+  final double monthlyIncome;
+  final double totalAmount;
+  final double totalPercent;
+  final double remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          _totalRow('Monthly income', CurrencyUtils.format(monthlyIncome)),
+          _totalRow('Allocated', CurrencyUtils.format(totalAmount)),
+          _totalRow('Percent used', '${totalPercent.toStringAsFixed(1)}%'),
+          _totalRow(
+            'Remaining salary',
+            CurrencyUtils.format(remaining),
+            highlight: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _totalRow(String label, String value, {bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: highlight ? AppTheme.primary : AppTheme.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ValidationBanner extends StatelessWidget {
+  const _ValidationBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Text(
+        message,
+        style: GoogleFonts.inter(
+          color: const Color(0xFFBE123C),
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryBudgetRow extends StatelessWidget {
+  const _CategoryBudgetRow({
+    required this.category,
+    required this.input,
+    required this.monthlyIncome,
+    required this.onChanged,
+  });
+
+  final String category;
+  final _CategoryBudgetInput input;
+  final double monthlyIncome;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final calculatedAmount = input.amount(monthlyIncome);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  category,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'manual', label: Text('Amount')),
+                  ButtonSegment(value: 'percent', label: Text('%')),
+                ],
+                selected: {input.mode},
+                onSelectionChanged: (value) {
+                  input.mode = value.first;
+                  onChanged();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (input.mode == 'manual')
+            TextField(
+              controller: input.amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                labelText: 'Manual amount',
+                prefixText: 'PKR ',
+              ),
+            )
+          else
+            TextField(
+              controller: input.percentController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                labelText: 'Salary percentage',
+                suffixText: '%',
+              ),
+            ),
+          const SizedBox(height: 8),
+          Text(
+            'Calculated budget: ${CurrencyUtils.format(calculatedAmount)}',
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

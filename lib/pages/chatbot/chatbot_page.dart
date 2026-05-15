@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 
+import '../../services/ai_service.dart';
 import '../../theme/app_theme.dart';
 
 class ChatMessage {
@@ -31,8 +30,10 @@ class _ChatbotPageState extends State<ChatbotPage> {
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isTyping = false;
-  late final GenerativeModel _model;
-  late final ChatSession _session;
+  bool _validatingConfig = true;
+  bool _aiReady = false;
+  String? _configError;
+  final AIService _aiService = AIService();
 
   final _prompts = const [
     'How can I pay off debt faster?',
@@ -44,25 +45,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   @override
   void initState() {
     super.initState();
-    final envKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-    _model = GenerativeModel(
-      model: 'gemini-2.0-pro',
-      apiKey: envKey,
-      systemInstruction: Content.system(
-        'You are FinEase AI, a friendly financial coach for users in Pakistan. '
-        'Prefer PKR examples instead of USD. Give practical budgeting, loans, savings, and investment basics. '
-        'Use concise answers and bullets where useful. Never recommend specific stocks.',
-      ),
-    );
-    _session = _model.startChat();
-    _messages.add(
-      ChatMessage(
-        text:
-            "Hi! I'm FinEase AI. I can help with budgeting, loans, savings goals, and financial planning in PKR.",
-        isUser: false,
-        timestamp: DateTime.now(),
-      ),
-    );
+    _initializeChatbot();
   }
 
   @override
@@ -73,6 +56,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   Future<void> _send(String text) async {
+    if (!_aiReady) {
+      return;
+    }
     if (text.trim().isEmpty) {
       return;
     }
@@ -86,18 +72,14 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _scrollToBottom();
 
     try {
-      final response = await _session.sendMessage(Content.text(text.trim()));
+      final response = await _aiService.generalFinancialAnswer(text.trim());
       if (!mounted) {
         return;
       }
       setState(() {
         _isTyping = false;
         _messages.add(
-          ChatMessage(
-            text: response.text ?? 'I could not generate a response.',
-            isUser: false,
-            timestamp: DateTime.now(),
-          ),
+          ChatMessage(text: response, isUser: false, timestamp: DateTime.now()),
         );
       });
       _scrollToBottom();
@@ -109,12 +91,48 @@ class _ChatbotPageState extends State<ChatbotPage> {
         _isTyping = false;
         _messages.add(
           ChatMessage(
-            text:
-                'I could not connect right now. Please check your internet and try again.',
+            text: 'AI is not running yet: $error',
             isUser: false,
             timestamp: DateTime.now(),
           ),
         );
+      });
+    }
+  }
+
+  Future<void> _initializeChatbot() async {
+    if (!_aiService.isConfigured) {
+      setState(() {
+        _validatingConfig = false;
+        _aiReady = false;
+        _configError =
+            'Chatbot API key is missing. Add GEMINI_API_KEY in .env and restart FinEase.';
+      });
+      return;
+    }
+
+    try {
+      await _aiService.validateConfiguration();
+      if (!mounted) return;
+      setState(() {
+        _validatingConfig = false;
+        _aiReady = true;
+        _configError = null;
+        _messages.add(
+          ChatMessage(
+            text:
+                "Hi! I'm the FinEase AI Chatbot. Ask me general finance questions about budgeting, loans, savings, and money basics in PKR.",
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _validatingConfig = false;
+        _aiReady = false;
+        _configError = error.toString();
       });
     }
   }
@@ -203,57 +221,130 @@ class _ChatbotPageState extends State<ChatbotPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              itemCount: _messages.length + (_isTyping ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return const _TypingIndicator();
-                }
-                return _Bubble(message: _messages[index]);
+      body: _validatingConfig
+          ? const Center(child: CircularProgressIndicator())
+          : _configError != null
+          ? _ConfigBlocker(
+              message: _configError!,
+              onRetry: () {
+                setState(() {
+                  _validatingConfig = true;
+                  _configError = null;
+                });
+                _initializeChatbot();
               },
-            ),
-          ),
-          if (_messages.length == 1)
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _prompts.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemBuilder: (context, index) => GestureDetector(
-                  onTap: () => _send(_prompts[index]),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppTheme.primary.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Text(
-                      _prompts[index],
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.primary,
+            )
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    itemCount: _messages.length + (_isTyping ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _messages.length) {
+                        return const _TypingIndicator();
+                      }
+                      return _Bubble(message: _messages[index]);
+                    },
+                  ),
+                ),
+                if (_messages.length == 1)
+                  SizedBox(
+                    height: 44,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _prompts.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(width: 8),
+                      itemBuilder: (context, index) => GestureDetector(
+                        onTap: () => _send(_prompts[index]),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Text(
+                            _prompts[index],
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                _InputBar(controller: _controller, onSend: _send),
+              ],
+            ),
+    );
+  }
+}
+
+class _ConfigBlocker extends StatelessWidget {
+  const _ConfigBlocker({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppTheme.border),
+            boxShadow: AppTheme.softShadow,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.key_off_rounded,
+                color: AppTheme.error,
+                size: 44,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Chatbot unavailable',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            ),
-          _InputBar(controller: _controller, onSend: _send),
-        ],
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Recheck API Key'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

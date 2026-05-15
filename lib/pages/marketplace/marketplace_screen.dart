@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -30,7 +31,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             backgroundColor: AppTheme.primary,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: const BoxDecoration(gradient: AppTheme.cardGradient),
+                decoration: const BoxDecoration(
+                  gradient: AppTheme.cardGradient,
+                ),
                 child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
@@ -70,13 +73,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       final partners = snapshot.data ?? const [];
                       final categories = {
                         'All',
-                        ...partners.map((partner) => partner['category'] as String? ?? 'General'),
+                        ...partners.map(
+                          (partner) =>
+                              partner['category'] as String? ?? 'General',
+                        ),
                       }.toList();
                       final filtered = _category == 'All'
                           ? partners
                           : partners
-                              .where((partner) => partner['category'] == _category)
-                              .toList();
+                                .where(
+                                  (partner) => partner['category'] == _category,
+                                )
+                                .toList();
 
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -87,14 +95,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: categories.length,
-                                separatorBuilder: (_, index) => const SizedBox(width: 8),
+                                separatorBuilder: (_, index) =>
+                                    const SizedBox(width: 8),
                                 itemBuilder: (context, index) {
                                   final value = categories[index];
                                   final selected = value == _category;
                                   return ChoiceChip(
                                     label: Text(value),
                                     selected: selected,
-                                    onSelected: (_) => setState(() => _category = value),
+                                    onSelected: (_) =>
+                                        setState(() => _category = value),
                                   );
                                 },
                               ),
@@ -105,7 +115,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                             if (filtered.isEmpty)
                               const _EmptyMarketplace()
                             else
-                              ...filtered.map((partner) => _PartnerCard(partner: partner)),
+                              ...filtered.map(
+                                (partner) => _PartnerCard(partner: partner),
+                              ),
                           ],
                         ),
                       );
@@ -141,7 +153,10 @@ class _TrustBanner extends StatelessWidget {
               color: AppTheme.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.verified_user_rounded, color: AppTheme.primary),
+            child: const Icon(
+              Icons.verified_user_rounded,
+              color: AppTheme.primary,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -190,7 +205,10 @@ class _PartnerCard extends StatelessWidget {
                   color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(_iconFor(partner['iconName'] as String?), color: color),
+                child: Icon(
+                  _iconFor(partner['iconName'] as String?),
+                  color: color,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -217,7 +235,10 @@ class _PartnerCard extends StatelessWidget {
               ),
               if ((partner['badge'] as String?)?.isNotEmpty ?? false)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(999),
@@ -236,27 +257,72 @@ class _PartnerCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             partner['description'] as String? ?? '',
-            style: GoogleFonts.inter(color: AppTheme.textSecondary, height: 1.5),
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondary,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${partner['name']} is available for onboarding integration.',
-                    ),
-                  ),
-                );
-              },
+              onPressed: () =>
+                  _openUrl(context, partner['websiteUrl'] as String?),
               child: Text(partner['ctaLabel'] as String? ?? 'Learn More'),
             ),
           ),
+          if (partner['latitude'] != null && partner['longitude'] != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openMap(
+                  context,
+                  (partner['latitude'] as num).toDouble(),
+                  (partner['longitude'] as num).toDouble(),
+                  partner['name'] as String? ?? 'Marketplace partner',
+                ),
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('View Location on Map'),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _openUrl(BuildContext context, String? url) async {
+    if (url == null || url.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No live website link is configured.')),
+      );
+      return;
+    }
+    final uri = Uri.parse(url);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this website.')),
+      );
+    }
+  }
+
+  Future<void> _openMap(
+    BuildContext context,
+    double latitude,
+    double longitude,
+    String label,
+  ) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+    );
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not open map for $label.')));
+    }
   }
 
   IconData _iconFor(String? name) {
@@ -291,7 +357,11 @@ class _EmptyMarketplace extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(Icons.storefront_rounded, size: 56, color: AppTheme.primary),
+          const Icon(
+            Icons.storefront_rounded,
+            size: 56,
+            color: AppTheme.primary,
+          ),
           const SizedBox(height: 12),
           Text(
             'No partners in this category yet.',

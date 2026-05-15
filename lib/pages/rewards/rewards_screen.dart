@@ -17,8 +17,8 @@ class RewardsScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           final userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
-          final points = userData['points'] ?? 1240;
-          final level = userData['level'] ?? 5;
+          final points = userData['points'] ?? 0;
+          final level = userData['level'] ?? 1;
           final nextLevelPoints = 2000;
           final progress = (points / nextLevelPoints).clamp(0.0, 1.0);
 

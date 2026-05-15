@@ -43,9 +43,13 @@ class _LoginPageState extends State<LoginPage>
   void initState() {
     super.initState();
     _shakeCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 500));
-    _shakeAnim = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _shakeCtrl, curve: Curves.elasticIn));
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _shakeAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _shakeCtrl, curve: Curves.elasticIn));
   }
 
   @override
@@ -62,7 +66,8 @@ class _LoginPageState extends State<LoginPage>
   String? _validateEmail(String? v) {
     if (v == null || v.trim().isEmpty) return 'Email address is required';
     final emailRegex = RegExp(
-        r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+      r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$',
+    );
     if (!emailRegex.hasMatch(v.trim())) {
       return 'Enter a valid email address (e.g. name@example.com)';
     }
@@ -101,8 +106,9 @@ class _LoginPageState extends State<LoginPage>
 
     if (_isCurrentlyLockedOut) {
       _showSnack(
-          '🔒 Too many failed attempts. Try again in $_lockoutRemaining.',
-          isError: true);
+        '🔒 Too many failed attempts. Try again in $_lockoutRemaining.',
+        isError: true,
+      );
       HapticFeedback.heavyImpact();
       return;
     }
@@ -115,8 +121,10 @@ class _LoginPageState extends State<LoginPage>
 
     setState(() => _isLoading = true);
     try {
-      await Provider.of<AuthService>(context, listen: false)
-          .signInWithEmail(_emailCtrl.text.trim(), _passCtrl.text);
+      await Provider.of<AuthService>(
+        context,
+        listen: false,
+      ).signInWithEmail(_emailCtrl.text.trim(), _passCtrl.text);
       // Reset on success
       _failedAttempts = 0;
     } on Exception catch (e) {
@@ -129,8 +137,9 @@ class _LoginPageState extends State<LoginPage>
             _lockoutEnd = DateTime.now().add(const Duration(seconds: 30));
           });
           _showSnack(
-              '🔒 Account temporarily locked after $_failedAttempts failed attempts. Wait 30s.',
-              isError: true);
+            '🔒 Account temporarily locked after $_failedAttempts failed attempts. Wait 30s.',
+            isError: true,
+          );
         } else {
           _shakeCtrl.forward(from: 0);
           HapticFeedback.heavyImpact();
@@ -138,8 +147,9 @@ class _LoginPageState extends State<LoginPage>
           // Show remaining attempts warning
           if (_failedAttempts >= 3) {
             _showSnack(
-                '⚠️ Warning: ${5 - _failedAttempts} attempt(s) remaining before lockout.',
-                isError: true);
+              '⚠️ Warning: ${5 - _failedAttempts} attempt(s) remaining before lockout.',
+              isError: true,
+            );
           }
         }
       }
@@ -168,83 +178,136 @@ class _LoginPageState extends State<LoginPage>
   }
 
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(
-            isError
-                ? Icons.error_outline_rounded
-                : Icons.check_circle_outline_rounded,
-            color: Colors.white,
-            size: 18),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg, style: GoogleFonts.inter(fontSize: 12))),
-      ]),
-      backgroundColor: isError ? _error : const Color(0xFF10B981),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 4),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError
+                  ? Icons.error_outline_rounded
+                  : Icons.check_circle_outline_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(msg, style: GoogleFonts.inter(fontSize: 12))),
+          ],
+        ),
+        backgroundColor: isError ? _error : const Color(0xFF10B981),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _forgotPassword() async {
     final email = _emailCtrl.text.trim();
     if (email.isEmpty || _validateEmail(email) != null) {
       _showSnack(
-          'Enter a valid email above first, then tap Forgot Password.',
-          isError: true);
+        'Enter a valid email above first, then tap Forgot Password.',
+        isError: true,
+      );
       return;
     }
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Reset Password',
-            style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w800, fontSize: 18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Reset Password',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
         content: Text(
-            'A secure password reset link will be sent to:\n\n$email',
-            style: GoogleFonts.inter(fontSize: 13, height: 1.6)),
+          'A secure password reset link will be sent to:\n\n$email',
+          style: GoogleFonts.inter(fontSize: 13, height: 1.6),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel',
-                style: GoogleFonts.inter(color: Colors.grey[600])),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(color: Colors.grey[600]),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                await Provider.of<AuthService>(context, listen: false)
-                    .sendPasswordResetEmail(email);
+                await Provider.of<AuthService>(
+                  context,
+                  listen: false,
+                ).sendPasswordResetEmail(email);
                 _showSnack('✅ Reset email sent to $email. Check your inbox.');
               } catch (_) {
                 _showSnack(
-                    'Could not send reset email. Verify the address and try again.',
-                    isError: true);
+                  'Could not send reset email. Verify the address and try again.',
+                  isError: true,
+                );
               }
             },
             style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12))),
-            child: Text('Send Reset Link',
-                style: GoogleFonts.inter(
-                    color: Colors.white, fontWeight: FontWeight.w700)),
+              backgroundColor: _primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Send Reset Link',
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _sendEmailLink() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || _validateEmail(email) != null) {
+      _showSnack(
+        'Enter a valid email first to receive a password-less login link.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      await Provider.of<AuthService>(
+        context,
+        listen: false,
+      ).sendPasswordlessSignInLink(email);
+      if (mounted) {
+        _showSnack(
+          'Password-less sign-in link sent to $email. Open it on this device.',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        _showSnack('Could not send email link: $error', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _biometricLogin() async {
     try {
-      final canAuth = await _localAuth.canCheckBiometrics ||
+      final canAuth =
+          await _localAuth.canCheckBiometrics ||
           await _localAuth.isDeviceSupported();
       if (!canAuth) {
-        _showSnack('Biometric authentication not available on this device.',
-            isError: true);
+        _showSnack(
+          'Biometric authentication not available on this device.',
+          isError: true,
+        );
         return;
       }
       final didAuth = await _localAuth.authenticate(
@@ -255,8 +318,10 @@ class _LoginPageState extends State<LoginPage>
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('Biometric authentication failed: ${e.toString()}',
-            isError: true);
+        _showSnack(
+          'Biometric authentication failed: ${e.toString()}',
+          isError: true,
+        );
       }
     }
   }
@@ -280,20 +345,23 @@ class _LoginPageState extends State<LoginPage>
           ),
           SafeArea(
             child: SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 28.0, vertical: 40.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 28.0,
+                vertical: 40.0,
+              ),
               child: Form(
                 key: _formKey,
                 child: AnimatedBuilder(
                   animation: _shakeAnim,
                   builder: (context, child) => Transform.translate(
                     offset: Offset(
-                        _shakeCtrl.isAnimating
-                            ? 8 *
+                      _shakeCtrl.isAnimating
+                          ? 8 *
                                 (0.5 - _shakeAnim.value).abs() *
                                 (_shakeAnim.value > 0.5 ? 1 : -1)
-                            : 0,
-                        0),
+                          : 0,
+                      0,
+                    ),
                     child: child,
                   ),
                   child: Column(
@@ -302,37 +370,44 @@ class _LoginPageState extends State<LoginPage>
                       const SizedBox(height: 30),
                       // Logo
                       Container(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                              colors: [_primary, Color(0xFF1565C0)]),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                                color: _primary.withOpacity(0.35),
-                                blurRadius: 24,
-                                offset: const Offset(0, 10))
+                              color: _primary.withOpacity(0.35),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
                           ],
                         ),
-                        child: const Icon(
-                            Icons.account_balance_wallet_rounded,
-                            color: Colors.white,
-                            size: 32),
+                        child: Image.asset(
+                          'assets/logo/logo.png',
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                       const SizedBox(height: 28),
-                      Text('Welcome back',
-                          style: GoogleFonts.plusJakartaSans(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
-                              color: _dark,
-                              letterSpacing: -1)),
+                      Text(
+                        'Welcome back',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          color: _dark,
+                          letterSpacing: -1,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
-                          'Securely access your financial world.',
-                          style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              height: 1.5)),
+                        'Securely access your financial world.',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          height: 1.5,
+                        ),
+                      ),
 
                       // Lockout warning banner
                       if (_isCurrentlyLockedOut) ...[
@@ -351,16 +426,15 @@ class _LoginPageState extends State<LoginPage>
                         keyboardType: TextInputType.emailAddress,
                         style: GoogleFonts.inter(fontSize: 15, color: _dark),
                         autovalidateMode: AutovalidateMode.onUserInteraction,
-                        validator:
-                            _emailTouched ? _validateEmail : null,
-                        onChanged: (_) =>
-                            setState(() => _emailTouched = true),
+                        validator: _emailTouched ? _validateEmail : null,
+                        onChanged: (_) => setState(() => _emailTouched = true),
                         onFieldSubmitted: (_) =>
                             FocusScope.of(context).requestFocus(_passFocus),
                         textInputAction: TextInputAction.next,
                         decoration: _fieldDeco(
-                            'name@example.com',
-                            Icons.alternate_email_rounded),
+                          'name@example.com',
+                          Icons.alternate_email_rounded,
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -372,15 +446,18 @@ class _LoginPageState extends State<LoginPage>
                           TextButton(
                             onPressed: _forgotPassword,
                             style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size.zero,
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap),
-                            child: Text('Forgot Password?',
-                                style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: _primary)),
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Forgot Password?',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _primary,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -391,25 +468,25 @@ class _LoginPageState extends State<LoginPage>
                         obscureText: !_showPass,
                         style: GoogleFonts.inter(fontSize: 15, color: _dark),
                         autovalidateMode: AutovalidateMode.onUserInteraction,
-                        validator:
-                            _passTouched ? _validatePassword : null,
-                        onChanged: (_) =>
-                            setState(() => _passTouched = true),
+                        validator: _passTouched ? _validatePassword : null,
+                        onChanged: (_) => setState(() => _passTouched = true),
                         onFieldSubmitted: (_) => _login(),
                         textInputAction: TextInputAction.done,
                         decoration: _fieldDeco(
-                            '••••••••',
-                            Icons.lock_outline_rounded,
-                            suffix: IconButton(
-                              icon: Icon(
-                                  _showPass
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Colors.grey[400],
-                                  size: 20),
-                              onPressed: () =>
-                                  setState(() => _showPass = !_showPass),
-                            )),
+                          '••••••••',
+                          Icons.lock_outline_rounded,
+                          suffix: IconButton(
+                            icon: Icon(
+                              _showPass
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey[400],
+                              size: 20,
+                            ),
+                            onPressed: () =>
+                                setState(() => _showPass = !_showPass),
+                          ),
+                        ),
                       ),
 
                       // Failed attempts indicator
@@ -422,6 +499,20 @@ class _LoginPageState extends State<LoginPage>
 
                       // ── Login Button ──
                       _buildLoginButton(),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _sendEmailLink,
+                          icon: const Icon(Icons.link_rounded),
+                          label: Text(
+                            'Email Me a Password-less Link',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 28),
 
                       // ── Divider ──
@@ -429,14 +520,16 @@ class _LoginPageState extends State<LoginPage>
                         children: [
                           const Expanded(child: Divider()),
                           Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text('OR QUICK ACCESS',
-                                style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.grey[400],
-                                    letterSpacing: 1.5)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'OR QUICK ACCESS',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.grey[400],
+                                letterSpacing: 1.5,
+                              ),
+                            ),
                           ),
                           const Expanded(child: Divider()),
                         ],
@@ -447,12 +540,18 @@ class _LoginPageState extends State<LoginPage>
                       Row(
                         children: [
                           Expanded(
-                              child: _buildBioButton(
-                                  Icons.fingerprint_rounded, 'Touch ID')),
+                            child: _buildBioButton(
+                              Icons.fingerprint_rounded,
+                              'Touch ID',
+                            ),
+                          ),
                           const SizedBox(width: 16),
                           Expanded(
-                              child: _buildBioButton(
-                                  Icons.face_unlock_rounded, 'Face ID')),
+                            child: _buildBioButton(
+                              Icons.face_unlock_rounded,
+                              'Face ID',
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 40),
@@ -464,21 +563,28 @@ class _LoginPageState extends State<LoginPage>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('New to FinEase? ',
-                                    style: GoogleFonts.inter(
-                                        color: Colors.grey[600],
-                                        fontSize: 13)),
+                                Text(
+                                  'New to FinEase? ',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.grey[600],
+                                    fontSize: 13,
+                                  ),
+                                ),
                                 GestureDetector(
                                   onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) =>
-                                              const SignupPage())),
-                                  child: Text('Create an account',
-                                      style: GoogleFonts.inter(
-                                          fontWeight: FontWeight.bold,
-                                          color: _primary,
-                                          fontSize: 13)),
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const SignupPage(),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Create an account',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      color: _primary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -501,13 +607,19 @@ class _LoginPageState extends State<LoginPage>
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   Widget _bgCircle(double size, Color color) => Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color));
+    width: size,
+    height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
 
-  Widget _fieldLabel(String text) => Text(text,
-      style: GoogleFonts.plusJakartaSans(
-          fontSize: 13, fontWeight: FontWeight.w700, color: _dark));
+  Widget _fieldLabel(String text) => Text(
+    text,
+    style: GoogleFonts.plusJakartaSans(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: _dark,
+    ),
+  );
 
   InputDecoration _fieldDeco(String hint, IconData icon, {Widget? suffix}) =>
       InputDecoration(
@@ -518,22 +630,29 @@ class _LoginPageState extends State<LoginPage>
         filled: true,
         fillColor: const Color(0xFFF8F9FE),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _primary, width: 1.5)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _primary, width: 1.5),
+        ),
         errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _error, width: 1.2)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _error, width: 1.2),
+        ),
         focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _error, width: 1.5)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _error, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 16,
+        ),
         errorStyle: GoogleFonts.inter(fontSize: 11, color: _error),
       );
 
@@ -553,7 +672,10 @@ class _LoginPageState extends State<LoginPage>
             child: Text(
               'Account temporarily locked. Try again in $_lockoutRemaining.',
               style: GoogleFonts.inter(
-                  fontSize: 13, color: _error, fontWeight: FontWeight.w600),
+                fontSize: 13,
+                color: _error,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -572,15 +694,19 @@ class _LoginPageState extends State<LoginPage>
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded,
-              color: Color(0xFFF97316), size: 16),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Color(0xFFF97316),
+            size: 16,
+          ),
           const SizedBox(width: 8),
           Text(
             '$remaining attempt${remaining == 1 ? '' : 's'} remaining before lockout',
             style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF92400E),
-                fontWeight: FontWeight.w600),
+              fontSize: 12,
+              color: const Color(0xFF92400E),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -591,14 +717,14 @@ class _LoginPageState extends State<LoginPage>
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [_primary, Color(0xFF1565C0)]),
+        gradient: const LinearGradient(colors: [_primary, Color(0xFF1565C0)]),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: _primary.withOpacity(0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8))
+            color: _primary.withOpacity(0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: ElevatedButton(
@@ -608,25 +734,35 @@ class _LoginPageState extends State<LoginPage>
           shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
         child: _isLoading
             ? const SizedBox(
                 height: 22,
                 width: 22,
                 child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2.5))
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.lock_open_rounded,
-                      color: Colors.white, size: 18),
+                  const Icon(
+                    Icons.lock_open_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
-                  Text('Login to Account',
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white)),
+                  Text(
+                    'Login to Account',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
       ),
@@ -641,9 +777,10 @@ class _LoginPageState extends State<LoginPage>
         border: Border.all(color: const Color(0xFFEEEEEE)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: InkWell(
@@ -655,11 +792,14 @@ class _LoginPageState extends State<LoginPage>
             children: [
               Icon(icon, color: _dark, size: 28),
               const SizedBox(height: 8),
-              Text(label,
-                  style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _dark)),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
+                ),
+              ),
             ],
           ),
         ),
@@ -686,9 +826,10 @@ class _LoginPageState extends State<LoginPage>
       children: [
         Icon(icon, size: 13, color: Colors.grey[400]),
         const SizedBox(width: 5),
-        Text(label,
-            style: GoogleFonts.inter(
-                fontSize: 11, color: Colors.grey[400])),
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[400]),
+        ),
       ],
     );
   }

@@ -1,0 +1,51 @@
+mutation CreateTransaction($accountId: UUID!, $amount: Float!, $description: String!, $transactionDate: Timestamp!, $categoryId: UUID, $merchant: String) @auth(level: USER) {
+  transaction_insert(data: {
+    accountId: $accountId,
+    amount: $amount,
+    description: $description,
+    transactionDate: $transactionDate,
+    createdAt_expr: "request.time",
+    categoryId: $categoryId,
+    merchant: $merchant
+  })
+}
+
+query GetAccountsByUserId @auth(level: USER) {
+  accounts(where: { userId: { eq_expr: "auth.uid" } }) {
+    id
+    accountName
+    accountType
+    balance
+    institutionName
+    lastSyncedAt
+    createdAt
+  }
+}
+
+mutation CreateGoal($goalName: String!, $targetAmount: Float!, $currentAmount: Float!, $targetDate: Date!, $goalType: String!, $description: String) @auth(level: USER) {
+  goal_insert(data: {
+    userId_expr: "auth.uid",
+    goalName: $goalName,
+    targetAmount: $targetAmount,
+    currentAmount: $currentAmount,
+    targetDate: $targetDate,
+    goalType: $goalType,
+    createdAt_expr: "request.time",
+    description: $description
+  })
+}
+
+query GetUserBudgets @auth(level: USER) {
+  budgets(where: { userId: { eq_expr: "auth.uid" } }) {
+    id
+    budgetAmount
+    startDate
+    endDate
+    category {
+      categoryName
+      categoryType
+    }
+    alertThreshold
+    createdAt
+  }
+}

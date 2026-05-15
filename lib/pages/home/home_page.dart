@@ -10,9 +10,11 @@ import '../../utils/currency_utils.dart';
 import '../budget/ai_budget_advisor_page.dart';
 import '../chatbot/chatbot_page.dart';
 import '../forum/community_forum_page.dart';
+import '../analytics/analytics_screen.dart';
 import '../literacy/literacy_hub_page.dart';
 import '../loans/loan_simulator_page.dart';
 import '../marketplace/marketplace_screen.dart';
+import '../profile/profile_page.dart';
 import '../savings/savings_tracker_page.dart';
 import '../transactions/add_transaction_page.dart';
 import '../transactions/all_transactions_page.dart';
@@ -53,278 +55,321 @@ class _HomePageState extends State<HomePage> {
           onRefresh: _handleRefresh,
           color: AppTheme.primary,
           child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: _TopBar(
-                  photoUrl: photoUrl,
-                  isRefreshing: _isRefreshing,
-                  onRefresh: () => _refreshKey.currentState?.show(),
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: _TopBar(
+                    photoUrl: photoUrl,
+                    isRefreshing: _isRefreshing,
+                    onRefresh: () => _refreshKey.currentState?.show(),
+                    onProfileTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ProfilePage()),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: firestoreService == null
-                    ? const SizedBox.shrink()
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: firestoreService == null
+                      ? const SizedBox.shrink()
+                      : StreamBuilder<List<FinancialTransaction>>(
+                          stream: firestoreService.getTransactions(),
+                          builder: (context, snapshot) {
+                            final txns = snapshot.data ?? const [];
+                            final now = DateTime.now();
+                            final monthlyTxns = txns
+                                .where(
+                                  (t) =>
+                                      t.date.year == now.year &&
+                                      t.date.month == now.month,
+                                )
+                                .toList();
+                            final income = monthlyTxns
+                                .where((t) => t.type == 'income')
+                                .fold<double>(0, (sum, t) => sum + t.amount);
+                            final expense = monthlyTxns
+                                .where((t) => t.type == 'expense')
+                                .fold<double>(0, (sum, t) => sum + t.amount);
+                            return StreamBuilder<Map<String, dynamic>>(
+                              stream: firestoreService.getMonthlySummary(),
+                              builder: (context, summarySnapshot) {
+                                final summary = summarySnapshot.data ?? {};
+                                final balance =
+                                    (summary['totalBalance'] as num?)
+                                        ?.toDouble() ??
+                                    income - expense;
+                                return _BalanceCard(
+                                  balance: balance,
+                                  income:
+                                      (summary['monthlyIncome'] as num?)
+                                          ?.toDouble() ??
+                                      income,
+                                  expense:
+                                      (summary['totalExpenses'] as num?)
+                                          ?.toDouble() ??
+                                      expense,
+                                );
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _SectionHeader(
+                    title: 'Core Tools',
+                    actionLabel: 'Open Budget Planer',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AIBudgetAdvisorPage(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _FeatureGrid(
+                    items: [
+                      _FeatureItem(
+                        label: 'Marketplace',
+                        icon: Icons.storefront_rounded,
+                        color: const Color(0xFF2E3192),
+                        background: const Color(0xFFEEF2FF),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MarketplaceScreen(),
+                          ),
+                        ),
+                      ),
+                      _FeatureItem(
+                        label: 'Budget',
+                        icon: Icons.account_balance_wallet_rounded,
+                        color: const Color(0xFF0EA5A4),
+                        background: const Color(0xFFECFEFF),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AIBudgetAdvisorPage(),
+                          ),
+                        ),
+                      ),
+                      _FeatureItem(
+                        label: 'Analysis',
+                        icon: Icons.query_stats_rounded,
+                        color: const Color(0xFF4F46E5),
+                        background: const Color(0xFFEEF2FF),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AnalyticsScreen(),
+                          ),
+                        ),
+                      ),
+                      _FeatureItem(
+                        label: 'Loans',
+                        icon: Icons.calculate_rounded,
+                        color: const Color(0xFFD97706),
+                        background: const Color(0xFFFFF7ED),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoanSimulatorPage(),
+                          ),
+                        ),
+                      ),
+                      _FeatureItem(
+                        label: 'Chatbot',
+                        icon: Icons.smart_toy_rounded,
+                        color: const Color(0xFF475569),
+                        background: const Color(0xFFF1F5F9),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ChatbotPage(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _SectionHeader(
+                    title: 'Explore FinEase',
+                    actionLabel: 'Open Savings Plan',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SavingsTrackerPage(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _FeatureGrid(
+                    items: [
+                      _FeatureItem(
+                        label: 'Savings',
+                        icon: Icons.savings_rounded,
+                        color: const Color(0xFF0EA5A4),
+                        background: const Color(0xFFECFEFF),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SavingsTrackerPage(),
+                          ),
+                        ),
+                      ),
+                      _FeatureItem(
+                        label: 'Literacy Hub',
+                        icon: Icons.school_rounded,
+                        color: const Color(0xFF4F46E5),
+                        background: const Color(0xFFEEF2FF),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LiteracyHubPage(),
+                          ),
+                        ),
+                      ),
+                      _FeatureItem(
+                        label: 'Welfare',
+                        icon: Icons.volunteer_activism_rounded,
+                        color: const Color(0xFFD97706),
+                        background: const Color(0xFFFFF7ED),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const WelfareProgramsPage(),
+                          ),
+                        ),
+                      ),
+                      _FeatureItem(
+                        label: 'Forum',
+                        icon: Icons.forum_rounded,
+                        color: const Color(0xFF475569),
+                        background: const Color(0xFFF1F5F9),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CommunityForumPage(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _SectionHeader(
+                    title: 'Your Progress',
+                    actionLabel: '',
+                    onTap: () {},
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: firestoreService == null
+                      ? const SizedBox.shrink()
+                      : StreamBuilder<List<SavingGoal>>(
+                          stream: firestoreService.getSavingGoals(),
+                          builder: (context, goalSnapshot) {
+                            return StreamBuilder<List<FinancialTransaction>>(
+                              stream: firestoreService.getTransactions(),
+                              builder: (context, txnSnapshot) {
+                                final goals = goalSnapshot.data ?? const [];
+                                final txns = txnSnapshot.data ?? const [];
+                                final saved = goals.fold<double>(
+                                  0,
+                                  (sum, goal) => sum + goal.currentAmount,
+                                );
+                                return FutureBuilder<int>(
+                                  future: _completedLessonCount(
+                                    firestoreService,
+                                  ),
+                                  builder: (context, lessonSnapshot) {
+                                    final completedLessons =
+                                        lessonSnapshot.data ?? 0;
+                                    return _ProgressPanel(
+                                      totalSaved: saved,
+                                      goalCount: goals.length,
+                                      transactionCount: txns.length,
+                                      completedLessons: completedLessons,
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _SectionHeader(
+                    title: 'Recent Transactions',
+                    actionLabel: 'See all',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AllTransactionsPage(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                sliver: firestoreService == null
+                    ? const SliverToBoxAdapter(child: SizedBox.shrink())
                     : StreamBuilder<List<FinancialTransaction>>(
                         stream: firestoreService.getTransactions(),
                         builder: (context, snapshot) {
-                          final txns = snapshot.data ?? const [];
-                          final income = txns
-                              .where((t) => t.type == 'income')
-                              .fold<double>(0, (sum, t) => sum + t.amount);
-                          final expense = txns
-                              .where((t) => t.type == 'expense')
-                              .fold<double>(0, (sum, t) => sum + t.amount);
-                          final balance = income - expense;
-                          return _BalanceCard(
-                            balance: balance,
-                            income: income,
-                            expense: expense,
-                          );
-                        },
-                      ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _SectionHeader(
-                  title: 'Core Tools',
-                  actionLabel: 'Open Budget Planer',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AIBudgetAdvisorPage(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _FeatureGrid(
-                  items: [
-                    _FeatureItem(
-                      label: 'Marketplace',
-                      icon: Icons.storefront_rounded,
-                      color: const Color(0xFF2E3192),
-                      background: const Color(0xFFEEF2FF),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MarketplaceScreen(),
-                        ),
-                      ),
-                    ),
-                    _FeatureItem(
-                      label: 'Budget',
-                      icon: Icons.account_balance_wallet_rounded,
-                      color: const Color(0xFF0EA5A4),
-                      background: const Color(0xFFECFEFF),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AIBudgetAdvisorPage(),
-                        ),
-                      ),
-                    ),
-                    _FeatureItem(
-                      label: 'Loans',
-                      icon: Icons.calculate_rounded,
-                      color: const Color(0xFFD97706),
-                      background: const Color(0xFFFFF7ED),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoanSimulatorPage(),
-                        ),
-                      ),
-                    ),
-                    _FeatureItem(
-                      label: 'Chatbot',
-                      icon: Icons.smart_toy_rounded,
-                      color: const Color(0xFF475569),
-                      background: const Color(0xFFF1F5F9),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ChatbotPage(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _SectionHeader(
-                  title: 'Explore FinEase',
-                  actionLabel: 'Open Savings Plan',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SavingsTrackerPage(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _FeatureGrid(
-                  items: [
-                    _FeatureItem(
-                      label: 'Savings',
-                      icon: Icons.savings_rounded,
-                      color: const Color(0xFF0EA5A4),
-                      background: const Color(0xFFECFEFF),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SavingsTrackerPage(),
-                        ),
-                      ),
-                    ),
-                    _FeatureItem(
-                      label: 'Literacy Hub',
-                      icon: Icons.school_rounded,
-                      color: const Color(0xFF4F46E5),
-                      background: const Color(0xFFEEF2FF),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LiteracyHubPage(),
-                        ),
-                      ),
-                    ),
-                    _FeatureItem(
-                      label: 'Welfare',
-                      icon: Icons.volunteer_activism_rounded,
-                      color: const Color(0xFFD97706),
-                      background: const Color(0xFFFFF7ED),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const WelfareProgramsPage(),
-                        ),
-                      ),
-                    ),
-                    _FeatureItem(
-                      label: 'Forum',
-                      icon: Icons.forum_rounded,
-                      color: const Color(0xFF475569),
-                      background: const Color(0xFFF1F5F9),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CommunityForumPage(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _SectionHeader(
-                  title: 'Your Progress',
-                  actionLabel: '',
-                  onTap: () {},
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: firestoreService == null
-                    ? const SizedBox.shrink()
-                    : StreamBuilder<List<SavingGoal>>(
-                        stream: firestoreService.getSavingGoals(),
-                        builder: (context, goalSnapshot) {
-                          return StreamBuilder<List<FinancialTransaction>>(
-                            stream: firestoreService.getTransactions(),
-                            builder: (context, txnSnapshot) {
-                              final goals = goalSnapshot.data ?? const [];
-                              final txns = txnSnapshot.data ?? const [];
-                              final saved = goals.fold<double>(
-                                0,
-                                (sum, goal) => sum + goal.currentAmount,
-                              );
-                              return FutureBuilder<int>(
-                                future: _completedLessonCount(firestoreService),
-                                builder: (context, lessonSnapshot) {
-                                  final completedLessons =
-                                      lessonSnapshot.data ?? 0;
-                                  return _ProgressPanel(
-                                    totalSaved: saved,
-                                    goalCount: goals.length,
-                                    transactionCount: txns.length,
-                                    completedLessons: completedLessons,
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _SectionHeader(
-                  title: 'Recent Transactions',
-                  actionLabel: 'See all',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AllTransactionsPage(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              sliver: firestoreService == null
-                  ? const SliverToBoxAdapter(child: SizedBox.shrink())
-                  : StreamBuilder<List<FinancialTransaction>>(
-                      stream: firestoreService.getTransactions(),
-                      builder: (context, snapshot) {
-                        final txns = (snapshot.data ?? const [])
-                            .take(5)
-                            .toList();
-                        if (txns.isEmpty) {
-                          return const SliverToBoxAdapter(child: _EmptyState());
-                        }
-                        return SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) => _DismissibleTransactionTile(
-                              txn: txns[index],
-                              firestoreService: firestoreService,
+                          final txns = (snapshot.data ?? const [])
+                              .take(5)
+                              .toList();
+                          if (txns.isEmpty) {
+                            return const SliverToBoxAdapter(
+                              child: _EmptyState(),
+                            );
+                          }
+                          return SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _DismissibleTransactionTile(
+                                txn: txns[index],
+                                firestoreService: firestoreService,
+                              ),
+                              childCount: txns.length,
                             ),
-                            childCount: txns.length,
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
-          ],
-        ),
+                          );
+                        },
+                      ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            ],
+          ),
         ),
       ),
       floatingActionButton: Container(
@@ -372,11 +417,13 @@ class _TopBar extends StatelessWidget {
     required this.photoUrl,
     required this.isRefreshing,
     required this.onRefresh,
+    required this.onProfileTap,
   });
 
   final String? photoUrl;
   final bool isRefreshing;
   final VoidCallback onRefresh;
+  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -401,36 +448,39 @@ class _TopBar extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: AppTheme.softShadow,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: photoUrl != null
-                        ? Image.network(
-                            photoUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const CircleAvatar(
-                                  backgroundColor: AppTheme.primary,
-                                  child: Icon(
-                                    Icons.person_rounded,
-                                    color: Colors.white,
+                GestureDetector(
+                  onTap: onProfileTap,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: AppTheme.softShadow,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: photoUrl != null
+                          ? Image.network(
+                              photoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const CircleAvatar(
+                                    backgroundColor: AppTheme.primary,
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
-                          )
-                        : const CircleAvatar(
-                            backgroundColor: AppTheme.primary,
-                            child: Icon(
-                              Icons.person_rounded,
-                              color: Colors.white,
+                            )
+                          : const CircleAvatar(
+                              backgroundColor: AppTheme.primary,
+                              child: Icon(
+                                Icons.person_rounded,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -542,13 +592,13 @@ class _BalanceCard extends StatelessWidget {
               Expanded(
                 child: _BalanceStat(
                   label: 'Income',
-                  value: CurrencyUtils.format(income, compact: true),
+                  value: CurrencyUtils.format(income),
                 ),
               ),
               Expanded(
                 child: _BalanceStat(
                   label: 'Expenses',
-                  value: CurrencyUtils.format(expense, compact: true),
+                  value: CurrencyUtils.format(expense),
                 ),
               ),
             ],
@@ -733,7 +783,7 @@ class _ProgressPanel extends StatelessWidget {
               Expanded(
                 child: _ProgressMetric(
                   label: 'Saved',
-                  value: CurrencyUtils.format(totalSaved, compact: true),
+                  value: CurrencyUtils.format(totalSaved),
                 ),
               ),
               Expanded(

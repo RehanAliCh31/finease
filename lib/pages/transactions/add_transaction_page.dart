@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 import '../../models/transaction.dart';
 
 class AddTransactionPage extends StatefulWidget {
@@ -21,21 +22,21 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   final _formKey = GlobalKey<FormState>();
 
   String _type = 'expense';
-  String _category = 'Food';
+  String _category = 'Groceries';
   bool _saving = false;
 
   late final AnimationController _anim;
   late final Animation<double> _fadeAnim;
 
   final List<_Cat> _categories = const [
-    _Cat('Food', Icons.restaurant_rounded, Color(0xFFFF6B35)),
-    _Cat('Transport', Icons.directions_car_rounded, Color(0xFF2E3192)),
-    _Cat('Shopping', Icons.shopping_bag_rounded, Color(0xFF8B5CF6)),
-    _Cat('Health', Icons.health_and_safety_rounded, Color(0xFF06C270)),
     _Cat('Education', Icons.school_rounded, Color(0xFF0099CC)),
-    _Cat('Bills', Icons.receipt_long_rounded, Color(0xFFFF4B5C)),
+    _Cat('Groceries', Icons.local_grocery_store_rounded, Color(0xFFFF6B35)),
+    _Cat('Electricity', Icons.bolt_rounded, Color(0xFFFF4B5C)),
+    _Cat('Transport', Icons.directions_car_rounded, Color(0xFF2E3192)),
+    _Cat('Entertainment', Icons.movie_rounded, Color(0xFF8B5CF6)),
+    _Cat('Healthcare', Icons.health_and_safety_rounded, Color(0xFF06C270)),
     _Cat('Salary', Icons.work_rounded, Color(0xFF06C270)),
-    _Cat('General', Icons.category_rounded, Color(0xFF6B7A99)),
+    _Cat('Others', Icons.category_rounded, Color(0xFF6B7A99)),
   ];
 
   @override
@@ -167,6 +168,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                                 if (double.tryParse(v) == null) {
                                   return 'Invalid number';
                                 }
+                                final amount = double.parse(v);
+                                if (!amount.isFinite || amount <= 0) {
+                                  return 'Amount must be greater than zero';
+                                }
                                 return null;
                               },
                             ),
@@ -282,16 +287,39 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     final authService = Provider.of<AuthService>(context, listen: false);
     final fs = authService.firestoreService;
     if (fs != null) {
-      await fs.addTransaction(
-        FinancialTransaction(
-          id: '',
-          title: _titleCtrl.text.trim(),
-          amount: double.parse(_amountCtrl.text.trim()),
-          date: DateTime.now(),
-          category: _category,
-          type: _type,
-        ),
+      final transaction = FinancialTransaction(
+        id: '',
+        title: _titleCtrl.text.trim(),
+        amount: double.parse(_amountCtrl.text.trim()),
+        date: DateTime.now(),
+        category: _category,
+        type: _type,
       );
+      try {
+        await fs.addTransaction(transaction);
+      } on SavingsUsageRequiredException catch (error) {
+        if (!mounted) return;
+        final approved = await _confirmSavingsUse(error.requiredAmount);
+        if (approved != true) {
+          setState(() => _saving = false);
+          return;
+        }
+        try {
+          await fs.addTransaction(transaction, allowSavingsWithdrawal: true);
+        } on FinanceValidationException catch (secondError) {
+          if (mounted) {
+            _showError(secondError.message);
+          }
+          setState(() => _saving = false);
+          return;
+        }
+      } on FinanceValidationException catch (error) {
+        if (mounted) {
+          _showError(error.message);
+        }
+        setState(() => _saving = false);
+        return;
+      }
     }
 
     if (mounted) {
@@ -308,6 +336,34 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         ),
       );
     }
+  }
+
+  Future<bool?> _confirmSavingsUse(double amount) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Use savings?'),
+        content: Text(
+          'This expense exceeds available budget or balance and needs PKR ${amount.toStringAsFixed(0)} from savings. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Use Savings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppTheme.error),
+    );
   }
 }
 

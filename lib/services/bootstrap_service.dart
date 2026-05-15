@@ -135,14 +135,13 @@ class BootstrapService {
 
   static Future<void> _seedMarketplace(FirebaseFirestore db) async {
     final partnersRef = db.collection('marketplace_partners');
-    final existing = await partnersRef.limit(1).get();
-    if (existing.docs.isNotEmpty) {
-      return;
-    }
-
     final batch = db.batch();
     for (final partner in DemoFinanceData.marketplacePartners) {
-      batch.set(partnersRef.doc(partner['id'] as String), partner);
+      batch.set(
+        partnersRef.doc(partner['id'] as String),
+        partner,
+        SetOptions(merge: true),
+      );
     }
     await batch.commit();
   }

@@ -27,6 +27,7 @@ class ProfilePage extends StatelessWidget {
             expandedHeight: 280,
             pinned: true,
             backgroundColor: AppTheme.primary,
+            iconTheme: const IconThemeData(color: Colors.black),
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
@@ -132,10 +133,7 @@ class ProfilePage extends StatelessWidget {
                             Expanded(
                               child: _StatCard(
                                 label: 'Saved',
-                                value: CurrencyUtils.format(
-                                  saved,
-                                  compact: true,
-                                ),
+                                value: CurrencyUtils.format(saved),
                               ),
                             ),
                             const SizedBox(width: 12),

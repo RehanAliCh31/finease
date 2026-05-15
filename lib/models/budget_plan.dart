@@ -9,6 +9,8 @@ class BudgetPlan {
     required this.notes,
     required this.monthKey,
     required this.createdAt,
+    this.allocationPercent,
+    this.allocationMode = 'manual',
   });
 
   final String id;
@@ -18,6 +20,8 @@ class BudgetPlan {
   final String notes;
   final String monthKey;
   final DateTime? createdAt;
+  final double? allocationPercent;
+  final String allocationMode;
 
   factory BudgetPlan.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -29,6 +33,8 @@ class BudgetPlan {
       notes: data['notes'] ?? '',
       monthKey: data['monthKey'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      allocationPercent: (data['allocationPercent'] as num?)?.toDouble(),
+      allocationMode: data['allocationMode'] ?? 'manual',
     );
   }
 
@@ -39,6 +45,8 @@ class BudgetPlan {
       'allocatedAmount': allocatedAmount,
       'notes': notes,
       'monthKey': monthKey,
+      'allocationPercent': allocationPercent,
+      'allocationMode': allocationMode,
     };
   }
 }

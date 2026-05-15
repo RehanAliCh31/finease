@@ -10,8 +10,7 @@ import 'firestore_service.dart';
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  final FlutterSecureStorage _secureStorage =
-      const FlutterSecureStorage(
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
     aOptions: AndroidOptions.biometric(
       enforceBiometrics: false,
       biometricPromptTitle: 'Authenticate to access FinEase',
@@ -24,6 +23,7 @@ class AuthService extends ChangeNotifier {
   FirestoreService? _firestoreService;
 
   bool _isBiometricEnabled = false;
+  String? _pendingEmailLinkAddress;
   List<BiometricType> _availableBiometrics = const [];
 
   // =========================
@@ -38,16 +38,15 @@ class AuthService extends ChangeNotifier {
 
   bool get isEmailVerified => _user?.emailVerified ?? false;
 
+  bool get canAccessProtectedFeatures => isAdmin || isEmailVerified;
+
   bool get isBiometricEnabled => _isBiometricEnabled;
 
-  List<BiometricType> get availableBiometrics =>
-      _availableBiometrics;
+  List<BiometricType> get availableBiometrics => _availableBiometrics;
 
-  bool get isAdmin =>
-      _user?.email == AppConstants.adminEmail;
+  bool get isAdmin => _user?.email == AppConstants.adminEmail;
 
-  bool get isDemoAccount =>
-      _user?.email == AppConstants.demoEmail;
+  bool get isDemoAccount => _user?.email == AppConstants.demoEmail;
 
   // =========================
   // Constructor
@@ -62,8 +61,11 @@ class AuthService extends ChangeNotifier {
         await user.reload();
         _user = _auth.currentUser;
 
-        _firestoreService =
-            FirestoreService(uid: user.uid);
+        _firestoreService = FirestoreService(uid: user.uid);
+        if (_user?.emailVerified == true ||
+            _user?.email == AppConstants.adminEmail) {
+          await _firestoreService?.ensureMonthlySavingsRollover();
+        }
       } else {
         _firestoreService = null;
       }
@@ -72,6 +74,7 @@ class AuthService extends ChangeNotifier {
     });
 
     _loadBiometricState();
+    _completeEmailLinkSignInIfPossible();
   }
 
   // =========================
@@ -81,6 +84,15 @@ class AuthService extends ChangeNotifier {
   Future<void> reloadUser() async {
     await _user?.reload();
     _user = _auth.currentUser;
+    if (_user != null && _user!.emailVerified) {
+      await _user!.getIdToken(true);
+      await _firestoreService?.saveUserProfile({
+        'emailVerified': _user!.emailVerified,
+        'emailVerifiedAt': _user!.emailVerified
+            ? FieldValue.serverTimestamp()
+            : null,
+      });
+    }
     notifyListeners();
   }
 
@@ -90,12 +102,24 @@ class AuthService extends ChangeNotifier {
 
   Future<void> sendEmailVerification() async {
     try {
-      await _user?.sendEmailVerification();
+      await _user?.reload();
+      _user = _auth.currentUser;
+      if (_user == null) {
+        throw FirebaseAuthException(
+          code: 'requires-recent-login',
+          message: 'Please sign in again before requesting verification.',
+        );
+      }
+      if (_user!.emailVerified) {
+        throw FirebaseAuthException(
+          code: 'already-verified',
+          message: 'This email address is already verified.',
+        );
+      }
+      await _user!.sendEmailVerification();
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
-        print(
-          'Email verification error [${e.code}]: ${e.message}',
-        );
+        print('Email verification error [${e.code}]: ${e.message}');
       }
       throw Exception(e.code);
     }
@@ -120,44 +144,44 @@ class AuthService extends ChangeNotifier {
   // Email Sign In
   // =========================
 
-  Future<void> signInWithEmail(
-    String email,
-    String password,
-  ) async {
+  Future<void> signInWithEmail(String email, String password) async {
     try {
-      final credential =
-          await _auth.signInWithEmailAndPassword(
+      final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       final uid = credential.user?.uid;
+      await credential.user?.reload();
+      _user = _auth.currentUser;
 
       // Check suspended account
-      if (uid != null &&
-          email != AppConstants.adminEmail) {
-        final profile =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(uid)
-                .get();
+      if (uid != null && email != AppConstants.adminEmail) {
+        final profile = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
 
-        if (profile.data()?['accountStatus'] ==
-            'suspended') {
+        if (profile.data()?['accountStatus'] == 'suspended') {
           await _auth.signOut();
 
           throw FirebaseAuthException(
             code: 'account-suspended',
-            message:
-                'This account has been suspended by FinEase admin.',
+            message: 'This account has been suspended by FinEase admin.',
           );
+        }
+        if (_user?.emailVerified == true) {
+          await _user!.getIdToken(true);
+          await FirebaseFirestore.instance.collection('users').doc(uid).set({
+            'emailVerified': true,
+            'emailVerifiedAt': FieldValue.serverTimestamp(),
+            'lastLoginAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
         }
       }
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
-        print(
-          'Login error [${e.code}]: ${e.message}',
-        );
+        print('Login error [${e.code}]: ${e.message}');
       }
 
       throw Exception(e.code);
@@ -170,6 +194,61 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<void> sendPasswordlessSignInLink(String email) async {
+    final normalizedEmail = email.trim();
+    final settings = ActionCodeSettings(
+      url: 'https://finease-27a62.web.app',
+      handleCodeInApp: true,
+      androidPackageName: 'com.example.finease',
+      androidInstallApp: true,
+      iOSBundleId: 'com.example.finease',
+    );
+    try {
+      await _auth.sendSignInLinkToEmail(
+        email: normalizedEmail,
+        actionCodeSettings: settings,
+      );
+      _pendingEmailLinkAddress = normalizedEmail;
+      await _secureStorage.write(
+        key: 'pending_email_link_address',
+        value: normalizedEmail,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.code);
+    }
+  }
+
+  Future<bool> signInWithEmailLinkIfValid({
+    required String email,
+    required String link,
+  }) async {
+    if (!_auth.isSignInWithEmailLink(link)) {
+      return false;
+    }
+    final credential = await _auth.signInWithEmailLink(
+      email: email.trim(),
+      emailLink: link,
+    );
+    await _secureStorage.delete(key: 'pending_email_link_address');
+    _pendingEmailLinkAddress = null;
+    await _ensureUserProfile(credential.user, email.trim());
+    return true;
+  }
+
+  Future<void> _completeEmailLinkSignInIfPossible() async {
+    final link = Uri.base.toString();
+    if (!_auth.isSignInWithEmailLink(link)) {
+      return;
+    }
+    final email =
+        _pendingEmailLinkAddress ??
+        await _secureStorage.read(key: 'pending_email_link_address');
+    if (email == null || email.isEmpty) {
+      return;
+    }
+    await signInWithEmailLinkIfValid(email: email, link: link);
+  }
+
   // =========================
   // Email Sign Up
   // =========================
@@ -180,17 +259,14 @@ class AuthService extends ChangeNotifier {
     String? fullName,
   }) async {
     try {
-      final credential =
-          await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      final name =
-          fullName ?? email.split('@').first;
+      final name = fullName ?? email.split('@').first;
 
-      await credential.user
-          ?.updateDisplayName(name);
+      await credential.user?.updateDisplayName(name);
 
       // Refresh current user
       await credential.user?.reload();
@@ -200,31 +276,10 @@ class AuthService extends ChangeNotifier {
       await credential.user?.sendEmailVerification();
 
       // Create Firestore profile
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(credential.user!.uid)
-          .set({
-        'fullName': name,
-        'email': email,
-        'role': 'user',
-        'accountStatus': 'active',
-        'isDemoAccount': false,
-        'currencyCode':
-            AppConstants.currencyCode,
-        'country': AppConstants.countryName,
-        'memberSince':
-            DateTime.now().year.toString(),
-        'pushAlerts': true,
-        'monthlyReports': true,
-        'biometricLogin': false,
-        'language': 'English (Pakistan)',
-        'createdAt': Timestamp.now(),
-      });
+      await _ensureUserProfile(credential.user, email, fullName: name);
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
-        print(
-          'Signup error [${e.code}]: ${e.message}',
-        );
+        print('Signup error [${e.code}]: ${e.message}');
       }
 
       throw Exception(e.code);
@@ -237,22 +292,41 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<void> _ensureUserProfile(
+    User? user,
+    String email, {
+    String? fullName,
+  }) async {
+    if (user == null) return;
+    final name = fullName ?? user.displayName ?? email.split('@').first;
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'fullName': name,
+      'email': email,
+      'role': 'user',
+      'accountStatus': 'active',
+      'isDemoAccount': false,
+      'currencyCode': AppConstants.currencyCode,
+      'country': AppConstants.countryName,
+      'memberSince': DateTime.now().year.toString(),
+      'pushAlerts': true,
+      'monthlyReports': true,
+      'biometricLogin': false,
+      'language': 'English (Pakistan)',
+      'emailVerified': user.emailVerified,
+      'createdAt': Timestamp.now(),
+    }, SetOptions(merge: true));
+  }
+
   // =========================
   // Password Reset
   // =========================
 
-  Future<void> sendPasswordResetEmail(
-    String email,
-  ) async {
+  Future<void> sendPasswordResetEmail(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(
-        email: email,
-      );
+      await _auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
-        print(
-          'Reset error [${e.code}]: ${e.message}',
-        );
+        print('Reset error [${e.code}]: ${e.message}');
       }
 
       throw Exception(e.code);
@@ -283,8 +357,7 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
-    final isSupported =
-        await canUseBiometrics();
+    final isSupported = await canUseBiometrics();
 
     if (!isSupported) {
       throw Exception(
@@ -292,27 +365,15 @@ class AuthService extends ChangeNotifier {
       );
     }
 
-    await _secureStorage.write(
-      key: 'biometric_email',
-      value: email,
-    );
+    await _secureStorage.write(key: 'biometric_email', value: email);
 
-    await _secureStorage.write(
-      key: 'biometric_password',
-      value: password,
-    );
+    await _secureStorage.write(key: 'biometric_password', value: password);
 
-    await _secureStorage.write(
-      key: 'biometric_enabled',
-      value: 'true',
-    );
+    await _secureStorage.write(key: 'biometric_enabled', value: 'true');
 
     _isBiometricEnabled = true;
 
-    await _firestoreService
-        ?.saveUserProfile({
-      'biometricLogin': true,
-    });
+    await _firestoreService?.saveUserProfile({'biometricLogin': true});
 
     notifyListeners();
   }
@@ -322,25 +383,15 @@ class AuthService extends ChangeNotifier {
   // =========================
 
   Future<void> disableBiometricLogin() async {
-    await _secureStorage.delete(
-      key: 'biometric_email',
-    );
+    await _secureStorage.delete(key: 'biometric_email');
 
-    await _secureStorage.delete(
-      key: 'biometric_password',
-    );
+    await _secureStorage.delete(key: 'biometric_password');
 
-    await _secureStorage.write(
-      key: 'biometric_enabled',
-      value: 'false',
-    );
+    await _secureStorage.write(key: 'biometric_enabled', value: 'false');
 
     _isBiometricEnabled = false;
 
-    await _firestoreService
-        ?.saveUserProfile({
-      'biometricLogin': false,
-    });
+    await _firestoreService?.saveUserProfile({'biometricLogin': false});
 
     notifyListeners();
   }
@@ -351,10 +402,8 @@ class AuthService extends ChangeNotifier {
 
   Future<bool> canUseBiometrics() async {
     try {
-      return await _localAuth
-              .canCheckBiometrics ||
-          await _localAuth
-              .isDeviceSupported();
+      return await _localAuth.canCheckBiometrics ||
+          await _localAuth.isDeviceSupported();
     } catch (_) {
       return false;
     }
@@ -364,12 +413,9 @@ class AuthService extends ChangeNotifier {
   // Get Available Biometrics
   // =========================
 
-  Future<List<BiometricType>>
-      getAvailableBiometrics() async {
+  Future<List<BiometricType>> getAvailableBiometrics() async {
     try {
-      _availableBiometrics =
-          await _localAuth
-              .getAvailableBiometrics();
+      _availableBiometrics = await _localAuth.getAvailableBiometrics();
 
       notifyListeners();
 
@@ -387,41 +433,28 @@ class AuthService extends ChangeNotifier {
   // Authenticate Biometrics
   // =========================
 
-  Future<bool>
-      authenticateWithBiometrics() async {
-    final enabled =
-        await _secureStorage.read(
-      key: 'biometric_enabled',
-    );
+  Future<bool> authenticateWithBiometrics() async {
+    final enabled = await _secureStorage.read(key: 'biometric_enabled');
 
     if (enabled != 'true') {
       return false;
     }
 
-    final email =
-        await _secureStorage.read(
-      key: 'biometric_email',
-    );
+    final email = await _secureStorage.read(key: 'biometric_email');
 
-    final password =
-        await _secureStorage.read(
-      key: 'biometric_password',
-    );
+    final password = await _secureStorage.read(key: 'biometric_password');
 
-    if (email == null ||
-        password == null) {
+    if (email == null || password == null) {
       return false;
     }
 
-    final isSupported =
-        await canUseBiometrics();
+    final isSupported = await canUseBiometrics();
 
     if (!isSupported) {
       return false;
     }
 
-    final didAuthenticate =
-        await _localAuth.authenticate(
+    final didAuthenticate = await _localAuth.authenticate(
       localizedReason:
           'Authenticate with Touch ID or Face ID to unlock FinEase',
       biometricOnly: true,
@@ -432,10 +465,7 @@ class AuthService extends ChangeNotifier {
       return false;
     }
 
-    await signInWithEmail(
-      email,
-      password,
-    );
+    await signInWithEmail(email, password);
 
     return true;
   }
@@ -444,16 +474,11 @@ class AuthService extends ChangeNotifier {
   // Load Biometric State
   // =========================
 
-  Future<void>
-      _loadBiometricState() async {
+  Future<void> _loadBiometricState() async {
     _isBiometricEnabled =
-        (await _secureStorage.read(
-              key: 'biometric_enabled',
-            )) ==
-            'true';
+        (await _secureStorage.read(key: 'biometric_enabled')) == 'true';
 
-    _availableBiometrics =
-        await getAvailableBiometrics();
+    _availableBiometrics = await getAvailableBiometrics();
 
     notifyListeners();
   }

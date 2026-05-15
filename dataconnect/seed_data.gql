@@ -1,0 +1,127 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "This is a seed data mutation for initial setup, not intended for client-side use.") {
+  user_insertMany(data: [
+    {
+      id: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      displayName: "Alice Smith",
+      email: "alice.smith@example.com",
+      createdAt: "2023-01-01T10:00:00Z",
+      photoUrl: "https://example.com/alice.jpg",
+      preferredCurrency: "USD"
+    },
+    {
+      id: "b2c3d4e5-f6a7-8901-2345-67890abcdef0",
+      displayName: "Bob Johnson",
+      email: "bob.johnson@example.com",
+      createdAt: "2023-01-01T10:05:00Z",
+      preferredCurrency: "EUR"
+    }
+  ])
+  category_insertMany(data: [
+    {
+      id: "c3d4e5f6-a7b8-9012-3456-7890abcdef01",
+      categoryName: "Groceries",
+      categoryType: "Expense",
+      iconUrl: "https://example.com/icons/groceries.png"
+    },
+    {
+      id: "d4e5f6a7-b8c9-0123-4567-890abcdef012",
+      categoryName: "Salary",
+      categoryType: "Income",
+      iconUrl: "https://example.com/icons/salary.png"
+    },
+    {
+      id: "e5f6a7b8-c9d0-1234-5678-90abcdef0123",
+      categoryName: "Utilities",
+      categoryType: "Expense"
+    }
+  ])
+  account_insertMany(data: [
+    {
+      id: "f6a7b8c9-d0e1-2345-6789-0abcdef01234",
+      userId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      accountName: "Checking Account",
+      accountType: "Bank",
+      balance: 1500.75,
+      lastSyncedAt: "2023-10-26T14:30:00Z",
+      createdAt: "2023-01-01T10:10:00Z",
+      institutionName: "First National Bank"
+    },
+    {
+      id: "a7b8c9d0-e1f2-3456-7890-abcdef012345",
+      userId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      accountName: "Savings Account",
+      accountType: "Savings",
+      balance: 5000.00,
+      lastSyncedAt: "2023-10-26T14:31:00Z",
+      createdAt: "2023-01-01T10:15:00Z",
+      institutionName: "First National Bank"
+    },
+    {
+      id: "b8c9d0e1-f2a3-4567-8901-abcdef012346",
+      userId: "b2c3d4e5-f6a7-8901-2345-67890abcdef0",
+      accountName: "Euro Bank",
+      accountType: "Bank",
+      balance: 2000.50,
+      lastSyncedAt: "2023-10-26T14:32:00Z",
+      createdAt: "2023-01-01T10:20:00Z",
+      institutionName: "Euro Capital Bank"
+    }
+  ])
+  budget_insertMany(data: [
+    {
+      id: "c9d0e1f2-a3b4-5678-9012-abcdef012347",
+      userId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      categoryId: "c3d4e5f6-a7b8-9012-3456-7890abcdef01",
+      budgetAmount: 300.00,
+      startDate: "2023-10-01",
+      endDate: "2023-10-31",
+      createdAt: "2023-09-25T08:00:00Z",
+      alertThreshold: 0.8
+    }
+  ])
+  transaction_insertMany(data: [
+    {
+      id: "d0e1f2a3-b4c5-6789-0123-abcdef012348",
+      accountId: "f6a7b8c9-d0e1-2345-6789-0abcdef01234",
+      categoryId: "c3d4e5f6-a7b8-9012-3456-7890abcdef01",
+      amount: -55.20,
+      description: "Weekly groceries",
+      transactionDate: "2023-10-25T18:00:00Z",
+      createdAt: "2023-10-25T18:05:00Z",
+      merchant: "Local Supermarket"
+    },
+    {
+      id: "e1f2a3b4-c5d6-7890-1234-abcdef012349",
+      accountId: "f6a7b8c9-d0e1-2345-6789-0abcdef01234",
+      categoryId: "d4e5f6a7-b8c9-0123-4567-890abcdef012",
+      amount: 1200.00,
+      description: "Monthly salary",
+      transactionDate: "2023-10-20T09:00:00Z",
+      createdAt: "2023-10-20T09:05:00Z",
+      merchant: "Employer Inc."
+    },
+    {
+      id: "f2a3b4c5-d6e7-8901-2345-abcdef01234a",
+      accountId: "b8c9d0e1-f2a3-4567-8901-abcdef012346",
+      categoryId: "e5f6a7b8-c9d0-1234-5678-90abcdef0123",
+      amount: -75.00,
+      description: "Electricity bill",
+      transactionDate: "2023-10-18T10:00:00Z",
+      createdAt: "2023-10-18T10:05:00Z",
+      merchant: "Power Company"
+    }
+  ])
+  goal_insertMany(data: [
+    {
+      id: "a3b4c5d6-e7f8-9012-3456-abcdef01234b",
+      userId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      goalName: "New Car Down Payment",
+      targetAmount: 5000.00,
+      currentAmount: 1500.00,
+      targetDate: "2024-12-31",
+      goalType: "Savings",
+      createdAt: "2023-03-10T11:00:00Z",
+      description: "Saving for a down payment on a new car."
+    }
+  ])
+}

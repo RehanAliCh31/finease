@@ -246,7 +246,7 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _SummaryPill(
                   label: 'Suggested monthly',
-                  value: CurrencyUtils.format(monthlyTarget, compact: true),
+                  value: CurrencyUtils.format(monthlyTarget),
                 ),
               ),
             ],

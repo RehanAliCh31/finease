@@ -18,6 +18,8 @@ class LessonCourse {
     required this.xpReward,
     required this.lessons,
     required this.quiz,
+    required this.externalUrl,
+    required this.videoUrl,
   });
 
   final String id;
@@ -31,6 +33,8 @@ class LessonCourse {
   final int xpReward;
   final List<Lesson> lessons;
   final CourseQuiz quiz;
+  final String externalUrl;
+  final String videoUrl;
 }
 
 class CourseQuiz {
@@ -73,6 +77,11 @@ class DemoFinanceData {
       'ctaLabel': 'Explore Cover',
       'colorHex': 0xFF2E3192,
       'iconName': 'shield',
+      'websiteUrl': 'https://jubileelife.com/',
+      'latitude': 24.8607,
+      'longitude': 67.0011,
+      'status': 'active',
+      'approved': true,
       'priority': 1,
     },
     {
@@ -85,6 +94,11 @@ class DemoFinanceData {
       'ctaLabel': 'Check Options',
       'colorHex': 0xFF0EA5A4,
       'iconName': 'bank',
+      'websiteUrl': 'https://www.hbl.com/',
+      'latitude': 24.8607,
+      'longitude': 67.0011,
+      'status': 'active',
+      'approved': true,
       'priority': 2,
     },
     {
@@ -97,6 +111,11 @@ class DemoFinanceData {
       'ctaLabel': 'View Roles',
       'colorHex': 0xFF059669,
       'iconName': 'briefcase',
+      'websiteUrl': 'https://www.rozee.pk/',
+      'latitude': 31.5204,
+      'longitude': 74.3587,
+      'status': 'active',
+      'approved': true,
       'priority': 3,
     },
     {
@@ -109,6 +128,11 @@ class DemoFinanceData {
       'ctaLabel': 'Compare Plans',
       'colorHex': 0xFFD97706,
       'iconName': 'sun',
+      'websiteUrl': 'https://www.lesco.gov.pk/',
+      'latitude': 31.5204,
+      'longitude': 74.3587,
+      'status': 'active',
+      'approved': true,
       'priority': 4,
     },
     {
@@ -121,6 +145,11 @@ class DemoFinanceData {
       'ctaLabel': 'See Programs',
       'colorHex': 0xFF7C3AED,
       'iconName': 'school',
+      'websiteUrl': 'https://www.hec.gov.pk/',
+      'latitude': 33.6844,
+      'longitude': 73.0479,
+      'status': 'active',
+      'approved': true,
       'priority': 5,
     },
   ];
@@ -141,7 +170,7 @@ class DemoFinanceData {
         title: 'Apartment Rent',
         amount: 85000,
         date: DateTime(now.year, now.month, 2),
-        category: 'Housing',
+        category: 'Others',
         type: 'expense',
       ),
       FinancialTransaction(
@@ -149,7 +178,7 @@ class DemoFinanceData {
         title: 'Groceries',
         amount: 18500,
         date: now.subtract(const Duration(days: 2)),
-        category: 'Food',
+        category: 'Groceries',
         type: 'expense',
       ),
       FinancialTransaction(
@@ -157,7 +186,7 @@ class DemoFinanceData {
         title: 'Coffee and Breakfast',
         amount: 1200,
         date: now.subtract(const Duration(days: 1)),
-        category: 'Food',
+        category: 'Groceries',
         type: 'expense',
       ),
       FinancialTransaction(
@@ -165,7 +194,7 @@ class DemoFinanceData {
         title: 'Gym Membership',
         amount: 6500,
         date: DateTime(now.year, now.month, 4),
-        category: 'Health',
+        category: 'Healthcare',
         type: 'expense',
       ),
       FinancialTransaction(
@@ -205,7 +234,7 @@ class DemoFinanceData {
         title: 'New Headphones',
         amount: 28500,
         date: now.subtract(const Duration(days: 7)),
-        category: 'Shopping',
+        category: 'Entertainment',
         type: 'expense',
       ),
       FinancialTransaction(
@@ -213,7 +242,7 @@ class DemoFinanceData {
         title: 'Electric Bill',
         amount: 14200,
         date: now.subtract(const Duration(days: 8)),
-        category: 'Utilities',
+        category: 'Electricity',
         type: 'expense',
       ),
       FinancialTransaction(
@@ -254,15 +283,14 @@ class DemoFinanceData {
         targetAmount: 300000,
         currentAmount: 118000,
         targetDate: DateTime(now.year, now.month + 5, 10),
-        category: 'General',
+        category: 'Others',
         emoji: 'Chart',
       ),
     ];
   }
 
   static const Map<String, dynamic> sampleProfile = {
-    'fullName': 'Alex Morgan',
-    'membershipTier': 'Elite Member',
+    'fullName': 'FinEase Demo',
     'monthlyIncome': 397000.0,
     'targetSavingsRate': 0.22,
   };
@@ -274,7 +302,7 @@ class DemoFinanceData {
       BudgetPlan(
         id: 'seed-budget-1',
         title: 'Home Essentials',
-        category: 'Housing',
+        category: 'Others',
         allocatedAmount: 95000,
         notes: 'Rent, maintenance, utilities, and internet.',
         monthKey: monthKey,
@@ -283,7 +311,7 @@ class DemoFinanceData {
       BudgetPlan(
         id: 'seed-budget-2',
         title: 'Food and Groceries',
-        category: 'Food',
+        category: 'Groceries',
         allocatedAmount: 45000,
         notes: 'Groceries plus weekly dining cap.',
         monthKey: monthKey,
@@ -384,6 +412,9 @@ class DemoFinanceData {
           ),
         ],
       ),
+      externalUrl: 'https://www.investopedia.com/budgeting-4427755',
+      videoUrl:
+          'https://www.youtube.com/results?search_query=budgeting+for+beginners',
     ),
     LessonCourse(
       id: 'smart-investing',
@@ -458,6 +489,9 @@ class DemoFinanceData {
           ),
         ],
       ),
+      externalUrl: 'https://www.investopedia.com/investing-4427685',
+      videoUrl:
+          'https://www.youtube.com/results?search_query=investing+for+beginners+index+funds',
     ),
     LessonCourse(
       id: 'credit-and-debt',
@@ -533,6 +567,10 @@ class DemoFinanceData {
           ),
         ],
       ),
+      externalUrl:
+          'https://www.khanacademy.org/college-careers-more/personal-finance',
+      videoUrl:
+          'https://www.youtube.com/results?search_query=debt+payoff+avalanche+snowball',
     ),
     LessonCourse(
       id: 'pakistan-finance-playbook',
@@ -608,6 +646,9 @@ class DemoFinanceData {
           ),
         ],
       ),
+      externalUrl: 'https://www.hec.gov.pk/',
+      videoUrl:
+          'https://www.youtube.com/results?search_query=personal+finance+pakistan+budgeting',
     ),
   ];
 

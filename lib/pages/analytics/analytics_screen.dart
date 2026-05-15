@@ -51,7 +51,8 @@ class AnalyticsScreen extends StatelessWidget {
                       _SectionHeader(
                         icon: Icons.warning_amber_rounded,
                         title: 'Spending Alerts',
-                        subtitle: '${anomalies.length} categor${anomalies.length == 1 ? 'y' : 'ies'} flagged',
+                        subtitle:
+                            '${anomalies.length} categor${anomalies.length == 1 ? 'y' : 'ies'} flagged',
                         iconColor: const Color(0xFFF59E0B),
                       ),
                       const SizedBox(height: 12),
@@ -69,7 +70,8 @@ class AnalyticsScreen extends StatelessWidget {
                     if (recurring.isEmpty)
                       _EmptyState(
                         icon: Icons.receipt_long_outlined,
-                        message: 'No recurring expenses detected yet.\nAdd more transactions to see patterns.',
+                        message:
+                            'No recurring expenses detected yet.\nAdd more transactions to see patterns.',
                       )
                     else
                       ...recurring.map((r) => _RecurringCard(expense: r)),
@@ -89,6 +91,7 @@ class AnalyticsScreen extends StatelessWidget {
       floating: false,
       pinned: true,
       backgroundColor: const Color(0xFF2E3192),
+      iconTheme: const IconThemeData(color: Colors.white),
       flexibleSpace: FlexibleSpaceBar(
         titlePadding: const EdgeInsets.fromLTRB(20, 0, 0, 16),
         title: const Text(
@@ -145,19 +148,23 @@ class _SectionHeader extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                  fontFamily: 'Plus Jakarta Sans',
-                )),
-            Text(subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                  fontFamily: 'Plus Jakarta Sans',
-                )),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Plus Jakarta Sans',
+              ),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF64748B),
+                fontFamily: 'Plus Jakarta Sans',
+              ),
+            ),
           ],
         ),
       ],
@@ -205,8 +212,7 @@ class _WeeklyBarChartState extends State<_WeeklyBarChart> {
           barTouchData: BarTouchData(
             touchCallback: (event, response) {
               setState(() {
-                _touchedIndex =
-                    response?.spot?.touchedBarGroupIndex;
+                _touchedIndex = response?.spot?.touchedBarGroupIndex;
               });
             },
             touchTooltipData: BarTouchTooltipData(
@@ -265,10 +271,12 @@ class _WeeklyBarChartState extends State<_WeeklyBarChart> {
                 },
               ),
             ),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
           gridData: FlGridData(
             show: true,
@@ -289,14 +297,12 @@ class _WeeklyBarChartState extends State<_WeeklyBarChart> {
                   toY: entries[i].value,
                   width: isTouched ? 18 : 14,
                   borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(6)),
+                    top: Radius.circular(6),
+                  ),
                   gradient: LinearGradient(
                     colors: isTouched
                         ? [const Color(0xFF4B5BD6), const Color(0xFF2E3192)]
-                        : [
-                            const Color(0xFF818CF8),
-                            const Color(0xFF4B5BD6),
-                          ],
+                        : [const Color(0xFF818CF8), const Color(0xFF4B5BD6)],
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                   ),
@@ -311,8 +317,9 @@ class _WeeklyBarChartState extends State<_WeeklyBarChart> {
     );
   }
 
-  String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+  String _fmt(double v) => v
+      .toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
 
   String _fmtK(double v) {
     if (v >= 1000) return '${(v / 1000).toStringAsFixed(0)}k';
@@ -334,7 +341,9 @@ class _AnomalyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
@@ -352,8 +361,11 @@ class _AnomalyCard extends StatelessWidget {
               color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.warning_amber_rounded,
-                color: Color(0xFFD97706), size: 20),
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFD97706),
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -374,7 +386,9 @@ class _AnomalyCard extends StatelessWidget {
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF59E0B),
                         borderRadius: BorderRadius.circular(20),
@@ -419,8 +433,18 @@ class _RecurringCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final d = expense.lastDetectedDate;
     final dateStr = '${d.day} ${months[d.month - 1]} ${d.year}';
@@ -447,8 +471,11 @@ class _RecurringCard extends StatelessWidget {
               color: const Color(0xFF2E3192).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.calendar_month_rounded,
-                color: Color(0xFF2E3192), size: 22),
+            child: const Icon(
+              Icons.calendar_month_rounded,
+              color: Color(0xFF2E3192),
+              size: 22,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -467,8 +494,11 @@ class _RecurringCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    const Icon(Icons.label_outline_rounded,
-                        size: 12, color: Color(0xFF94A3B8)),
+                    const Icon(
+                      Icons.label_outline_rounded,
+                      size: 12,
+                      color: Color(0xFF94A3B8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       expense.category,
@@ -479,8 +509,11 @@ class _RecurringCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Icon(Icons.access_time_rounded,
-                        size: 12, color: Color(0xFF94A3B8)),
+                    const Icon(
+                      Icons.access_time_rounded,
+                      size: 12,
+                      color: Color(0xFF94A3B8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Last: $dateStr',
@@ -522,8 +555,9 @@ class _RecurringCard extends StatelessWidget {
     );
   }
 
-  String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+  String _fmt(double v) => v
+      .toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
 }
 
 // ─── Empty State ───────────────────────────────────────────────────────────
