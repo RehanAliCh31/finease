@@ -44,6 +44,21 @@ class AppTheme {
   static Color textHintFor(BuildContext context) =>
       isDark(context) ? const Color(0xFF94A3B8) : textHint;
 
+  static Color primaryFor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF8B8DF6) : primary;
+
+  static Color secondaryFor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF34F5EF) : secondary;
+
+  static Color mutedFillFor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF202640) : const Color(0xFFF1F5F9);
+
+  static Color successFillFor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF063B2C) : const Color(0xFFECFDF5);
+
+  static Color warningFillFor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF3A2A08) : const Color(0xFFFFFBEB);
+
   // Gradient
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [Color(0xFF2E3192), Color(0xFF00F2EA)],

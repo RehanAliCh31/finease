@@ -71,7 +71,7 @@ class PartnerProductCard extends StatelessWidget {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFECFDF5),
+                                color: AppTheme.successFillFor(context),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
@@ -111,9 +111,11 @@ class PartnerProductCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
+                color: AppTheme.successFillFor(context),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFA7F3D0)),
+                border: Border.all(
+                  color: AppTheme.success.withValues(alpha: 0.35),
+                ),
               ),
               child: Row(
                 children: [
@@ -184,6 +186,8 @@ class PartnerProductCard extends StatelessWidget {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Estimated benefit',
@@ -241,7 +245,9 @@ class PartnerProductCard extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: onTap,
                     style: ElevatedButton.styleFrom(
+                      
                       backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -257,7 +263,9 @@ class PartnerProductCard extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.textPrimaryFor(context),
                       side: BorderSide(
-                        color: isCompared ? AppTheme.primary : AppTheme.borderFor(context),
+                        color: isCompared
+                            ? AppTheme.primary
+                            : AppTheme.borderFor(context),
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(

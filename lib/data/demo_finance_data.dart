@@ -316,7 +316,7 @@ class DemoFinanceData {
     },
     {
       'id': 'education-aid',
-      'name': 'Education & Scholarship Desk',
+      'name': 'Education Desk',
       'description':
           'Student financing, scholarships, and training programs designed for Pakistani learners and early professionals.',
       'category': 'Education',
@@ -662,8 +662,8 @@ class DemoFinanceData {
       ),
       externalUrl:
           'https://www.khanacademy.org/college-careers-more/financial-literacy/xa6995ea67a8e9fdd:budgeting-and-saving',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=50+30+20+budgeting+rule+Khan+Academy',
+      videoUrl: 'https://www.youtube.com/watch?v=LKxOamnP8J4',
+      videoId: 'LKxOamnP8J4',
       trackId: 'beginner',
       localRelevance:
           'Uses PKR salary cycles, rent, grocery inflation, and family support realities.',
@@ -785,8 +785,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.investopedia.com/terms/i/indexfund.asp',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=index+funds+asset+allocation+investing+for+beginners',
+      videoUrl: 'https://www.youtube.com/watch?v=qbaZHZkadfg',
+      videoId: 'qbaZHZkadfg',
       trackId: 'intermediate',
       prerequisites: ['Budget Foundations', 'Emergency Fund Systems'],
       localRelevance:
@@ -911,8 +911,8 @@ class DemoFinanceData {
       ),
       externalUrl:
           'https://www.consumerfinance.gov/consumer-tools/debt-collection/',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=debt+avalanche+vs+debt+snowball+explained',
+      videoUrl: 'https://www.youtube.com/watch?v=S19s7RwpKSM',
+      videoId: 'S19s7RwpKSM',
       trackId: 'beginner',
       localRelevance:
           'Uses installment plans, salary advances, BNPL, and family borrowing examples.',
@@ -1035,8 +1035,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.sbp.org.pk/finc/FL.asp',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=personal+finance+Pakistan+budgeting+saving+borrowing',
+      videoUrl: 'https://www.youtube.com/watch?v=6eV8_8sVDMY',
+      videoId: '6eV8_8sVDMY',
       trackId: 'specialist',
       localRelevance:
           'Built around Pakistani salary timing, fuel and grocery volatility, committee savings, and markup comparisons.',
@@ -1147,8 +1147,8 @@ class DemoFinanceData {
       ),
       externalUrl:
           'https://www.consumerfinance.gov/consumer-tools/saving-money/',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=emergency+fund+explained+personal+finance',
+      videoUrl: 'https://www.youtube.com/watch?v=csaTMk23c2s',
+      videoId: 'csaTMk23c2s',
       trackId: 'beginner',
       prerequisites: ['Budget Foundations'],
       localRelevance:
@@ -1247,8 +1247,8 @@ class DemoFinanceData {
       ),
       externalUrl:
           'https://www.consumerfinance.gov/consumer-tools/managing-your-money/',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=psychology+of+spending+money+personal+finance',
+      videoUrl: 'https://www.youtube.com/watch?v=TJDcGv9OH4Q',
+      videoId: 'TJDcGv9OH4Q',
       trackId: 'beginner',
       localRelevance:
           'Includes food delivery, weddings, family expectations, and status purchases in PKR.',
@@ -1345,8 +1345,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.investopedia.com/insurance-4427716',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=insurance+basics+health+life+personal+finance',
+      videoUrl: 'https://www.youtube.com/watch?v=c9OUSaPM1DA',
+      videoId: 'c9OUSaPM1DA',
       trackId: 'intermediate',
       prerequisites: ['Emergency Fund Systems'],
       localRelevance:
@@ -1440,8 +1440,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.fbr.gov.pk/',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=Pakistan+income+tax+filer+non+filer+basics',
+      videoUrl: 'https://www.youtube.com/watch?v=dZ9o1e1UnGk',
+      videoId: 'dZ9o1e1UnGk',
       trackId: 'intermediate',
       prerequisites: ['Budget Foundations'],
       localRelevance:
@@ -1534,8 +1534,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.investopedia.com/portfolio-management-4689745',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=portfolio+construction+asset+allocation+rebalancing',
+      videoUrl: 'https://www.youtube.com/watch?v=mzhj8zpDuDU',
+      videoId: 'mzhj8zpDuDU',
       trackId: 'advanced',
       prerequisites: ['Smart Investing'],
       localRelevance:
@@ -1628,8 +1628,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.investopedia.com/retirement-planning-4689695',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=retirement+planning+FIRE+financial+independence',
+      videoUrl: 'https://www.youtube.com/watch?v=bVv1GWYO5IU',
+      videoId: 'bVv1GWYO5IU',
       trackId: 'advanced',
       prerequisites: ['Portfolio Construction'],
       localRelevance:
@@ -1722,8 +1722,8 @@ class DemoFinanceData {
       ),
       externalUrl:
           'https://www.investopedia.com/articles/pf/08/small-business-finance.asp',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=small+business+finance+cash+flow+pricing+basics',
+      videoUrl: 'https://www.youtube.com/watch?v=9kKlZQGEOto',
+      videoId: '9kKlZQGEOto',
       trackId: 'advanced',
       localRelevance:
           'Built for Pakistani freelancers, ecommerce sellers, shopkeepers, and service businesses.',
@@ -1817,8 +1817,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.investopedia.com/terms/i/islamicbanking.asp',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=islamic+finance+halal+investing+sukuk+basics',
+      videoUrl: 'https://www.youtube.com/watch?v=LZDjPukeC34',
+      videoId: 'LZDjPukeC34',
       trackId: 'specialist',
       prerequisites: ['Smart Investing'],
       localRelevance:
@@ -1911,8 +1911,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.islamic-relief.org/zakat/zakat-faqs/',
-      videoUrl:
-          'https://www.youtube.com/results?search_query=zakat+calculation+cash+gold+investments+basics',
+      videoUrl: 'https://www.youtube.com/watch?v=UVOaj3eXzeQ',
+      videoId: 'UVOaj3eXzeQ',
       trackId: 'specialist',
       localRelevance:
           'Uses PKR, gold value, family obligations, business inventory, and local documentation needs.',
@@ -2002,8 +2002,8 @@ class DemoFinanceData {
         ],
       ),
       externalUrl: 'https://www.investopedia.com/wealth-management-4689749',
-      videoUrl:
-          'https://www.youtube.com/watch?si=eJQAQCtCkAaWbLlF&v=HqdMV0mWO-8&feature=youtu.be',
+      videoUrl: 'https://www.youtube.com/watch?v=HqdMV0mWO-8',
+      videoId: 'HqdMV0mWO-8',
       trackId: 'advanced',
       prerequisites: ['Portfolio Construction', 'Retirement and FIRE Planning'],
       localRelevance:

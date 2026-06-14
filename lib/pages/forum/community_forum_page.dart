@@ -116,9 +116,9 @@ class _CommunityForumPageState extends State<CommunityForumPage>
                 headerSliverBuilder: (context, innerBoxIsScrolled) => [
                   SliverAppBar(
                     pinned: true,
-                    backgroundColor: AppTheme.backgroundFor(context).withValues(
-                      alpha: 0.88,
-                    ),
+                    backgroundColor: AppTheme.backgroundFor(
+                      context,
+                    ).withValues(alpha: 0.88),
                     elevation: innerBoxIsScrolled ? 1 : 0,
                     title: Text(
                       _forumCopy(_language, 'title'),
@@ -484,11 +484,7 @@ class _LanguageMenu extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.translate_rounded,
-              size: 16,
-              color: AppTheme.primary,
-            ),
+            Icon(Icons.translate_rounded, size: 16, color: AppTheme.primary),
             const SizedBox(width: 5),
             Text(
               language.shortLabel,
@@ -569,7 +565,9 @@ class _FocusButton extends StatelessWidget {
             children: [
               Icon(
                 focus.icon,
-                color: selected ? Colors.white : AppTheme.textSecondaryFor(context),
+                color: selected
+                    ? Colors.white
+                    : AppTheme.textSecondaryFor(context),
                 size: 16,
               ),
               const SizedBox(width: 5),
@@ -579,7 +577,9 @@ class _FocusButton extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    color: selected ? Colors.white : AppTheme.textSecondaryFor(context),
+                    color: selected
+                        ? Colors.white
+                        : AppTheme.textSecondaryFor(context),
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
@@ -897,10 +897,7 @@ class _TrendingDiscussionStrip extends StatelessWidget {
               color: AppTheme.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              Icons.trending_up_rounded,
-              color: AppTheme.primary,
-            ),
+            child: Icon(Icons.trending_up_rounded, color: AppTheme.primary),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -948,11 +945,7 @@ class _AiCoachBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          Icons.psychology_alt_outlined,
-          color: AppTheme.primary,
-          size: 18,
-        ),
+        Icon(Icons.psychology_alt_outlined, color: AppTheme.primary, size: 18),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -1439,7 +1432,9 @@ class _ReactionButton extends StatelessWidget {
     return Tooltip(
       message: reactionType.label,
       child: Material(
-        color: selected ? color.withValues(alpha: 0.10) : AppTheme.surfaceFor(context),
+        color: selected
+            ? color.withValues(alpha: 0.10)
+            : AppTheme.surfaceFor(context),
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -1485,7 +1480,9 @@ class _ReactionButton extends StatelessWidget {
                   Text(
                     '$count',
                     style: GoogleFonts.inter(
-                      color: selected ? color : AppTheme.textSecondaryFor(context),
+                      color: selected
+                          ? color
+                          : AppTheme.textSecondaryFor(context),
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1586,7 +1583,9 @@ class _SaveButton extends StatelessWidget {
           onPressed: () => _toggleSave(savedDoc, isSaved),
           icon: Icon(
             isSaved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
-            color: isSaved ? AppTheme.primary : AppTheme.textSecondaryFor(context),
+            color: isSaved
+                ? AppTheme.primary
+                : AppTheme.textSecondaryFor(context),
           ),
         );
       },
@@ -2113,7 +2112,9 @@ class _CommentReactionButton extends StatelessWidget {
         visualDensity: VisualDensity.compact,
         padding: EdgeInsets.zero,
         minimumSize: const Size(72, 30),
-        foregroundColor: selected ? AppTheme.success : AppTheme.textSecondaryFor(context),
+        foregroundColor: selected
+            ? AppTheme.success
+            : AppTheme.textSecondaryFor(context),
       ),
     );
   }
@@ -2763,7 +2764,9 @@ class _StepIndicator extends StatelessWidget {
               child: Container(
                 height: 1,
                 margin: const EdgeInsets.symmetric(horizontal: 8),
-                color: step > index ? AppTheme.primary : AppTheme.borderFor(context),
+                color: step > index
+                    ? AppTheme.primary
+                    : AppTheme.borderFor(context),
               ),
             ),
         ],
@@ -2803,7 +2806,9 @@ class _StepDot extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.inter(
-            color: selected ? AppTheme.primary : AppTheme.textSecondaryFor(context),
+            color: selected
+                ? AppTheme.primary
+                : AppTheme.textSecondaryFor(context),
             fontSize: 10,
             fontWeight: FontWeight.w700,
           ),
@@ -2837,7 +2842,9 @@ class _PostTypeOption extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: selected ? type.color : AppTheme.borderFor(context)),
+            border: Border.all(
+              color: selected ? type.color : AppTheme.borderFor(context),
+            ),
           ),
           child: Row(
             children: [
@@ -2847,7 +2854,9 @@ class _PostTypeOption extends StatelessWidget {
                 child: Text(
                   type.label,
                   style: GoogleFonts.inter(
-                    color: selected ? Colors.white : AppTheme.textPrimaryFor(context),
+                    color: selected
+                        ? Colors.white
+                        : AppTheme.textPrimaryFor(context),
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -2896,7 +2905,9 @@ class _FilterChipButton extends StatelessWidget {
           child: Text(
             label,
             style: GoogleFonts.inter(
-              color: selected ? Colors.white : AppTheme.textSecondaryFor(context),
+              color: selected
+                  ? Colors.white
+                  : AppTheme.textSecondaryFor(context),
               fontSize: compact ? 12 : 13,
               fontWeight: FontWeight.w700,
             ),
@@ -2930,7 +2941,9 @@ class _TypeFilterChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: selected ? type.color : AppTheme.borderFor(context)),
+            border: Border.all(
+              color: selected ? type.color : AppTheme.borderFor(context),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -3312,11 +3325,7 @@ class _AiSummaryPreview extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.auto_awesome_outlined,
-            size: 16,
-            color: AppTheme.primary,
-          ),
+          Icon(Icons.auto_awesome_outlined, size: 16, color: AppTheme.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -3371,9 +3380,9 @@ class _ForumPausedBanner extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: AppTheme.warningFillFor(context),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFDE68A)),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
@@ -3456,7 +3465,7 @@ class _GlassPanel extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppTheme.surfaceFor(context).withValues(alpha: 0.78),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.54)),
+            border: Border.all(color: AppTheme.borderFor(context)),
             boxShadow: [
               BoxShadow(
                 color: glowColor.withValues(alpha: 0.10),
@@ -3489,8 +3498,12 @@ class _ForumAmbientBackground extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             AppTheme.backgroundFor(context),
-            const Color(0xFFEFF7FF),
-            const Color(0xFFF7F4FF),
+            AppTheme.isDark(context)
+                ? AppTheme.surfaceFor(context)
+                : const Color(0xFFEFF7FF),
+            AppTheme.isDark(context)
+                ? AppTheme.surfaceCardFor(context)
+                : const Color(0xFFF7F4FF),
             AppTheme.backgroundFor(context),
           ],
           stops: const [0, 0.34, 0.68, 1],
@@ -3687,11 +3700,7 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: AppTheme.error,
-              size: 38,
-            ),
+            Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 38),
             const SizedBox(height: 12),
             Text(
               title,

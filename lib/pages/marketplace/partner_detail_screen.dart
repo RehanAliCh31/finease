@@ -31,7 +31,7 @@ class PartnerDetailScreen extends StatelessWidget {
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 260,
+            expandedHeight: 340,
             backgroundColor: AppTheme.primary,
             actions: [
               IconButton(
@@ -64,7 +64,6 @@ class PartnerDetailScreen extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(20, 72, 20, 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Wrap(
                           spacing: 8,
@@ -91,6 +90,8 @@ class PartnerDetailScreen extends StatelessWidget {
                         const SizedBox(height: 10),
                         Text(
                           partner.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
                             color: Colors.white.withValues(alpha: 0.82),
                             height: 1.5,
@@ -232,7 +233,9 @@ class PartnerDetailScreen extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: AppTheme.surfaceCardFor(context),
                                   borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(color: AppTheme.borderFor(context)),
+                                  border: Border.all(
+                                    color: AppTheme.borderFor(context),
+                                  ),
                                 ),
                                 child: Text(
                                   tag,
@@ -281,7 +284,6 @@ void _showApplyOptions(
           ),
           padding: const EdgeInsets.all(18),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -464,7 +466,7 @@ class _TrustLayerCard extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
+                      color: AppTheme.successFillFor(context),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(

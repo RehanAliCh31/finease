@@ -24,7 +24,11 @@ class WelfareProgramDetailPage extends StatelessWidget {
       backgroundColor: AppTheme.backgroundFor(context),
       body: CustomScrollView(
         slivers: [
-          _DetailAppBar(program: program, bookmarked: bookmarked, provider: provider),
+          _DetailAppBar(
+            program: program,
+            bookmarked: bookmarked,
+            provider: provider,
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
             sliver: SliverList(
@@ -40,14 +44,20 @@ class WelfareProgramDetailPage extends StatelessWidget {
                   icon: Icons.check_circle_outline_rounded,
                   color: AppTheme.success,
                   title: 'Eligibility Criteria',
-                  child: _BulletList(items: program.eligibilityCriteria, color: AppTheme.success),
+                  child: _BulletList(
+                    items: program.eligibilityCriteria,
+                    color: AppTheme.success,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _SectionCard(
                   icon: Icons.folder_outlined,
                   color: AppTheme.warning,
                   title: 'Required Documents',
-                  child: _BulletList(items: program.requiredDocuments, color: AppTheme.warning),
+                  child: _BulletList(
+                    items: program.requiredDocuments,
+                    color: AppTheme.warning,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _SectionCard(
@@ -73,7 +83,11 @@ class WelfareProgramDetailPage extends StatelessWidget {
 // ─── App Bar ───────────────────────────────────────────────────────────────────
 
 class _DetailAppBar extends StatelessWidget {
-  const _DetailAppBar({required this.program, required this.bookmarked, required this.provider});
+  const _DetailAppBar({
+    required this.program,
+    required this.bookmarked,
+    required this.provider,
+  });
   final WelfareProgram program;
   final bool bookmarked;
   final WelfareProvider provider;
@@ -93,7 +107,9 @@ class _DetailAppBar extends StatelessWidget {
           icon: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: Icon(
-              bookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+              bookmarked
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_outline_rounded,
               key: ValueKey(bookmarked),
               color: Colors.white,
             ),
@@ -113,11 +129,18 @@ class _DetailAppBar extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
-                      color: program.category.badgeColor.withValues(alpha: 0.25),
+                      color: program.category.badgeColor.withValues(
+                        alpha: 0.25,
+                      ),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Text(
                       program.category.displayName,
@@ -131,18 +154,29 @@ class _DetailAppBar extends StatelessWidget {
                   const SizedBox(width: 8),
                   if (program.isVerified)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.verified_rounded, color: Colors.white, size: 12),
+                          Icon(
+                            Icons.verified_rounded,
+                            color: Colors.white,
+                            size: 12,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Verified',
-                            style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
@@ -180,12 +214,19 @@ class _HeaderSection extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: [
-            Icon(Icons.corporate_fare_rounded, size: 14, color: AppTheme.textSecondaryFor(context)),
+            Icon(
+              Icons.corporate_fare_rounded,
+              size: 14,
+              color: AppTheme.textSecondaryFor(context),
+            ),
             const SizedBox(width: 5),
             Expanded(
               child: Text(
                 program.organization,
-                style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context), fontWeight: FontWeight.w600),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -194,11 +235,18 @@ class _HeaderSection extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              Icon(Icons.location_on_outlined, size: 14, color: AppTheme.textSecondaryFor(context)),
+              Icon(
+                Icons.location_on_outlined,
+                size: 14,
+                color: AppTheme.textSecondaryFor(context),
+              ),
               const SizedBox(width: 5),
               Text(
                 program.regionRestriction!,
-                style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context), fontSize: 13),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
@@ -206,28 +254,37 @@ class _HeaderSection extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           program.description,
-          style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context), height: 1.6, fontSize: 15),
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            height: 1.6,
+            fontSize: 15,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 6,
           runSpacing: 6,
           children: program.tags
-              .map((tag) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(20),
+              .map(
+                (tag) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '#$tag',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.w600,
                     ),
-                    child: Text(
-                      '#$tag',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ))
+                  ),
+                ),
+              )
               .toList(),
         ),
       ],
@@ -265,7 +322,9 @@ class _MetadataRow extends StatelessWidget {
           _MetaTile(
             label: 'Verification',
             value: program.isVerified ? 'Official' : 'Unverified',
-            icon: program.isVerified ? Icons.verified_outlined : Icons.help_outline_rounded,
+            icon: program.isVerified
+                ? Icons.verified_outlined
+                : Icons.help_outline_rounded,
             iconColor: program.isVerified ? AppTheme.success : AppTheme.warning,
           ),
         ],
@@ -274,15 +333,20 @@ class _MetadataRow extends StatelessWidget {
   }
 
   Widget _divider(BuildContext context) => Container(
-        width: 1,
-        height: 44,
-        margin: const EdgeInsets.symmetric(horizontal: 8),
-        color: AppTheme.borderFor(context),
-      );
+    width: 1,
+    height: 44,
+    margin: const EdgeInsets.symmetric(horizontal: 8),
+    color: AppTheme.borderFor(context),
+  );
 }
 
 class _MetaTile extends StatelessWidget {
-  const _MetaTile({required this.label, required this.value, required this.icon, required this.iconColor});
+  const _MetaTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.iconColor,
+  });
   final String label;
   final String value;
   final IconData icon;
@@ -309,7 +373,10 @@ class _MetaTile extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textSecondaryFor(context)),
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: AppTheme.textSecondaryFor(context),
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -342,7 +409,10 @@ class _DifficultyTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             'Complexity',
-            style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textSecondaryFor(context)),
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: AppTheme.textSecondaryFor(context),
+            ),
           ),
         ],
       ),
@@ -381,11 +451,31 @@ class _StatusBanner extends StatelessWidget {
 
   (String, IconData, Color) _statusStyle(ApplicationStatus s) {
     return switch (s) {
-      ApplicationStatus.saved => ('Saved', Icons.bookmark_rounded, AppTheme.primary),
-      ApplicationStatus.applied => ('Applied', Icons.send_rounded, AppTheme.warning),
-      ApplicationStatus.inReview => ('In Review', Icons.hourglass_top_rounded, AppTheme.warning),
-      ApplicationStatus.approved => ('Approved', Icons.check_circle_rounded, AppTheme.success),
-      ApplicationStatus.rejected => ('Not Approved', Icons.cancel_rounded, AppTheme.error),
+      ApplicationStatus.saved => (
+        'Saved',
+        Icons.bookmark_rounded,
+        AppTheme.primary,
+      ),
+      ApplicationStatus.applied => (
+        'Applied',
+        Icons.send_rounded,
+        AppTheme.warning,
+      ),
+      ApplicationStatus.inReview => (
+        'In Review',
+        Icons.hourglass_top_rounded,
+        AppTheme.warning,
+      ),
+      ApplicationStatus.approved => (
+        'Approved',
+        Icons.check_circle_rounded,
+        AppTheme.success,
+      ),
+      ApplicationStatus.rejected => (
+        'Not Approved',
+        Icons.cancel_rounded,
+        AppTheme.error,
+      ),
     };
   }
 }
@@ -393,7 +483,12 @@ class _StatusBanner extends StatelessWidget {
 // ─── Section Card ──────────────────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.icon, required this.color, required this.title, required this.child});
+  const _SectionCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.child,
+  });
   final IconData icon;
   final Color color;
   final String title;
@@ -436,10 +531,7 @@ class _SectionCard extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: AppTheme.borderFor(context)),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
     );
@@ -457,29 +549,37 @@ class _BulletList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: items
-          .map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 5),
-                      child: Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          .map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        item,
-                        style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context), height: 1.5),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondaryFor(context),
+                        height: 1.5,
                       ),
                     ),
-                  ],
-                ),
-              ))
+                  ),
+                ],
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -512,7 +612,11 @@ class _StepList extends StatelessWidget {
                   alignment: Alignment.center,
                   child: Text(
                     '${step.stepNumber}',
-                    style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 if (!isLast)
@@ -586,7 +690,11 @@ class _ContactCard extends StatelessWidget {
                     color: AppTheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.contact_support_outlined, color: AppTheme.primary, size: 18),
+                  child: Icon(
+                    Icons.contact_support_outlined,
+                    color: AppTheme.primary,
+                    size: 18,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Text(
@@ -606,14 +714,20 @@ class _ContactCard extends StatelessWidget {
               icon: Icons.phone_outlined,
               label: 'Helpline',
               value: program.helplineNumber,
-              onTap: () => UrlLauncherService.instance.launchPhoneDialer(context, program.helplineNumber),
+              onTap: () => UrlLauncherService.instance.launchPhoneDialer(
+                context,
+                program.helplineNumber,
+              ),
             ),
           if (program.helplineEmail.isNotEmpty)
             _ContactRow(
               icon: Icons.email_outlined,
               label: 'Email',
               value: program.helplineEmail,
-              onTap: () => UrlLauncherService.instance.launchEmail(context, program.helplineEmail),
+              onTap: () => UrlLauncherService.instance.launchEmail(
+                context,
+                program.helplineEmail,
+              ),
             ),
         ],
       ),
@@ -622,7 +736,12 @@ class _ContactCard extends StatelessWidget {
 }
 
 class _ContactRow extends StatelessWidget {
-  const _ContactRow({required this.icon, required this.label, required this.value, required this.onTap});
+  const _ContactRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -641,7 +760,13 @@ class _ContactRow extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textSecondaryFor(context))),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: AppTheme.textSecondaryFor(context),
+                  ),
+                ),
                 Text(
                   value,
                   style: GoogleFonts.inter(
@@ -653,7 +778,11 @@ class _ContactRow extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondaryFor(context), size: 18),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.textSecondaryFor(context),
+              size: 18,
+            ),
           ],
         ),
       ),
@@ -686,25 +815,28 @@ class _TrackingSection extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: [
-            ApplicationStatus.saved,
-            ApplicationStatus.applied,
-            ApplicationStatus.inReview,
-            ApplicationStatus.approved,
-          ]
-              .map((status) => _StatusChip(
-                    status: status,
-                    isSelected: currentStatus == status,
-                    onTap: () {
-                      if (currentStatus == status) {
-                        // Allow deselect — not implemented to keep it simple
-                        provider.setApplicationStatus(program.id, status);
-                      } else {
-                        provider.setApplicationStatus(program.id, status);
-                      }
-                    },
-                  ))
-              .toList(),
+          children:
+              [
+                    ApplicationStatus.saved,
+                    ApplicationStatus.applied,
+                    ApplicationStatus.inReview,
+                    ApplicationStatus.approved,
+                  ]
+                  .map(
+                    (status) => _StatusChip(
+                      status: status,
+                      isSelected: currentStatus == status,
+                      onTap: () {
+                        if (currentStatus == status) {
+                          // Allow deselect — not implemented to keep it simple
+                          provider.setApplicationStatus(program.id, status);
+                        } else {
+                          provider.setApplicationStatus(program.id, status);
+                        }
+                      },
+                    ),
+                  )
+                  .toList(),
         ),
       ],
     );
@@ -712,7 +844,11 @@ class _TrackingSection extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status, required this.isSelected, required this.onTap});
+  const _StatusChip({
+    required this.status,
+    required this.isSelected,
+    required this.onTap,
+  });
   final ApplicationStatus status;
   final bool isSelected;
   final VoidCallback onTap;
@@ -742,7 +878,9 @@ class _StatusChip extends StatelessWidget {
           label,
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : AppTheme.textSecondaryFor(context),
+            color: isSelected
+                ? Colors.white
+                : AppTheme.textSecondaryFor(context),
             fontSize: 13,
           ),
         ),
@@ -767,7 +905,9 @@ class _BottomCTA extends StatelessWidget {
           border: Border(top: BorderSide(color: AppTheme.borderFor(context))),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withValues(
+                alpha: AppTheme.isDark(context) ? 0.28 : 0.05,
+              ),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
@@ -775,11 +915,14 @@ class _BottomCTA extends StatelessWidget {
         ),
         child: Row(
           children: [
-              Expanded(
+            Expanded(
               flex: 3,
               child: ElevatedButton.icon(
                 onPressed: () async {
-                  await UrlLauncherService.instance.launchExternalUrl(context, program.officialUrl);
+                  await UrlLauncherService.instance.launchExternalUrl(
+                    context,
+                    program.officialUrl,
+                  );
                 },
                 icon: Icon(Icons.open_in_new_rounded, size: 16),
                 label: const Text('Apply on Official Website'),
@@ -795,7 +938,9 @@ class _BottomCTA extends StatelessWidget {
                 return IconButton.outlined(
                   onPressed: () => provider.toggleBookmark(program.id),
                   icon: Icon(
-                    bookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+                    bookmarked
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_outline_rounded,
                     color: AppTheme.primary,
                   ),
                   style: IconButton.styleFrom(

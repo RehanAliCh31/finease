@@ -13,6 +13,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
+import '../../utils/finance_consistency_utils.dart';
 import '../budget/ai_budget_advisor_page.dart';
 
 enum _SavingsPeriodMode { daily, weekly, monthly, yearly }
@@ -168,8 +169,11 @@ class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
                                           analytics: analytics,
                                           existingGoal: goal,
                                         ),
-                                        onDelete: () => firestoreService
-                                            .deleteSavingGoal(goal.id),
+                                        onDelete: () => _confirmDeleteGoal(
+                                          context,
+                                          firestoreService,
+                                          goal,
+                                        ),
                                         onContribute: () =>
                                             _showContributionDialog(
                                               context,
@@ -273,6 +277,49 @@ class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
       );
     });
   }
+
+  Future<void> _confirmDeleteGoal(
+    BuildContext context,
+    FirestoreService firestoreService,
+    SavingGoal goal,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete journey?'),
+        content: Text(
+          'This removes "${goal.title}" and its contribution history. Your savings balance stays unchanged.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await firestoreService.deleteSavingGoal(goal.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${goal.title}" deleted'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    } on FinanceValidationException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: AppTheme.error),
+      );
+    }
+  }
 }
 
 String _monthKey(DateTime date) {
@@ -348,6 +395,8 @@ class _SavingsPeriod {
   }
 
   bool contains(DateTime date) => !date.isBefore(start) && date.isBefore(end);
+
+  String get modeName => mode.name;
 
   DateTime shift(_SavingsPeriodMode mode, int step) {
     switch (mode) {
@@ -441,9 +490,11 @@ class _SavingsAnalytics {
       transactions: transactions,
       budgets: budgets,
       profileSavings: profileSavings,
-      monthlyIncome: periodIncome > 0
-          ? periodIncome
-          : _scaledIncome(profileIncome, period.mode),
+      monthlyIncome: FinanceConsistencyUtils.resolvePeriodIncome(
+        profileMonthlyIncome: profileIncome,
+        transactionIncome: periodIncome,
+        periodType: period.modeName,
+      ),
       totalBudgeted: totalBudgeted,
       totalExpenses: totalExpenses,
       totalSaved: totalSaved,
@@ -454,19 +505,6 @@ class _SavingsAnalytics {
     );
   }
 
-  static double _scaledIncome(double monthlyIncome, _SavingsPeriodMode mode) {
-    switch (mode) {
-      case _SavingsPeriodMode.daily:
-        return monthlyIncome / 30;
-      case _SavingsPeriodMode.weekly:
-        return monthlyIncome / 4.345;
-      case _SavingsPeriodMode.yearly:
-        return monthlyIncome * 12;
-      case _SavingsPeriodMode.monthly:
-        return monthlyIncome;
-    }
-  }
-
   double get overallProgress =>
       totalTarget <= 0 ? 0 : (totalSaved / totalTarget).clamp(0.0, 1.0);
   double get remainingBudget => (monthlyIncome - totalBudgeted - totalExpenses)
@@ -474,6 +512,8 @@ class _SavingsAnalytics {
       .toDouble();
   double get savingsCapacity =>
       math.min(profileSavings, remainingBudget + profileSavings);
+  double get unallocatedSavings =>
+      (profileSavings - totalSaved).clamp(0, double.infinity).toDouble();
   bool get isOverAllocated =>
       profileSavings > 0 && totalSaved > profileSavings + 0.01;
   bool get goalPlanTooAggressive =>
@@ -808,7 +848,7 @@ class _NarrativeCard extends StatelessWidget {
                 Text(
                   _message(),
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF475569),
+                    color: AppTheme.textSecondaryFor(context),
                     height: 1.5,
                   ),
                 ),
@@ -1072,7 +1112,9 @@ class _JourneyCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       '${goal.goalType} - ${goal.daysLeft} days left',
-                      style: GoogleFonts.inter(color: Colors.grey[600]),
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondaryFor(context),
+                      ),
                     ),
                   ],
                 ),
@@ -1120,7 +1162,7 @@ class _JourneyCard extends StatelessWidget {
                 'Target ${CurrencyUtils.format(goal.targetAmount)}',
                 style: GoogleFonts.inter(
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF334155),
+                  color: AppTheme.textSecondaryFor(context),
                 ),
               ),
             ],
@@ -1131,8 +1173,8 @@ class _JourneyCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: goal.progress,
               minHeight: 8,
-              backgroundColor: const Color(0xFFF1F5F9),
-              color: AppTheme.primary,
+              backgroundColor: AppTheme.mutedFillFor(context),
+              color: AppTheme.primaryFor(context),
             ),
           ),
           const SizedBox(height: 12),
@@ -1147,7 +1189,7 @@ class _JourneyCard extends StatelessWidget {
           Text(
             _journeyMessage(goal, analytics),
             style: GoogleFonts.inter(
-              color: const Color(0xFF475569),
+              color: AppTheme.textSecondaryFor(context),
               height: 1.45,
             ),
           ),
@@ -1204,7 +1246,7 @@ class _BehaviorTriggers extends StatelessWidget {
                 child: Text(
                   message,
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF475569),
+                    color: AppTheme.textSecondaryFor(context),
                     height: 1.45,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1238,10 +1280,10 @@ class _SignalRow extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFEEF2FF),
+            color: AppTheme.primaryFor(context).withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(icon, color: AppTheme.primary),
+          child: Icon(icon, color: AppTheme.primaryFor(context)),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -1272,7 +1314,7 @@ class _SignalRow extends StatelessWidget {
               Text(
                 body,
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF475569),
+                  color: AppTheme.textSecondaryFor(context),
                   height: 1.45,
                 ),
               ),
@@ -1358,7 +1400,10 @@ class _EmptyState extends StatelessWidget {
           Text(
             'Create a journey to track milestones, projected timelines, savings velocity, and budget feasibility.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(color: Colors.grey[600], height: 1.5),
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 18),
           ElevatedButton(
@@ -1386,8 +1431,12 @@ Future<void> _showGoalEditor(
   final currentController = TextEditingController(
     text: existingGoal?.currentAmount.toStringAsFixed(0) ?? '0',
   );
+  final today = DateTime.now();
   var targetDate =
-      existingGoal?.targetDate ?? DateTime.now().add(const Duration(days: 180));
+      existingGoal?.targetDate ?? today.add(const Duration(days: 180));
+  if (targetDate.isBefore(DateTime(today.year, today.month, today.day))) {
+    targetDate = DateTime(today.year, today.month, today.day);
+  }
   var goalType = existingGoal?.goalType ?? 'Emergency Fund';
   var payoffStrategy = existingGoal?.payoffStrategy ?? 'steady';
   var isDebtGoal = existingGoal?.isDebtGoal ?? false;
@@ -1425,11 +1474,10 @@ Future<void> _showGoalEditor(
           );
           final monthlyTarget = draft.monthlyTarget;
           final allocationWarning =
-              analytics.profileSavings > 0 &&
               analytics.totalSaved -
-                      (existingGoal?.currentAmount ?? 0) +
-                      current >
-                  analytics.profileSavings;
+                  (existingGoal?.currentAmount ?? 0) +
+                  current >
+              analytics.profileSavings;
           final budgetWarning =
               analytics.remainingBudget > 0 &&
               monthlyTarget > analytics.remainingBudget;
@@ -1461,7 +1509,7 @@ Future<void> _showGoalEditor(
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: AppTheme.borderFor(context),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -1508,7 +1556,7 @@ Future<void> _showGoalEditor(
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: targetDate,
-                        firstDate: DateTime.now(),
+                        firstDate: DateTime(today.year, today.month, today.day),
                         lastDate: DateTime(2100),
                       );
                       if (picked != null) {
@@ -1655,7 +1703,7 @@ Future<void> _showContributionDialog(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Available savings pool: ${CurrencyUtils.format(analytics.profileSavings)}',
+            'Unallocated savings available: ${CurrencyUtils.format(analytics.unallocatedSavings)}',
           ),
           const SizedBox(height: 12),
           TextField(
@@ -1673,16 +1721,14 @@ Future<void> _showContributionDialog(
         ElevatedButton(
           onPressed: () async {
             try {
-              await firestoreService.addContribution(
-                goal.id,
-                double.tryParse(controller.text.trim()) ?? 0,
-              );
+              final amount = double.tryParse(controller.text.trim()) ?? 0;
+              await firestoreService.addContribution(goal.id, amount);
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      goal.progress >= 1
+                      goal.currentAmount + amount >= goal.targetAmount
                           ? 'Milestone celebrated'
                           : 'Contribution added to journey',
                     ),
@@ -1812,7 +1858,9 @@ void _showTimelineSheet(
             if (analytics.goals.isEmpty)
               Text(
                 'Create journeys to see projected milestones.',
-                style: GoogleFonts.inter(color: const Color(0xFF475569)),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                ),
               )
             else
               ...analytics.goals
@@ -1869,11 +1917,7 @@ class _PickerBox extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.calendar_month_rounded,
-            color: AppTheme.primary,
-            size: 18,
-          ),
+          Icon(Icons.calendar_month_rounded, color: AppTheme.primary, size: 18),
           const SizedBox(width: 8),
           Text(
             label,
@@ -1914,16 +1958,24 @@ class _SheetMetricPanel extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _metric('Income', CurrencyUtils.format(income)),
-          _metric('Remaining budget', CurrencyUtils.format(remainingBudget)),
-          _metric('Monthly target', CurrencyUtils.format(monthlyTarget)),
-          _metric('Savings rate', '${rate.toStringAsFixed(0)}%'),
+          _metric(context, 'Income', CurrencyUtils.format(income)),
+          _metric(
+            context,
+            'Remaining budget',
+            CurrencyUtils.format(remainingBudget),
+          ),
+          _metric(
+            context,
+            'Monthly target',
+            CurrencyUtils.format(monthlyTarget),
+          ),
+          _metric(context, 'Savings rate', '${rate.toStringAsFixed(0)}%'),
         ],
       ),
     );
   }
 
-  Widget _metric(String label, String value) {
+  Widget _metric(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: Row(
@@ -1932,7 +1984,7 @@ class _SheetMetricPanel extends StatelessWidget {
             child: Text(
               label,
               style: GoogleFonts.inter(
-                color: const Color(0xFF475569),
+                color: AppTheme.textSecondaryFor(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1961,9 +2013,11 @@ class _ValidationBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F2),
+        color: AppTheme.isDark(context)
+            ? AppTheme.error.withValues(alpha: 0.14)
+            : const Color(0xFFFFF1F2),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppTheme.error.withValues(alpha: 0.28)),
       ),
       child: Text(
         message,

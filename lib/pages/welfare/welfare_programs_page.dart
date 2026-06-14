@@ -60,7 +60,7 @@ class _WelfarePageContentState extends State<_WelfarePageContent> {
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Colors.black,
+            color: AppTheme.textPrimaryFor(context),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -97,7 +97,10 @@ class _BookmarkBadge extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Icon(Icons.bookmark_outline_rounded, color: Colors.black87),
+        Icon(
+          Icons.bookmark_outline_rounded,
+          color: AppTheme.textPrimaryFor(context),
+        ),
         if (count > 0)
           Positioned(
             top: -4,
@@ -208,7 +211,10 @@ class _HeroHeader extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'Discover real welfare, scholarship, health and loan programs in Pakistan.',
-          style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context), height: 1.5),
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            height: 1.5,
+          ),
         ),
       ],
     );
@@ -409,7 +415,9 @@ class _Chip extends StatelessWidget {
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w600,
               fontSize: 13,
-              color: selected ? Colors.white : AppTheme.textSecondaryFor(context),
+              color: selected
+                  ? Colors.white
+                  : AppTheme.textSecondaryFor(context),
             ),
           ),
         ),
@@ -447,7 +455,10 @@ class _SectionHeader extends StatelessWidget {
         const Spacer(),
         Text(
           subtitle,
-          style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondaryFor(context)),
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: AppTheme.textSecondaryFor(context),
+          ),
         ),
       ],
     );
@@ -968,7 +979,9 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'Try adjusting your search or filters.',
-              style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context)),
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondaryFor(context),
+              ),
             ),
             const SizedBox(height: 20),
             TextButton.icon(

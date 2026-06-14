@@ -401,7 +401,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       builder: (context) => AlertDialog(
         title: const Text('Use money from Savings?'),
         content: Text(
-          'Total expenses exceed income for this period. Do you want to take ${CurrencyUtils.format(amount)} from Savings?',
+          'This transaction needs ${CurrencyUtils.format(amount)} from Savings. Do you want FinEase to use savings for it?',
         ),
         actions: [
           TextButton(

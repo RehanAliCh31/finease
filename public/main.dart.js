@@ -10395,7 +10395,7 @@ if(n==null)n=""
 s=$.adk().gQO().h(0,o)
 if((s==null?p:B.c.bA(s).length!==0)===!0){s=$.adk().gQO().h(0,o)
 s.toString
-s=B.c.bA(s)}else s="gemini-1.5-flash-latest"
+s=B.c.bA(s)}else s="gemini-2.5-flash"
 r=new A.adn(n,s)
 if(n.length!==0){q=A.boO("https","generativelanguage.googleapis.com","v1beta",p)
 r.c=new A.am2(A.biN(s),B.V_,p,p,new A.anc(n,p),q,p,p)}return r},
@@ -124821,7 +124821,7 @@ B.Xy=new A.c2(B.i9,["jubilee-insurance","Jubilee Health Secure","Affordable heal
 B.XA=new A.c2(B.i9,["hbl-microfinance","HBL Microfinance Support","Microfinance options for women-led households, shopkeepers, and first-time business borrowers.","Loans","Popular","Check Options",4279149988,"bank","https://www.hbl.com/",24.8607,67.0011,"active",!0,2],t.yf)
 B.Xz=new A.c2(B.i9,["rozee-careers","Career Growth Network","Find verified roles, freelance gigs, and upskilling opportunities that improve monthly cash flow.","Jobs","New","View Roles",4278556265,"briefcase","https://www.rozee.pk/",31.5204,74.3587,"active",!0,3],t.yf)
 B.XB=new A.c2(B.i9,["solar-installments","Solar Installment Partners","Compare installment-based solar solutions to lower electricity costs and protect your household budget.","Utilities","Save More","Compare Plans",4292441862,"sun","https://www.lesco.gov.pk/",31.5204,74.3587,"active",!0,4],t.yf)
-B.XC=new A.c2(B.i9,["education-aid","Education & Scholarship Desk","Student financing, scholarships, and training programs designed for Pakistani learners and early professionals.","Education","Featured","See Programs",4286331629,"school","https://www.hec.gov.pk/",33.6844,73.0479,"active",!0,5],t.yf)
+B.XC=new A.c2(B.i9,["education-aid","Education Desk","Student financing, scholarships, and training programs designed for Pakistani learners and early professionals.","Education","Featured","See Programs",4286331629,"school","https://www.hec.gov.pk/",33.6844,73.0479,"active",!0,5],t.yf)
 B.VE=s([B.Xy,B.XA,B.Xz,B.XB,B.XC],t.H7)
 B.Tz=s([0.001200833568784504,0.002389694492170889,0.0002795742885861124],t.n)
 B.UQ=s([0.0005891086651375999,0.0029785502573438758,0.0003270666104008398],t.n)

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +7,7 @@ import '../../models/saving_goal.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
+import '../../utils/profile_image_utils.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../profile/about_page.dart';
 import '../settings/settings_screen.dart';
@@ -50,9 +49,11 @@ class ProfilePage extends StatelessWidget {
                           stream: firestoreService?.getUserProfile(),
                           builder: (context, snapshot) {
                             final profile = snapshot.data ?? const {};
-                            final image = _profileImageProvider(
-                              profile['photoUrl'] as String? ?? user?.photoURL,
-                              profile['photoDataUrl'] as String?,
+                            final image = profileImageProvider(
+                              photoUrl:
+                                  profile['photoUrl'] as String? ??
+                                  user?.photoURL,
+                              photoDataUrl: profile['photoDataUrl'] as String?,
                             );
                             return GestureDetector(
                               onTap: () => _showProfilePhotoActions(
@@ -61,7 +62,9 @@ class ProfilePage extends StatelessWidget {
                               ),
                               child: CircleAvatar(
                                 radius: 44,
-                                backgroundColor: Theme.of(context).colorScheme.surface,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.surface,
                                 backgroundImage: image,
                                 child: image == null
                                     ? Icon(
@@ -256,9 +259,7 @@ class ProfilePage extends StatelessWidget {
                         if (authService.isAdmin) ...[
                           const Divider(height: 1),
                           ListTile(
-                            leading: Icon(
-                              Icons.admin_panel_settings_outlined,
-                            ),
+                            leading: Icon(Icons.admin_panel_settings_outlined),
                             title: const Text('Admin Panel'),
                             subtitle: const Text(
                               'Moderation, metrics, and operational controls',
@@ -452,22 +453,6 @@ class ProfilePage extends StatelessWidget {
         ),
       );
     }
-  }
-
-  ImageProvider? _profileImageProvider(String? photoUrl, String? photoDataUrl) {
-    final dataUrl = photoDataUrl?.trim() ?? '';
-    if (dataUrl.isNotEmpty) {
-      try {
-        final encoded = dataUrl.contains(',')
-            ? dataUrl.split(',').last
-            : dataUrl;
-        return MemoryImage(base64Decode(encoded));
-      } catch (_) {
-        return null;
-      }
-    }
-    final url = photoUrl?.trim() ?? '';
-    return url.isEmpty ? null : NetworkImage(url);
   }
 
   Future<bool> _saveProfilePhotoUrl(

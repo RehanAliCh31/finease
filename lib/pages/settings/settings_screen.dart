@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/profile_image_utils.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,9 +17,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final name = user?.displayName ?? 'Alex Rivera';
     final authService = context.watch<AuthService>();
     final themeService = context.watch<ThemeService>();
+    final firestoreService = authService.firestoreService;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -40,70 +41,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          backgroundImage: user?.photoURL != null
-                              ? NetworkImage(user!.photoURL!)
-                              : null,
-                          child: user?.photoURL == null
-                              ? Icon(
-                                  Icons.person_rounded,
-                                  size: 36,
-                                  color: Colors.white,
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                    child: StreamBuilder<Map<String, dynamic>>(
+                      stream: firestoreService?.getUserProfile(),
+                      builder: (context, snapshot) {
+                        final profile = snapshot.data ?? const {};
+                        final name =
+                            profile['fullName'] as String? ??
+                            user?.displayName ??
+                            user?.email?.split('@').first ??
+                            'User';
+                        final image = profileImageProvider(
+                          photoUrl:
+                              profile['photoUrl'] as String? ?? user?.photoURL,
+                          photoDataUrl: profile['photoDataUrl'] as String?,
+                        );
+
+                        return Row(
                           children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Plus Jakarta Sans',
+                            CircleAvatar(
+                              radius: 36,
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.2,
                               ),
+                              backgroundImage: image,
+                              child: image == null
+                                  ? const Icon(
+                                      Icons.person_rounded,
+                                      size: 36,
+                                      color: Colors.white,
+                                    )
+                                  : null,
                             ),
-                            const SizedBox(height: 4),
-                            // const Text(
-                            //   'Premium Member since 2023',
-                            //   style: TextStyle(
-                            //     color: Colors.white70,
-                            //     fontSize: 12,
-                            //     fontFamily: 'Inter',
-                            //   ),
-                            // ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Plus Jakarta Sans',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: 52,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF00F2EA,
+                                      ).withValues(alpha: 0.25),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFF00F2EA,
-                                ).withValues(alpha: 0.25),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              // child: const Text(
-                              //   'Pro Member',
-                              //   style: TextStyle(
-                              //     color: AppTheme.secondary,
-                              //     fontWeight: FontWeight.bold,
-                              //     fontSize: 11,
-                              //     fontFamily: 'Inter',
-                              //   ),
-                              // ),
                             ),
                           ],
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -456,10 +458,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       obscureText: obscureNew,
                       decoration: InputDecoration(
                         labelText: 'New Password',
-                        prefixIcon: Icon(
-                          Icons.lock_open_rounded,
-                          size: 20,
-                        ),
+                        prefixIcon: Icon(Icons.lock_open_rounded, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
                             obscureNew
@@ -486,10 +485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       obscureText: obscureConfirm,
                       decoration: InputDecoration(
                         labelText: 'Confirm New Password',
-                        prefixIcon: Icon(
-                          Icons.check_circle_outline,
-                          size: 20,
-                        ),
+                        prefixIcon: Icon(Icons.check_circle_outline, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
                             obscureConfirm

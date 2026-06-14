@@ -14,6 +14,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
+import '../../utils/finance_consistency_utils.dart';
 
 enum _PeriodMode { daily, weekly, monthly, yearly }
 
@@ -375,14 +376,38 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
         suggestions: suggestions,
         analytics: analytics,
         onApply: () async {
-          await _applySuggestedBudgets(
-            firestoreService,
-            analytics,
-            budgets,
-            suggestions,
-          );
-          if (context.mounted) {
-            Navigator.pop(context);
+          try {
+            await _applySuggestedBudgets(
+              firestoreService,
+              analytics,
+              budgets,
+              suggestions,
+            );
+            if (context.mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Suggested budget applied.')),
+              );
+            }
+          } on FinanceValidationException catch (error) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(error.message),
+                  backgroundColor: AppTheme.error,
+                ),
+              );
+            }
+          } catch (_) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Could not apply the suggested budget. Please try again.',
+                  ),
+                ),
+              );
+            }
           }
         },
       ),
@@ -395,10 +420,35 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
     List<BudgetPlan> budgets,
     List<_BudgetSuggestion> suggestions,
   ) async {
+    final total = suggestions.fold<double>(
+      0,
+      (total, suggestion) => total + suggestion.amount,
+    );
+    if (total > analytics.projectedIncome) {
+      throw FinanceValidationException(
+        'Suggested budget total cannot exceed projected income.',
+      );
+    }
     final existingByCategory = {
       for (final budget in budgets) budget.category: budget,
     };
-    for (final suggestion in suggestions) {
+    final suggestedCategories = {
+      for (final suggestion in suggestions) suggestion.category,
+    };
+    for (final existing in budgets.where(
+      (budget) => !suggestedCategories.contains(budget.category),
+    )) {
+      await firestoreService.deleteBudgetPlan(existing.id);
+    }
+    final ordered = [...suggestions]
+      ..sort((a, b) {
+        final oldA = existingByCategory[a.category]?.allocatedAmount ?? 0;
+        final oldB = existingByCategory[b.category]?.allocatedAmount ?? 0;
+        final deltaA = a.amount - oldA;
+        final deltaB = b.amount - oldB;
+        return deltaA.compareTo(deltaB);
+      });
+    for (final suggestion in ordered) {
       final existing = existingByCategory[suggestion.category];
       final budget = BudgetPlan(
         id: existing?.id ?? '',
@@ -551,9 +601,11 @@ class _BudgetAnalytics {
         .fold<double>(0, (total, txn) => total + txn.amount);
     final monthlyProfileIncome = ((profile['monthlyIncome'] ?? 0) as num)
         .toDouble();
-    final projectedIncome = periodIncome > 0
-        ? periodIncome
-        : _scaledIncome(monthlyProfileIncome, period.mode);
+    final projectedIncome = FinanceConsistencyUtils.resolvePeriodIncome(
+      profileMonthlyIncome: monthlyProfileIncome,
+      transactionIncome: periodIncome,
+      periodType: period.modeName,
+    );
     final totalBudgeted = budgets.fold<double>(
       0,
       (total, budget) => total + budget.allocatedAmount,
@@ -583,19 +635,6 @@ class _BudgetAnalytics {
       categorySpend: categorySpend,
       profileSavings: profileSavings,
     );
-  }
-
-  static double _scaledIncome(double monthlyIncome, _PeriodMode mode) {
-    switch (mode) {
-      case _PeriodMode.daily:
-        return monthlyIncome / 30;
-      case _PeriodMode.weekly:
-        return monthlyIncome / 4.345;
-      case _PeriodMode.yearly:
-        return monthlyIncome * 12;
-      case _PeriodMode.monthly:
-        return monthlyIncome;
-    }
   }
 
   double get remainingBudget =>
@@ -1255,10 +1294,7 @@ class _BudgetPlanCard extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onDelete,
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: AppTheme.error,
-                ),
+                icon: Icon(Icons.delete_outline_rounded, color: AppTheme.error),
               ),
             ],
           ),
@@ -1924,12 +1960,13 @@ class _CategoryBudgetManagerSheetState
       final existingByCategory = {
         for (final budget in widget.budgets) budget.category: budget,
       };
+      final changes = <_BudgetSaveChange>[];
       for (final category in AppConstants.budgetCategories) {
         final input = _inputs[category]!;
         final existing = existingByCategory[category];
         if (input.amount <= 0) {
           if (existing != null) {
-            await widget.firestoreService.deleteBudgetPlan(existing.id);
+            changes.add(_BudgetSaveChange.delete(existing));
           }
           continue;
         }
@@ -1949,12 +1986,19 @@ class _CategoryBudgetManagerSheetState
           isDebtPayment: input.isDebtPayment,
           reminderDate: input.reminderDate,
         );
-        if (existing == null) {
-          await widget.firestoreService.addBudgetPlan(budget);
+        changes.add(_BudgetSaveChange.upsert(existing, budget));
+      }
+
+      changes.sort((a, b) => a.delta.compareTo(b.delta));
+      for (final change in changes) {
+        if (change.deleteExisting) {
+          await widget.firestoreService.deleteBudgetPlan(change.existing!.id);
+        } else if (change.existing == null) {
+          await widget.firestoreService.addBudgetPlan(change.next!);
         } else {
           await widget.firestoreService.updateBudgetPlan(
-            existing.id,
-            budget.toMap(),
+            change.existing!.id,
+            change.next!.toMap(),
           );
         }
       }
@@ -1979,6 +2023,39 @@ class _CategoryBudgetManagerSheetState
         backgroundColor: const Color(0xFFBA1A1A),
       ),
     );
+  }
+}
+
+class _BudgetSaveChange {
+  const _BudgetSaveChange._({
+    required this.existing,
+    required this.next,
+    required this.deleteExisting,
+  });
+
+  factory _BudgetSaveChange.delete(BudgetPlan existing) {
+    return _BudgetSaveChange._(
+      existing: existing,
+      next: null,
+      deleteExisting: true,
+    );
+  }
+
+  factory _BudgetSaveChange.upsert(BudgetPlan? existing, BudgetPlan next) {
+    return _BudgetSaveChange._(
+      existing: existing,
+      next: next,
+      deleteExisting: false,
+    );
+  }
+
+  final BudgetPlan? existing;
+  final BudgetPlan? next;
+  final bool deleteExisting;
+
+  double get delta {
+    if (deleteExisting) return -(existing?.allocatedAmount ?? 0);
+    return (next?.allocatedAmount ?? 0) - (existing?.allocatedAmount ?? 0);
   }
 }
 

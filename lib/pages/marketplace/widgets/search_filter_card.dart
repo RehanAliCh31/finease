@@ -65,7 +65,7 @@ class SearchAndFilterCard extends StatelessWidget {
               hintText:
                   'Search loans, insurance, jobs, rates, tags, or benefits',
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: AppTheme.surfaceCardFor(context),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
                 borderSide: BorderSide.none,
@@ -105,12 +105,14 @@ class SearchAndFilterCard extends StatelessWidget {
                     selectedColor: AppTheme.primary.withValues(alpha: 0.12),
                     labelStyle: GoogleFonts.inter(
                       color: selected
-                          ? AppTheme.primary
+                          ? AppTheme.primaryFor(context)
                           : AppTheme.textSecondaryFor(context),
                       fontWeight: FontWeight.w700,
                     ),
                     side: BorderSide(
-                      color: selected ? AppTheme.primary : AppTheme.borderFor(context),
+                      color: selected
+                          ? AppTheme.primaryFor(context)
+                          : AppTheme.borderFor(context),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
@@ -142,13 +144,17 @@ class SearchAndFilterCard extends StatelessWidget {
                   selected: selected,
                   onSelected: (_) => onTagToggle(tag),
                   backgroundColor: AppTheme.surfaceCardFor(context),
-                  selectedColor: const Color(0xFFDCFCE7),
+                  selectedColor: AppTheme.successFillFor(context),
                   labelStyle: GoogleFonts.inter(
-                    color: selected ? AppTheme.success : AppTheme.textPrimaryFor(context),
+                    color: selected
+                        ? AppTheme.success
+                        : AppTheme.textPrimaryFor(context),
                     fontWeight: FontWeight.w600,
                   ),
                   side: BorderSide(
-                    color: selected ? const Color(0xFF86EFAC) : AppTheme.borderFor(context),
+                    color: selected
+                        ? AppTheme.success.withValues(alpha: 0.45)
+                        : AppTheme.borderFor(context),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),

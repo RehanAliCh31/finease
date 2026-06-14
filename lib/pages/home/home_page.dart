@@ -8,8 +8,11 @@ import '../../models/budget_plan.dart';
 import '../../models/saving_goal.dart';
 import '../../models/transaction.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
+import '../../utils/finance_consistency_utils.dart';
+import '../../utils/profile_image_utils.dart';
 import '../../widgets/app_config_gate.dart';
 import '../budget/ai_budget_advisor_page.dart';
 import '../chatbot/chatbot_page.dart';
@@ -49,8 +52,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final authService = context.watch<AuthService>();
     final firestoreService = authService.firestoreService;
-    final user = authService.user;
-    final photoUrl = user?.photoURL;
     final appConfig = widget.appConfig ?? AppConfig.defaults();
     final primaryColor = appConfigColor(
       appConfig.primaryColorHex,
@@ -80,7 +81,6 @@ class _HomePageState extends State<HomePage> {
                   child: _TopBar(
                     appConfig: appConfig,
                     primaryColor: primaryColor,
-                    photoUrl: photoUrl,
                     isRefreshing: _isRefreshing,
                     onRefresh: () => _refreshKey.currentState?.show(),
                     onProfileTap: () => Navigator.push(
@@ -615,7 +615,10 @@ class _HomeDashboardAnalytics {
       transactions: transactions,
       goals: goals,
       budgets: budgets,
-      monthlyIncome: income > 0 ? income : profileIncome,
+      monthlyIncome: FinanceConsistencyUtils.resolveMonthlyIncome(
+        profileMonthlyIncome: profileIncome,
+        transactionIncome: income,
+      ),
       monthlyExpenses: expenses,
       totalBudgeted: budgets.fold<double>(
         0,
@@ -1426,7 +1429,6 @@ class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.appConfig,
     required this.primaryColor,
-    required this.photoUrl,
     required this.isRefreshing,
     required this.onRefresh,
     required this.onProfileTap,
@@ -1434,7 +1436,6 @@ class _TopBar extends StatelessWidget {
 
   final AppConfig appConfig;
   final Color primaryColor;
-  final String? photoUrl;
   final bool isRefreshing;
   final VoidCallback onRefresh;
   final VoidCallback onProfileTap;
@@ -1446,11 +1447,16 @@ class _TopBar extends StatelessWidget {
       stream: firestoreService?.getUserProfile(),
       builder: (context, snapshot) {
         final profile = snapshot.data ?? const {};
+        final user = context.watch<AuthService>().user;
         final name =
             (profile['fullName'] as String?)?.split(' ').first ??
-            context.watch<AuthService>().user?.displayName?.split(' ').first ??
-            context.watch<AuthService>().user?.email?.split('@').first ??
+            user?.displayName?.split(' ').first ??
+            user?.email?.split('@').first ??
             'User';
+        final image = profileImageProvider(
+          photoUrl: profile['photoUrl'] as String? ?? user?.photoURL,
+          photoDataUrl: profile['photoDataUrl'] as String?,
+        );
         final role = profile['role'] == 'admin'
             ? 'Administrator'
             : (profile['isDemoAccount'] == true
@@ -1481,17 +1487,13 @@ class _TopBar extends StatelessWidget {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(24),
-                        child: photoUrl != null
-                            ? Image.network(
-                                photoUrl!,
+                        child: image != null
+                            ? Image(
+                                image: image,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    CircleAvatar(
-                                      backgroundColor: primaryColor,
-                                      child: Icon(
-                                        Icons.person_rounded,
-                                        color: Colors.white,
-                                      ),
+                                errorBuilder: (_, _, _) =>
+                                    _DefaultProfileAvatar(
+                                      primaryColor: primaryColor,
                                     ),
                               )
                             : CircleAvatar(
@@ -1574,6 +1576,20 @@ class _TopBar extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _DefaultProfileAvatar extends StatelessWidget {
+  const _DefaultProfileAvatar({required this.primaryColor});
+
+  final Color primaryColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      backgroundColor: primaryColor,
+      child: const Icon(Icons.person_rounded, color: Colors.white),
     );
   }
 }
@@ -2057,9 +2073,12 @@ class _DismissibleTransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canDelete = txn.type != 'transfer';
     return Dismissible(
       key: Key(txn.id),
-      direction: DismissDirection.endToStart,
+      direction: canDelete
+          ? DismissDirection.endToStart
+          : DismissDirection.none,
       background: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -2084,32 +2103,86 @@ class _DismissibleTransactionTile extends StatelessWidget {
         ),
       ),
       confirmDismiss: (direction) async {
-        return true;
-      },
-      onDismissed: (direction) {
-        firestoreService.deleteTransaction(txn.id);
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '"${txn.title}" deleted',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+        if (!canDelete) return false;
+        try {
+          await firestoreService.deleteTransaction(txn.id);
+          if (!context.mounted) return false;
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '"${txn.title}" deleted',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+              ),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'UNDO',
+                textColor: AppTheme.secondary,
+                onPressed: () async {
+                  try {
+                    await firestoreService.addTransaction(txn);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '"${txn.title}" restored',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  } on FinanceValidationException catch (error) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(error.message),
+                        backgroundColor: AppTheme.error,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'Could not restore this transaction. Please add it again.',
+                        ),
+                        backgroundColor: AppTheme.error,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+              ),
             ),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          );
+        } on FinanceValidationException catch (error) {
+          if (!context.mounted) return false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error.message),
+              backgroundColor: AppTheme.error,
+              behavior: SnackBarBehavior.floating,
             ),
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'UNDO',
-              textColor: AppTheme.secondary,
-              onPressed: () {
-                firestoreService.addTransaction(txn);
-              },
+          );
+        } catch (_) {
+          if (!context.mounted) return false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Could not delete this transaction. Please try again.',
+              ),
+              backgroundColor: AppTheme.error,
+              behavior: SnackBarBehavior.floating,
             ),
-          ),
-        );
+          );
+        }
+        return false;
       },
       child: _TransactionTile(txn: txn),
     );

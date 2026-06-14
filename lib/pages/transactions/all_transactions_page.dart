@@ -7,6 +7,7 @@ import '../../models/budget_plan.dart';
 import '../../models/saving_goal.dart';
 import '../../models/transaction.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
 import '../budget/ai_budget_advisor_page.dart';
@@ -169,7 +170,9 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                                                         .textTheme
                                                         .bodyMedium
                                                         ?.color ??
-                                                    AppTheme.textSecondaryFor(context)),
+                                                    AppTheme.textSecondaryFor(
+                                                      context,
+                                                    )),
                                               ),
                                               suffixIcon:
                                                   _searchQuery.isNotEmpty
@@ -217,7 +220,9 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                                                 (Theme.of(
                                                   context,
                                                 ).textTheme.bodyMedium?.color ??
-                                                AppTheme.textSecondaryFor(context)),
+                                                AppTheme.textSecondaryFor(
+                                                  context,
+                                                )),
                                           ),
                                         ),
                                       ),
@@ -239,6 +244,10 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                                               transaction:
                                                   visibleTransactions[index],
                                               analytics: analytics,
+                                              onDelete: () =>
+                                                  _deleteTransaction(
+                                                    visibleTransactions[index],
+                                                  ),
                                             ),
                                       ),
                                     ),
@@ -331,6 +340,71 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
 
   String _monthKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _deleteTransaction(FinancialTransaction transaction) async {
+    final fs = Provider.of<AuthService>(
+      context,
+      listen: false,
+    ).firestoreService;
+    if (fs == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete transaction?'),
+        content: Text(
+          'This will remove "${transaction.title}" and update your totals.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Delete'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await fs.deleteTransaction(transaction.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${transaction.title}" deleted'),
+          backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on FinanceValidationException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Could not delete this transaction. Please try again.',
+          ),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }
 
@@ -918,10 +992,7 @@ class _AutoBudgetShortcut extends StatelessWidget {
                 color: AppTheme.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                Icons.auto_awesome_rounded,
-                color: AppTheme.primary,
-              ),
+              child: Icon(Icons.auto_awesome_rounded, color: AppTheme.primary),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1002,10 +1073,15 @@ class _Chip extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.transaction, required this.analytics});
+  const _TransactionTile({
+    required this.transaction,
+    required this.analytics,
+    required this.onDelete,
+  });
 
   final FinancialTransaction transaction;
   final _TransactionAnalytics analytics;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1019,91 +1095,129 @@ class _TransactionTile extends StatelessWidget {
         : transaction.type == 'transfer'
         ? ''
         : '-';
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: analytics.overspentCategory(transaction.category)
-              ? AppTheme.warning.withValues(alpha: 0.45)
-              : Theme.of(context).dividerColor,
+    final canDelete = transaction.type != 'transfer';
+    return Dismissible(
+      key: ValueKey(transaction.id),
+      direction: canDelete
+          ? DismissDirection.endToStart
+          : DismissDirection.none,
+      confirmDismiss: (_) async {
+        if (!canDelete) return false;
+        onDelete();
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: AppTheme.error,
+          borderRadius: BorderRadius.circular(16),
         ),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(_icon(), color: color, size: 22),
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: analytics.overspentCategory(transaction.category)
+                ? AppTheme.warning.withValues(alpha: 0.45)
+                : Theme.of(context).dividerColor,
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        transaction.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.onSurface,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(_icon(), color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          transaction.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
                       ),
-                    ),
-                    if (transaction.deadline != null)
-                      Icon(
-                        Icons.notifications_active_rounded,
-                        size: 16,
-                        color: AppTheme.warning,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${transaction.category} - ${DateFormat('MMM dd, yyyy').format(transaction.date)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color:
-                        (Theme.of(context).textTheme.bodyMedium?.color ??
-                        AppTheme.textSecondaryFor(context)),
+                      if (transaction.deadline != null)
+                        Icon(
+                          Icons.notifications_active_rounded,
+                          size: 16,
+                          color: AppTheme.warning,
+                        ),
+                    ],
                   ),
-                ),
-                if (transaction.deadline != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Deadline ${DateFormat('MMM dd').format(transaction.deadline!)} linked to budget',
+                    '${transaction.category} - ${DateFormat('MMM dd, yyyy').format(transaction.date)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: AppTheme.warning,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      color:
+                          (Theme.of(context).textTheme.bodyMedium?.color ??
+                          AppTheme.textSecondaryFor(context)),
                     ),
                   ),
+                  if (transaction.deadline != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Deadline ${DateFormat('MMM dd').format(transaction.deadline!)} linked to budget',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: AppTheme.warning,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '$sign${CurrencyUtils.format(transaction.amount)}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                if (canDelete)
+                  IconButton(
+                    tooltip: 'Delete transaction',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onDelete,
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 19,
+                      color: AppTheme.error,
+                    ),
+                  ),
               ],
             ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            '$sign${CurrencyUtils.format(transaction.amount)}',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -110,16 +110,9 @@ class _LiteracyExperienceState extends State<_LiteracyExperience> {
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverAppBar(
-            expandedHeight: 240,
+            expandedHeight: 260,
             pinned: true,
             backgroundColor: AppTheme.primary,
-            title: Text(
-              'Literacy Hub',
-              style: GoogleFonts.plusJakartaSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
             flexibleSpace: FlexibleSpaceBar(background: _HubHero(plan: plan)),
           ),
           SliverPadding(
@@ -244,6 +237,7 @@ class _HubHero extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
+                alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 7,
@@ -509,8 +503,8 @@ class _LevelProgressBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: plan.levelProgress,
             minHeight: 10,
-            backgroundColor: const Color(0xFFE8EDF7),
-            color: AppTheme.primary,
+            backgroundColor: AppTheme.mutedFillFor(context),
+            color: AppTheme.primaryFor(context),
           ),
         ),
       ],
@@ -600,10 +594,7 @@ class _AchievementPrompt extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              color: Color(0xFF1BFFFF),
-            ),
+            child: Icon(Icons.auto_awesome_rounded, color: Color(0xFF1BFFFF)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1332,7 +1323,7 @@ class _AchievementGallery extends StatelessWidget {
                         : null,
                     color: achievement.unlocked
                         ? null
-                        : const Color(0xFFF8FAFC),
+                        : AppTheme.surfaceCardFor(context),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: achievement.unlocked
@@ -1688,7 +1679,9 @@ class _CourseJourneyCard extends StatelessWidget {
           BoxShadow(
             color: isRecommended
                 ? const Color(0xFF0EA5A4).withValues(alpha: 0.12)
-                : Colors.black.withValues(alpha: 0.04),
+                : Colors.black.withValues(
+                    alpha: AppTheme.isDark(context) ? 0.24 : 0.04,
+                  ),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -1707,13 +1700,13 @@ class _CourseJourneyCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(
                   height: 178,
-                  color: const Color(0xFFE8EDF7),
+                  color: AppTheme.mutedFillFor(context),
                   alignment: Alignment.center,
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
                 errorWidget: (context, url, error) => Container(
                   height: 178,
-                  color: const Color(0xFFE8EDF7),
+                  color: AppTheme.mutedFillFor(context),
                   alignment: Alignment.center,
                   child: Icon(Icons.image_not_supported_rounded),
                 ),
@@ -1889,10 +1882,7 @@ class _CourseJourneyCard extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () => _showCourseVideo(context, course),
-                        icon: Icon(
-                          Icons.play_circle_outline_rounded,
-                          size: 18,
-                        ),
+                        icon: Icon(Icons.play_circle_outline_rounded, size: 18),
                         label: const Text('Watch'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFFDC2626),
@@ -1956,7 +1946,9 @@ class _OutcomeBand extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEF8F7),
+        color: AppTheme.isDark(context)
+            ? const Color(0xFF0B3B38)
+            : const Color(0xFFEEF8F7),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: const Color(0xFF0EA5A4).withValues(alpha: 0.2),
@@ -1971,7 +1963,9 @@ class _OutcomeBand extends StatelessWidget {
             child: Text(
               course.outcome,
               style: GoogleFonts.inter(
-                color: const Color(0xFF115E59),
+                color: AppTheme.isDark(context)
+                    ? const Color(0xFF99F6E4)
+                    : const Color(0xFF115E59),
                 fontWeight: FontWeight.w700,
                 height: 1.4,
                 fontSize: 13,
@@ -2106,8 +2100,10 @@ class _CourseProgressLine extends StatelessWidget {
           child: LinearProgressIndicator(
             value: progress.clamp(0.0, 1.0),
             minHeight: 9,
-            backgroundColor: const Color(0xFFE8EDF7),
-            color: progress >= 1 ? AppTheme.success : AppTheme.primary,
+            backgroundColor: AppTheme.mutedFillFor(context),
+            color: progress >= 1
+                ? AppTheme.success
+                : AppTheme.primaryFor(context),
           ),
         ),
         if (quizPercentage > 0) ...[
@@ -2179,8 +2175,8 @@ class _LessonStepRow extends StatelessWidget {
           color: completed
               ? AppTheme.success.withValues(alpha: 0.06)
               : isNext
-              ? AppTheme.primary.withValues(alpha: 0.06)
-              : const Color(0xFFF8FAFC),
+              ? AppTheme.primaryFor(context).withValues(alpha: 0.08)
+              : AppTheme.surfaceCardFor(context),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: completed
@@ -2321,7 +2317,9 @@ class _LessonStepRow extends StatelessWidget {
                   completed
                       ? Icons.check_circle_rounded
                       : Icons.radio_button_unchecked_rounded,
-                  color: completed ? AppTheme.success : AppTheme.textHintFor(context),
+                  color: completed
+                      ? AppTheme.success
+                      : AppTheme.textHintFor(context),
                 ),
               ),
             ),
@@ -2452,14 +2450,16 @@ class _LessonDetailSheet extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: AppTheme.surfaceCardFor(context),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppTheme.borderFor(context)),
+                          border: Border.all(
+                            color: AppTheme.borderFor(context),
+                          ),
                         ),
                         child: Text(
                           lesson.content,
                           style: GoogleFonts.inter(
                             fontSize: 15,
                             height: 1.65,
-                            color: const Color(0xFF334155),
+                            color: AppTheme.textSecondaryFor(context),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -2470,7 +2470,9 @@ class _LessonDetailSheet extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
+                          color: AppTheme.primaryFor(
+                            context,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(18),
                         ),
                         child: Row(
@@ -2478,7 +2480,7 @@ class _LessonDetailSheet extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.lightbulb_rounded,
-                              color: AppTheme.primary,
+                              color: AppTheme.primaryFor(context),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -2530,8 +2532,8 @@ class _LessonDetailSheet extends StatelessWidget {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: completed
-                            ? const Color(0xFF475569)
-                            : AppTheme.primary,
+                            ? AppTheme.textHintFor(context)
+                            : AppTheme.primaryFor(context),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -3049,11 +3051,13 @@ class _QuizQuestionCard extends StatelessWidget {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? AppTheme.primary.withValues(alpha: 0.08)
-                      : const Color(0xFFF8FAFC),
+                      ? AppTheme.primaryFor(context).withValues(alpha: 0.08)
+                      : AppTheme.surfaceCardFor(context),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isSelected ? AppTheme.primary : AppTheme.borderFor(context),
+                    color: isSelected
+                        ? AppTheme.primaryFor(context)
+                        : AppTheme.borderFor(context),
                     width: isSelected ? 1.5 : 1,
                   ),
                 ),
@@ -3063,7 +3067,9 @@ class _QuizQuestionCard extends StatelessWidget {
                       isSelected
                           ? Icons.check_circle_rounded
                           : Icons.circle_outlined,
-                      color: isSelected ? AppTheme.primary : AppTheme.textHintFor(context),
+                      color: isSelected
+                          ? AppTheme.primaryFor(context)
+                          : AppTheme.textHintFor(context),
                       size: 21,
                     ),
                     const SizedBox(width: 10),
@@ -4349,13 +4355,13 @@ class _ProgressDot extends StatelessWidget {
           CircularProgressIndicator(
             value: value.clamp(0.0, 1.0),
             strokeWidth: 4,
-            backgroundColor: const Color(0xFFE8EDF7),
-            color: complete ? AppTheme.success : AppTheme.primary,
+            backgroundColor: AppTheme.mutedFillFor(context),
+            color: complete ? AppTheme.success : AppTheme.primaryFor(context),
           ),
           Icon(
             complete ? Icons.check_rounded : Icons.route_rounded,
             size: 16,
-            color: complete ? AppTheme.success : AppTheme.primary,
+            color: complete ? AppTheme.success : AppTheme.primaryFor(context),
           ),
         ],
       ),

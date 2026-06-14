@@ -93,6 +93,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           Container(
+                            alignment: Alignment.center,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 8,
