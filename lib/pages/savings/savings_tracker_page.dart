@@ -1,22 +1,13 @@
-import 'dart:math' as math;
-
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/budget_plan.dart';
 import '../../models/saving_goal.dart';
-import '../../models/transaction.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
-import '../../utils/finance_consistency_utils.dart';
-import '../budget/ai_budget_advisor_page.dart';
-
-enum _SavingsPeriodMode { daily, weekly, monthly, yearly }
 
 class SavingsTrackerPage extends StatefulWidget {
   const SavingsTrackerPage({super.key});
@@ -27,210 +18,138 @@ class SavingsTrackerPage extends StatefulWidget {
 
 class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
   bool _rolloverChecked = false;
-  _SavingsPeriodMode _periodMode = _SavingsPeriodMode.monthly;
-  DateTime _anchorDate = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
     final firestoreService = context.watch<AuthService>().firestoreService;
-    const primaryColor = AppTheme.primary;
 
     if (firestoreService == null) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
     _scheduleRollover(context, firestoreService);
-    final period = _SavingsPeriod.from(_periodMode, _anchorDate);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: StreamBuilder<List<SavingGoal>>(
-        stream: firestoreService.getSavingGoals(),
-        builder: (context, goalSnapshot) {
-          final goals = goalSnapshot.data ?? const <SavingGoal>[];
-          return StreamBuilder<List<FinancialTransaction>>(
-            stream: firestoreService.getTransactions(),
-            builder: (context, transactionSnapshot) {
-              final transactions =
-                  transactionSnapshot.data ?? const <FinancialTransaction>[];
-              return StreamBuilder<Map<String, dynamic>>(
-                stream: firestoreService.getUserProfile(),
-                builder: (context, profileSnapshot) {
-                  final profile = profileSnapshot.data ?? const {};
-                  return StreamBuilder<List<BudgetPlan>>(
-                    stream: firestoreService.getBudgetPlans(
-                      monthKey: period.key,
-                    ),
-                    builder: (context, budgetSnapshot) {
-                      final budgets =
-                          budgetSnapshot.data ?? const <BudgetPlan>[];
-                      final analytics = _SavingsAnalytics.from(
-                        goals: goals,
-                        transactions: transactions,
-                        profile: profile,
-                        budgets: budgets,
-                        period: period,
-                      );
+    return StreamBuilder<List<SavingGoal>>(
+      stream: firestoreService.getSavingGoals(),
+      builder: (context, goalSnapshot) {
+        return StreamBuilder<Map<String, dynamic>>(
+          stream: firestoreService.getUserProfile(),
+          builder: (context, profileSnapshot) {
+            final goals = goalSnapshot.data ?? const <SavingGoal>[];
+            final profile = profileSnapshot.data ?? const <String, dynamic>{};
+            final summary = _SavingsSummary.from(goals, profile);
+            final sortedGoals = _sortGoals(goals);
 
-                      return CustomScrollView(
+            return Scaffold(
+              backgroundColor: AppTheme.backgroundFor(context),
+              body: SafeArea(
+                child:
+                    goalSnapshot.connectionState == ConnectionState.waiting &&
+                        !goalSnapshot.hasData
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView(
                         physics: const BouncingScrollPhysics(),
-                        slivers: [
-                          const _SavingsAppBar(),
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
-                            sliver: SliverList(
-                              delegate: SliverChildListDelegate([
-                                _TotalSavingsCard(analytics: analytics),
-                                const SizedBox(height: 16),
-                                _SavingsPeriodSwitcher(
-                                  period: period,
-                                  mode: _periodMode,
-                                  onPrevious: () => setState(
-                                    () => _anchorDate = period.shift(
-                                      _periodMode,
-                                      -1,
-                                    ),
-                                  ),
-                                  onNext: () => setState(
-                                    () => _anchorDate = period.shift(
-                                      _periodMode,
-                                      1,
-                                    ),
-                                  ),
-                                  onModeChanged: (mode) => setState(() {
-                                    _periodMode = mode;
-                                    _anchorDate = DateTime.now();
-                                  }),
-                                ),
-                                const SizedBox(height: 16),
-                                _HealthBreakdownCard(analytics: analytics),
-                                const SizedBox(height: 16),
-                                _NarrativeCard(analytics: analytics),
-                                const SizedBox(height: 16),
-                                _QuickActions(
-                                  onNewJourney: () => _showGoalEditor(
-                                    context,
-                                    firestoreService: firestoreService,
-                                    analytics: analytics,
-                                  ),
-                                  onWhatIf: () => _showWhatIfSheet(
-                                    context,
-                                    analytics: analytics,
-                                  ),
-                                  onAutoBudget: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const AIBudgetAdvisorPage(),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                _SectionHeader(
-                                  title: 'Progress Charts',
-                                  actionLabel: 'Timeline',
-                                  onTap: () => _showTimelineSheet(
-                                    context,
-                                    analytics: analytics,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                _MomentumChart(analytics: analytics),
-                                const SizedBox(height: 24),
-                                _SectionHeader(
-                                  title: 'Active Journeys',
-                                  actionLabel: 'Add Journey',
-                                  onTap: () => _showGoalEditor(
-                                    context,
-                                    firestoreService: firestoreService,
-                                    analytics: analytics,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                if (goals.isEmpty)
-                                  _EmptyState(
-                                    onPressed: () => _showGoalEditor(
-                                      context,
-                                      firestoreService: firestoreService,
-                                      analytics: analytics,
-                                    ),
-                                  )
-                                else
-                                  ...goals.map(
-                                    (goal) => Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 16,
-                                      ),
-                                      child: _JourneyCard(
-                                        goal: goal,
-                                        analytics: analytics,
-                                        onEdit: () => _showGoalEditor(
-                                          context,
-                                          firestoreService: firestoreService,
-                                          analytics: analytics,
-                                          existingGoal: goal,
-                                        ),
-                                        onDelete: () => _confirmDeleteGoal(
-                                          context,
-                                          firestoreService,
-                                          goal,
-                                        ),
-                                        onContribute: () =>
-                                            _showContributionDialog(
-                                              context,
-                                              firestoreService,
-                                              goal,
-                                              analytics,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                const SizedBox(height: 8),
-                                _BehaviorTriggers(analytics: analytics),
-                              ]),
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+                        children: [
+                          _SavingsHeader(
+                            summary: summary,
+                            onNewGoal: () => _showGoalEditor(
+                              context,
+                              firestoreService: firestoreService,
+                              summary: summary,
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          _SavingsOverviewCard(summary: summary),
+                          if (summary.nextGoal != null) ...[
+                            const SizedBox(height: 12),
+                            _PriorityGoalCard(
+                              goal: summary.nextGoal!,
+                              summary: summary,
+                              onContribute: () => _showContributionSheet(
+                                context,
+                                firestoreService,
+                                summary.nextGoal!,
+                                summary,
+                              ),
+                              onDetails: () => _showGoalDetailSheet(
+                                context,
+                                firestoreService: firestoreService,
+                                goal: summary.nextGoal!,
+                                summary: summary,
+                              ),
+                            ),
+                          ],
+                          if (summary.warningMessage != null) ...[
+                            const SizedBox(height: 12),
+                            _NoticeBanner(message: summary.warningMessage!),
+                          ],
+                          const SizedBox(height: 22),
+                          _SectionTitle(
+                            title: 'Goals',
+                            trailing: '${summary.activeGoals} active',
+                          ),
+                          const SizedBox(height: 12),
+                          if (sortedGoals.isEmpty)
+                            _EmptySavingsState(
+                              onPressed: () => _showGoalEditor(
+                                context,
+                                firestoreService: firestoreService,
+                                summary: summary,
+                              ),
+                            )
+                          else
+                            ...sortedGoals.map(
+                              (goal) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _GoalCard(
+                                  goal: goal,
+                                  summary: summary,
+                                  onContribute: () => _showContributionSheet(
+                                    context,
+                                    firestoreService,
+                                    goal,
+                                    summary,
+                                  ),
+                                  onDetails: () => _showGoalDetailSheet(
+                                    context,
+                                    firestoreService: firestoreService,
+                                    goal: goal,
+                                    summary: summary,
+                                  ),
+                                  onEdit: () => _showGoalEditor(
+                                    context,
+                                    firestoreService: firestoreService,
+                                    summary: summary,
+                                    existingGoal: goal,
+                                  ),
+                                  onDelete: () => _confirmDeleteGoal(
+                                    context,
+                                    firestoreService,
+                                    goal,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final goals = await firestoreService.getSavingGoals().first;
-          final txns = await firestoreService.getTransactions().first;
-          final profile = await firestoreService.getUserProfile().first;
-          final budgets = await firestoreService
-              .getBudgetPlans(monthKey: _monthKey(DateTime.now()))
-              .first;
-          final period = _SavingsPeriod.from(_periodMode, _anchorDate);
-          if (!context.mounted) return;
-          _showGoalEditor(
-            context,
-            firestoreService: firestoreService,
-            analytics: _SavingsAnalytics.from(
-              goals: goals,
-              transactions: txns,
-              profile: profile,
-              budgets: budgets,
-              period: period,
-            ),
-          );
-        },
-        backgroundColor: primaryColor,
-        icon: Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(
-          'New Journey',
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+                      ),
+              ),
+              bottomNavigationBar: SafeArea(
+                minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: ElevatedButton.icon(
+                  onPressed: () => _showGoalEditor(
+                    context,
+                    firestoreService: firestoreService,
+                    summary: summary,
+                  ),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('New goal'),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -241,7 +160,7 @@ class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
     if (_rolloverChecked) return;
     _rolloverChecked = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      firestoreService.ensureMonthlySavingsRollover();
+      await firestoreService.ensureMonthlySavingsRollover();
       final now = DateTime.now();
       final previous = DateTime(now.year, now.month - 1);
       final periodKey = _monthKey(previous);
@@ -253,9 +172,9 @@ class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
       final approved = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Carry leftover budget into Savings?'),
+          title: const Text('Move leftover to savings?'),
           content: Text(
-            '${CurrencyUtils.format(leftover)} is left from last month. Move it to Savings and log the transfer?',
+            '${CurrencyUtils.format(leftover)} is left from last month.',
           ),
           actions: [
             TextButton(
@@ -264,7 +183,7 @@ class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Move to Savings'),
+              child: const Text('Move'),
             ),
           ],
         ),
@@ -286,9 +205,9 @@ class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete journey?'),
+        title: const Text('Delete goal?'),
         content: Text(
-          'This removes "${goal.title}" and its contribution history. Your savings balance stays unchanged.',
+          'This removes "${goal.title}" and its contribution history.',
         ),
         actions: [
           TextButton(
@@ -303,154 +222,41 @@ class _SavingsTrackerPageState extends State<SavingsTrackerPage> {
         ],
       ),
     );
+
     if (confirmed != true) return;
     try {
       await firestoreService.deleteSavingGoal(goal.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('"${goal.title}" deleted'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      _showSnack(context, '"${goal.title}" deleted');
     } on FinanceValidationException catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message), backgroundColor: AppTheme.error),
-      );
+      _showSnack(context, error.message, isError: true);
     }
   }
 }
 
-String _monthKey(DateTime date) {
-  return '${date.year}-${date.month.toString().padLeft(2, '0')}';
-}
-
-class _SavingsPeriod {
-  const _SavingsPeriod({
-    required this.mode,
-    required this.key,
-    required this.label,
-    required this.start,
-    required this.end,
-  });
-
-  final _SavingsPeriodMode mode;
-  final String key;
-  final String label;
-  final DateTime start;
-  final DateTime end;
-
-  factory _SavingsPeriod.from(_SavingsPeriodMode mode, DateTime anchor) {
-    switch (mode) {
-      case _SavingsPeriodMode.daily:
-        final start = DateTime(anchor.year, anchor.month, anchor.day);
-        return _SavingsPeriod(
-          mode: mode,
-          key:
-              '${anchor.year}-${anchor.month.toString().padLeft(2, '0')}-${anchor.day.toString().padLeft(2, '0')}',
-          label: DateFormat('MMM dd, yyyy').format(anchor),
-          start: start,
-          end: start.add(const Duration(days: 1)),
-        );
-      case _SavingsPeriodMode.weekly:
-        final start = DateTime(
-          anchor.year,
-          anchor.month,
-          anchor.day,
-        ).subtract(Duration(days: anchor.weekday - DateTime.monday));
-        final firstDay = DateTime(anchor.year, 1, 1);
-        final offset = firstDay.weekday - DateTime.monday;
-        final firstMonday = firstDay.subtract(
-          Duration(days: offset < 0 ? 6 : offset),
-        );
-        final week = (start.difference(firstMonday).inDays ~/ 7) + 1;
-        return _SavingsPeriod(
-          mode: mode,
-          key: '${anchor.year}-W${week.toString().padLeft(2, '0')}',
-          label:
-              '${DateFormat('MMM dd').format(start)} - ${DateFormat('MMM dd').format(start.add(const Duration(days: 6)))}',
-          start: start,
-          end: start.add(const Duration(days: 7)),
-        );
-      case _SavingsPeriodMode.yearly:
-        final start = DateTime(anchor.year);
-        return _SavingsPeriod(
-          mode: mode,
-          key: '${anchor.year}',
-          label: '${anchor.year}',
-          start: start,
-          end: DateTime(anchor.year + 1),
-        );
-      case _SavingsPeriodMode.monthly:
-        final start = DateTime(anchor.year, anchor.month);
-        return _SavingsPeriod(
-          mode: mode,
-          key: _monthKey(anchor),
-          label: DateFormat('MMMM yyyy').format(anchor),
-          start: start,
-          end: DateTime(anchor.year, anchor.month + 1),
-        );
-    }
-  }
-
-  bool contains(DateTime date) => !date.isBefore(start) && date.isBefore(end);
-
-  String get modeName => mode.name;
-
-  DateTime shift(_SavingsPeriodMode mode, int step) {
-    switch (mode) {
-      case _SavingsPeriodMode.daily:
-        return start.add(Duration(days: step));
-      case _SavingsPeriodMode.weekly:
-        return start.add(Duration(days: step * 7));
-      case _SavingsPeriodMode.monthly:
-        return DateTime(start.year, start.month + step);
-      case _SavingsPeriodMode.yearly:
-        return DateTime(start.year + step);
-    }
-  }
-}
-
-class _SavingsAnalytics {
-  const _SavingsAnalytics({
+class _SavingsSummary {
+  const _SavingsSummary({
     required this.goals,
-    required this.transactions,
-    required this.budgets,
-    required this.profileSavings,
-    required this.monthlyIncome,
-    required this.totalBudgeted,
-    required this.totalExpenses,
+    required this.availableSavings,
     required this.totalSaved,
     required this.totalTarget,
     required this.monthlyNeed,
-    required this.monthlySavingsTransfers,
-    required this.period,
   });
 
   final List<SavingGoal> goals;
-  final List<FinancialTransaction> transactions;
-  final List<BudgetPlan> budgets;
-  final double profileSavings;
-  final double monthlyIncome;
-  final double totalBudgeted;
-  final double totalExpenses;
+  final double availableSavings;
   final double totalSaved;
   final double totalTarget;
   final double monthlyNeed;
-  final double monthlySavingsTransfers;
-  final _SavingsPeriod period;
 
-  factory _SavingsAnalytics.from({
-    required List<SavingGoal> goals,
-    required List<FinancialTransaction> transactions,
-    required Map<String, dynamic> profile,
-    required List<BudgetPlan> budgets,
-    required _SavingsPeriod period,
-  }) {
-    final periodTransactions = transactions
-        .where((txn) => period.contains(txn.date))
-        .toList();
+  factory _SavingsSummary.from(
+    List<SavingGoal> goals,
+    Map<String, dynamic> profile,
+  ) {
+    final availableSavings =
+        ((profile['savingsBalance'] ?? 0) as num).toDouble() +
+        ((profile['extraSavingsBalance'] ?? 0) as num).toDouble();
     final totalSaved = goals.fold<double>(
       0,
       (total, goal) => total + goal.currentAmount,
@@ -463,309 +269,181 @@ class _SavingsAnalytics {
       0,
       (total, goal) => total + goal.monthlyTarget,
     );
-    final totalBudgeted = budgets.fold<double>(
-      0,
-      (total, budget) => total + budget.allocatedAmount,
-    );
-    final totalExpenses = periodTransactions
-        .where((txn) => txn.type == 'expense')
-        .fold<double>(0, (total, txn) => total + txn.amount);
-    final periodIncome = periodTransactions
-        .where((txn) => txn.type == 'income')
-        .fold<double>(0, (total, txn) => total + txn.amount);
-    final profileIncome = ((profile['monthlyIncome'] ?? 0) as num).toDouble();
-    final profileSavings =
-        ((profile['savingsBalance'] ?? 0) as num).toDouble() +
-        ((profile['extraSavingsBalance'] ?? 0) as num).toDouble();
-    final monthlySavingsTransfers = periodTransactions
-        .where(
-          (txn) =>
-              txn.type == 'transfer' &&
-              (txn.category == 'Savings' ||
-                  (txn.transferDirection ?? '').contains('savings')),
-        )
-        .fold<double>(0, (total, txn) => total + txn.amount);
-    return _SavingsAnalytics(
+
+    return _SavingsSummary(
       goals: goals,
-      transactions: transactions,
-      budgets: budgets,
-      profileSavings: profileSavings,
-      monthlyIncome: FinanceConsistencyUtils.resolvePeriodIncome(
-        profileMonthlyIncome: profileIncome,
-        transactionIncome: periodIncome,
-        periodType: period.modeName,
-      ),
-      totalBudgeted: totalBudgeted,
-      totalExpenses: totalExpenses,
+      availableSavings: availableSavings,
       totalSaved: totalSaved,
       totalTarget: totalTarget,
       monthlyNeed: monthlyNeed,
-      monthlySavingsTransfers: monthlySavingsTransfers,
-      period: period,
     );
   }
 
-  double get overallProgress =>
+  double get progress =>
       totalTarget <= 0 ? 0 : (totalSaved / totalTarget).clamp(0.0, 1.0);
-  double get remainingBudget => (monthlyIncome - totalBudgeted - totalExpenses)
-      .clamp(0, double.infinity)
-      .toDouble();
-  double get savingsCapacity =>
-      math.min(profileSavings, remainingBudget + profileSavings);
-  double get unallocatedSavings =>
-      (profileSavings - totalSaved).clamp(0, double.infinity).toDouble();
+  double get unallocated =>
+      (availableSavings - totalSaved).clamp(0, double.infinity).toDouble();
+  double get remainingTarget =>
+      (totalTarget - totalSaved).clamp(0, double.infinity).toDouble();
   bool get isOverAllocated =>
-      profileSavings > 0 && totalSaved > profileSavings + 0.01;
-  bool get goalPlanTooAggressive =>
-      remainingBudget > 0 && monthlyNeed > remainingBudget;
-  double get recommendedSavingsRate =>
-      monthlyIncome <= 0 ? 0 : (monthlyNeed / monthlyIncome) * 100;
-  int get activeJourneys => goals.where((goal) => goal.remaining > 0).length;
-  int get debtJourneys => goals.where((goal) => goal.isDebtGoal).length;
-  double get velocity {
-    final cutoff = DateTime.now().subtract(const Duration(days: 30));
-    final recent = transactions
-        .where(
-          (txn) =>
-              txn.date.isAfter(cutoff) &&
-              txn.type == 'transfer' &&
-              (txn.transferDirection ?? '').contains('goal'),
-        )
-        .fold<double>(0, (total, txn) => total + txn.amount);
-    return recent;
+      availableSavings > 0 && totalSaved > availableSavings + 0.01;
+  int get activeGoals => goals.where((goal) => goal.remaining > 0).length;
+  int get completedGoals => goals.where((goal) => goal.remaining <= 0).length;
+  int get debtGoals => goals.where((goal) => goal.isDebtGoal).length;
+
+  SavingGoal? get nextGoal {
+    final active = goals.where((goal) => goal.remaining > 0).toList()
+      ..sort((a, b) => a.targetDate.compareTo(b.targetDate));
+    return active.isEmpty ? null : active.first;
   }
 
-  int get healthScore {
-    var score = 100;
-    if (isOverAllocated) score -= 25;
-    if (goalPlanTooAggressive) score -= 18;
-    if (monthlyIncome > 0) {
-      score -= ((totalExpenses / monthlyIncome).clamp(0.0, 1.3) * 25).round();
-      score += (recommendedSavingsRate.clamp(0, 20) / 2).round();
-    }
-    if (activeJourneys == 0) score -= 8;
-    if (velocity <= 0 && activeJourneys > 0) score -= 8;
-    return score.clamp(0, 100);
+  String get motivationTitle {
+    if (goals.isEmpty) return 'Start one goal';
+    if (nextGoal != null && nextGoal!.daysLeft < 0) return 'Goal is overdue';
+    if (nextGoal != null && nextGoal!.daysLeft <= 30) return 'Due soon';
+    if (progress >= 0.75) return 'Strong progress';
+    return 'Keep saving steady';
   }
 
-  List<FlSpot> get momentumSpots {
-    final now = DateTime.now();
-    final spots = <FlSpot>[];
-    for (var i = 5; i >= 0; i--) {
-      final date = DateTime(now.year, now.month - i);
-      final amount = transactions
-          .where(
-            (txn) =>
-                txn.date.year == date.year &&
-                txn.date.month == date.month &&
-                txn.type == 'transfer' &&
-                (txn.transferDirection ?? '').contains('goal'),
-          )
-          .fold<double>(0, (total, txn) => total + txn.amount);
-      spots.add(FlSpot((5 - i).toDouble(), amount));
+  String get motivationMessage {
+    if (goals.isEmpty) {
+      return 'One clear target is easier to fund than many vague intentions.';
     }
-    return spots;
+    final goal = nextGoal;
+    if (goal == null) {
+      return 'All active goals are funded. Create the next target.';
+    }
+    if (goal.daysLeft < 0) {
+      return '${goal.title} is past its target date. Add money or update the date.';
+    }
+    if (goal.daysLeft <= 30) {
+      return '${goal.title} needs ${CurrencyUtils.format(goal.remaining)} within ${goal.daysLeft} days.';
+    }
+    return '${CurrencyUtils.format(goal.monthlyTarget)} per month keeps ${goal.title} on track.';
+  }
+
+  String? get warningMessage {
+    if (isOverAllocated) {
+      return 'Goals use more money than the savings pool. Reduce an allocation or add savings first.';
+    }
+    if (activeGoals >= 5) {
+      return 'Many active goals can split attention. Keep the top priorities visible.';
+    }
+    if (nextGoal != null && nextGoal!.daysLeft < 0) {
+      return '${nextGoal!.title} is past its target date.';
+    }
+    return null;
   }
 }
 
-class _SavingsAppBar extends StatelessWidget {
-  const _SavingsAppBar();
+class _SavingsHeader extends StatelessWidget {
+  const _SavingsHeader({required this.summary, required this.onNewGoal});
+
+  final _SavingsSummary summary;
+  final VoidCallback onNewGoal;
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = AppTheme.primary;
-    const accentColor = AppTheme.secondary;
-    return SliverAppBar(
-      expandedHeight: 150,
-      pinned: true,
-      backgroundColor: primaryColor,
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.only(left: 20, bottom: 18),
-        title: Text(
-          'Savings Journeys',
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(color: primaryColor),
-            Positioned(
-              right: -24,
-              top: -24,
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accentColor.withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SavingsPeriodSwitcher extends StatelessWidget {
-  const _SavingsPeriodSwitcher({
-    required this.period,
-    required this.mode,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onModeChanged,
-  });
-
-  final _SavingsPeriod period;
-  final _SavingsPeriodMode mode;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-  final ValueChanged<_SavingsPeriodMode> onModeChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return _InfoCard(
-      child: Column(
-        children: [
-          Row(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                onPressed: onPrevious,
-                icon: Icon(Icons.chevron_left_rounded),
-                color: AppTheme.primary,
-              ),
-              Expanded(
-                child: Text(
-                  period.label,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
+              Text(
+                'Savings',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimaryFor(context),
                 ),
               ),
-              IconButton(
-                onPressed: onNext,
-                icon: Icon(Icons.chevron_right_rounded),
-                color: AppTheme.primary,
+              const SizedBox(height: 4),
+              Text(
+                summary.nextGoal == null
+                    ? 'Start with one clear target.'
+                    : 'Next: ${summary.nextGoal!.title}',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: _SavingsPeriodMode.values
-                .map(
-                  (item) => Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: GestureDetector(
-                        onTap: () => onModeChanged(item),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            color: mode == item
-                                ? AppTheme.primary
-                                : Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            item.name[0].toUpperCase() + item.name.substring(1),
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              color: mode == item
-                                  ? Colors.white
-                                  : (Theme.of(
-                                          context,
-                                        ).textTheme.bodyMedium?.color ??
-                                        AppTheme.textSecondaryFor(context)),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
+        ),
+        IconButton.filled(
+          onPressed: onNewGoal,
+          icon: const Icon(Icons.add_rounded),
+          tooltip: 'New goal',
+          style: IconButton.styleFrom(
+            backgroundColor: AppTheme.primaryFor(context),
+            foregroundColor: Colors.white,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _TotalSavingsCard extends StatelessWidget {
-  const _TotalSavingsCard({required this.analytics});
+class _SavingsOverviewCard extends StatelessWidget {
+  const _SavingsOverviewCard({required this.summary});
 
-  final _SavingsAnalytics analytics;
+  final _SavingsSummary summary;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onSurface,
-        borderRadius: BorderRadius.circular(30),
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Saved across financial journeys',
-            style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _MetricBlock(
+                  label: 'Saved in goals',
+                  value: CurrencyUtils.format(summary.totalSaved),
+                ),
+              ),
+              _StatusPill(
+                label: '${(summary.progress * 100).toStringAsFixed(0)}%',
+                color: AppTheme.success,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            CurrencyUtils.format(analytics.totalSaved),
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
-              fontSize: 36,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
-              value: analytics.overallProgress,
-              minHeight: 10,
-              backgroundColor: Colors.white.withValues(alpha: 0.08),
-              color: const Color(0xFF1BFFFF),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${(analytics.overallProgress * 100).round()}% of ${CurrencyUtils.format(analytics.totalTarget)} total journey targets funded.',
-            style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.7),
+              minHeight: 9,
+              value: summary.progress,
+              backgroundColor: AppTheme.mutedFillFor(context),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppTheme.primaryFor(context),
+              ),
             ),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: _SummaryPill(
-                  label: 'Active journeys',
-                  value: '${analytics.activeJourneys}',
+                child: _SmallStat(
+                  label: 'Pool left',
+                  value: CurrencyUtils.format(summary.unallocated),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: _SummaryPill(
+                child: _SmallStat(
                   label: 'Monthly need',
-                  value: CurrencyUtils.format(analytics.monthlyNeed),
+                  value: CurrencyUtils.format(summary.monthlyNeed),
                 ),
               ),
             ],
@@ -776,344 +454,66 @@ class _TotalSavingsCard extends StatelessWidget {
   }
 }
 
-class _HealthBreakdownCard extends StatelessWidget {
-  const _HealthBreakdownCard({required this.analytics});
-
-  final _SavingsAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    return _InfoCard(
-      child: Column(
-        children: [
-          _SignalRow(
-            icon: Icons.health_and_safety_rounded,
-            title: 'Financial Health Score',
-            value: '${analytics.healthScore}/100',
-            body:
-                'Savings, budget capacity, spending load, and journey velocity combined.',
-          ),
-          const SizedBox(height: 14),
-          _SignalRow(
-            icon: Icons.account_balance_wallet_rounded,
-            title: 'Remaining Budget',
-            value: CurrencyUtils.format(analytics.remainingBudget),
-            body: 'Used to validate whether new journeys are feasible.',
-          ),
-          const SizedBox(height: 14),
-          _SignalRow(
-            icon: Icons.savings_rounded,
-            title: 'Savings Pool',
-            value: CurrencyUtils.format(analytics.profileSavings),
-            body: analytics.isOverAllocated
-                ? 'Savings are over-allocated. Pause new allocations.'
-                : 'Available savings are within journey allocation limits.',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NarrativeCard extends StatelessWidget {
-  const _NarrativeCard({required this.analytics});
-
-  final _SavingsAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    final warning =
-        analytics.isOverAllocated || analytics.goalPlanTooAggressive;
-    return _InfoCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            warning ? Icons.warning_amber_rounded : Icons.auto_awesome_rounded,
-            color: warning ? const Color(0xFFF97316) : AppTheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Weekly savings narrative',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _message(),
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSecondaryFor(context),
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _message() {
-    if (analytics.activeJourneys == 0) {
-      return 'Start a journey and FinEase will split it into monthly milestones that stay connected to your budget.';
-    }
-    if (analytics.isOverAllocated) {
-      return 'Savings are stretched across too many allocations. Rebalance journeys before adding more contributions.';
-    }
-    if (analytics.goalPlanTooAggressive) {
-      return 'Your dreams are ambitious. Extend a deadline or reduce a category budget to keep the plan calm.';
-    }
-    if (analytics.velocity > 0) {
-      return 'Momentum is alive. Recent contributions are moving journeys forward and keeping your timeline realistic.';
-    }
-    return 'A small contribution this week would restart momentum and keep milestones within reach.';
-  }
-}
-
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({
-    required this.onNewJourney,
-    required this.onWhatIf,
-    required this.onAutoBudget,
-  });
-
-  final VoidCallback onNewJourney;
-  final VoidCallback onWhatIf;
-  final VoidCallback onAutoBudget;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.add_rounded,
-            label: 'New Journey',
-            onTap: onNewJourney,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.psychology_rounded,
-            label: 'What If',
-            onTap: onWhatIf,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Auto-Budget',
-            onTap: onAutoBudget,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceFor(context),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: AppTheme.primary),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.actionLabel,
-    required this.onTap,
-  });
-
-  final String title;
-  final String actionLabel;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        TextButton(onPressed: onTap, child: Text(actionLabel)),
-      ],
-    );
-  }
-}
-
-class _MomentumChart extends StatelessWidget {
-  const _MomentumChart({required this.analytics});
-
-  final _SavingsAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    final spots = analytics.momentumSpots;
-    final maxY = math.max(
-      1,
-      spots.fold<double>(0, (max, spot) => math.max(max, spot.y)),
-    );
-    return _InfoCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Saving Momentum',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 170,
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: maxY * 1.2,
-                gridData: FlGridData(
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => FlLine(
-                    color: Theme.of(context).dividerColor,
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: AppTheme.primary,
-                    barWidth: 4,
-                    dotData: const FlDotData(show: true),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: AppTheme.primary.withValues(alpha: 0.10),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _JourneyCard extends StatelessWidget {
-  const _JourneyCard({
+class _GoalCard extends StatelessWidget {
+  const _GoalCard({
     required this.goal,
-    required this.analytics,
+    required this.summary,
+    required this.onContribute,
+    required this.onDetails,
     required this.onEdit,
     required this.onDelete,
-    required this.onContribute,
   });
 
   final SavingGoal goal;
-  final _SavingsAnalytics analytics;
+  final _SavingsSummary summary;
+  final VoidCallback onContribute;
+  final VoidCallback onDetails;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onContribute;
 
   @override
   Widget build(BuildContext context) {
-    final urgent =
-        goal.reminderDate != null &&
-        goal.reminderDate!.difference(DateTime.now()).inDays <= 5;
-    final milestoneText = goal.milestones.isEmpty
-        ? 'Milestones will appear after saving.'
-        : '${goal.completedMilestones}/${goal.milestones.length} milestones complete';
-    return _InfoCard(
+    final completed = goal.remaining <= 0;
+    final late = goal.daysLeft < 0 && !completed;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _GoalIcon(goal: goal),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            goal.title,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        if (goal.isDebtGoal)
-                          const _MiniTag(
-                            label: 'Debt',
-                            color: Color(0xFFF97316),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
                     Text(
-                      '${goal.goalType} - ${goal.daysLeft} days left',
+                      goal.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimaryFor(context),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _goalSubtitle(goal),
                       style: GoogleFonts.inter(
-                        color: AppTheme.textSecondaryFor(context),
+                        color: late
+                            ? AppTheme.error
+                            : AppTheme.textSecondaryFor(context),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -1123,47 +523,11 @@ class _JourneyCard extends StatelessWidget {
                 onSelected: (value) {
                   if (value == 'edit') onEdit();
                   if (value == 'delete') onDelete();
-                  if (value == 'contribute') onContribute();
                 },
                 itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: 'contribute',
-                    child: Text('Add Contribution'),
-                  ),
-                  PopupMenuItem(value: 'edit', child: Text('Edit Journey')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete Journey')),
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
-              ),
-            ],
-          ),
-          if (goal.reminderDate != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              '${urgent ? 'Urgent: ' : ''}Reminder ${DateFormat('MMM dd').format(goal.reminderDate!)}',
-              style: GoogleFonts.inter(
-                color: urgent ? const Color(0xFFF97316) : AppTheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${CurrencyUtils.format(goal.currentAmount)} saved',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.primary,
-                ),
-              ),
-              Text(
-                'Target ${CurrencyUtils.format(goal.targetAmount)}',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textSecondaryFor(context),
-                ),
               ),
             ],
           ),
@@ -1171,154 +535,209 @@ class _JourneyCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
-              value: goal.progress,
               minHeight: 8,
+              value: goal.progress,
               backgroundColor: AppTheme.mutedFillFor(context),
-              color: AppTheme.primaryFor(context),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                completed ? AppTheme.success : AppTheme.primaryFor(context),
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            milestoneText,
-            style: GoogleFonts.inter(
-              color: const Color(0xFF059669),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _journeyMessage(goal, analytics),
-            style: GoogleFonts.inter(
-              color: AppTheme.textSecondaryFor(context),
-              height: 1.45,
-            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${CurrencyUtils.format(goal.currentAmount)} of ${CurrencyUtils.format(goal.targetAmount)}',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondaryFor(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                completed
+                    ? 'Done'
+                    : '${CurrencyUtils.format(goal.remaining)} left',
+                style: GoogleFonts.inter(
+                  color: completed
+                      ? AppTheme.success
+                      : AppTheme.primaryFor(context),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
-          ElevatedButton.icon(
-            onPressed: onContribute,
-            icon: Icon(Icons.savings_rounded),
-            label: const Text('Add Contribution'),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: completed ? null : onContribute,
+                  icon: const Icon(Icons.add_card_rounded, size: 18),
+                  label: const Text('Add money'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton.outlined(
+                onPressed: onDetails,
+                icon: const Icon(Icons.info_outline_rounded),
+                tooltip: 'Details',
+              ),
+            ],
           ),
         ],
       ),
     );
   }
-
-  String _journeyMessage(SavingGoal goal, _SavingsAnalytics analytics) {
-    if (goal.progress >= 1) {
-      return 'Milestone complete. Celebrate this win and choose the next journey.';
-    }
-    if (goal.monthlyTarget > analytics.remainingBudget &&
-        analytics.remainingBudget > 0) {
-      return 'This journey is tight against the current budget. Extend the date or free up budget room.';
-    }
-    if (goal.isDebtGoal) {
-      return 'Debt payoff strategy: ${goal.payoffStrategy}. Keep reminders active to avoid missed payments.';
-    }
-    return 'Monthly target ${CurrencyUtils.format(goal.monthlyTarget)} keeps this journey on schedule.';
-  }
 }
 
-class _BehaviorTriggers extends StatelessWidget {
-  const _BehaviorTriggers({required this.analytics});
+class _PriorityGoalCard extends StatelessWidget {
+  const _PriorityGoalCard({
+    required this.goal,
+    required this.summary,
+    required this.onContribute,
+    required this.onDetails,
+  });
 
-  final _SavingsAnalytics analytics;
+  final SavingGoal goal;
+  final _SavingsSummary summary;
+  final VoidCallback onContribute;
+  final VoidCallback onDetails;
 
   @override
   Widget build(BuildContext context) {
-    final messages = <String>[
-      if (analytics.isOverAllocated)
-        'Savings cannot be over-allocated. Rebalance journeys before contributing more.',
-      if (analytics.goalPlanTooAggressive)
-        'Gentle nudge: journey targets are above remaining budget. A later deadline can make this easier.',
-      if (analytics.velocity <= 0 && analytics.activeJourneys > 0)
-        'A small contribution this week would restart your saving streak.',
-      if (analytics.monthlySavingsTransfers > 0)
-        'Nice movement: Savings-related transactions are flowing into your journey system.',
-    ];
-    if (messages.isEmpty) return const SizedBox.shrink();
-    return Column(
-      children: messages
-          .map(
-            (message) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _InfoCard(
-                child: Text(
-                  message,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSecondaryFor(context),
-                    height: 1.45,
-                    fontWeight: FontWeight.w700,
+    final urgent = goal.daysLeft <= 30 && goal.remaining > 0;
+    final color = goal.daysLeft < 0
+        ? AppTheme.error
+        : urgent
+        ? AppTheme.warning
+        : AppTheme.success;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: AppTheme.isDark(context) ? 0.18 : 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _GoalIcon(goal: goal),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  summary.motivationTitle,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppTheme.textPrimaryFor(context),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  summary.motivationMessage,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondaryFor(context),
+                    height: 1.4,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: goal.remaining <= 0 ? null : onContribute,
+                        icon: const Icon(Icons.add_card_rounded, size: 18),
+                        label: const Text('Contribute'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: color,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.outlined(
+                      onPressed: onDetails,
+                      icon: const Icon(Icons.info_outline_rounded),
+                      tooltip: 'Details',
+                    ),
+                  ],
+                ),
+              ],
             ),
-          )
-          .toList(),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _SignalRow extends StatelessWidget {
-  const _SignalRow({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.body,
-  });
+class _GoalIcon extends StatelessWidget {
+  const _GoalIcon({required this.goal});
 
-  final IconData icon;
+  final SavingGoal goal;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: goal.isDebtGoal
+            ? AppTheme.warningFillFor(context)
+            : AppTheme.successFillFor(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        goal.isDebtGoal ? Icons.payments_rounded : _categoryIcon(goal.category),
+        color: goal.isDebtGoal ? AppTheme.warning : AppTheme.success,
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.trailing});
+
   final String title;
-  final String value;
-  final String body;
+  final String trailing;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryFor(context).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(icon, color: AppTheme.primaryFor(context)),
-        ),
-        const SizedBox(width: 16),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: GoogleFonts.plusJakartaSans(
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                body,
-                style: GoogleFonts.inter(
-                  color: AppTheme.textSecondaryFor(context),
-                  height: 1.45,
-                ),
-              ),
-            ],
+          child: Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimaryFor(context),
+            ),
+          ),
+        ),
+        Text(
+          trailing,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -1326,27 +745,85 @@ class _SignalRow extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.child});
+class _MetricBlock extends StatelessWidget {
+  const _MetricBlock({required this.label, required this.value});
 
-  final Widget child;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: child,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 25,
+            fontWeight: FontWeight.w900,
+            color: AppTheme.textPrimaryFor(context),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _MiniTag extends StatelessWidget {
-  const _MiniTag({required this.label, required this.color});
+class _SmallStat extends StatelessWidget {
+  const _SmallStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCardFor(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -1354,16 +831,16 @@ class _MiniTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: GoogleFonts.inter(
           color: color,
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -1371,44 +848,96 @@ class _MiniTag extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onPressed});
+class _NoticeBanner extends StatelessWidget {
+  const _NoticeBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.warningFillFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.priority_high_rounded,
+            color: AppTheme.warning,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimaryFor(context),
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptySavingsState extends StatelessWidget {
+  const _EmptySavingsState({required this.onPressed});
 
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(30),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
       ),
       child: Column(
         children: [
-          Icon(Icons.savings_rounded, size: 56, color: AppTheme.primary),
-          const SizedBox(height: 16),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppTheme.successFillFor(context),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.savings_rounded, color: AppTheme.success),
+          ),
+          const SizedBox(height: 12),
           Text(
-            'No financial journeys yet',
+            'No goals yet',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 22,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimaryFor(context),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Text(
-            'Create a journey to track milestones, projected timelines, savings velocity, and budget feasibility.',
+            'Create one target and fund it from your savings pool.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               color: AppTheme.textSecondaryFor(context),
-              height: 1.5,
+              height: 1.4,
             ),
           ),
-          const SizedBox(height: 18),
-          ElevatedButton(
-            onPressed: onPressed,
-            child: const Text('Create Journey'),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Create goal'),
+            ),
           ),
         ],
       ),
@@ -1419,7 +948,7 @@ class _EmptyState extends StatelessWidget {
 Future<void> _showGoalEditor(
   BuildContext context, {
   required FirestoreService firestoreService,
-  required _SavingsAnalytics analytics,
+  required _SavingsSummary summary,
   SavingGoal? existingGoal,
 }) async {
   final titleController = TextEditingController(
@@ -1432,167 +961,161 @@ Future<void> _showGoalEditor(
     text: existingGoal?.currentAmount.toStringAsFixed(0) ?? '0',
   );
   final today = DateTime.now();
+  final firstDate = DateTime(today.year, today.month, today.day);
   var targetDate =
       existingGoal?.targetDate ?? today.add(const Duration(days: 180));
-  if (targetDate.isBefore(DateTime(today.year, today.month, today.day))) {
-    targetDate = DateTime(today.year, today.month, today.day);
-  }
-  var goalType = existingGoal?.goalType ?? 'Emergency Fund';
+  if (targetDate.isBefore(firstDate)) targetDate = firstDate;
+  var category =
+      existingGoal?.goalType ?? existingGoal?.category ?? 'Emergency Fund';
+  var isDebtGoal = existingGoal?.isDebtGoal ?? category == 'Debt Payoff';
   var payoffStrategy = existingGoal?.payoffStrategy ?? 'steady';
-  var isDebtGoal = existingGoal?.isDebtGoal ?? false;
   DateTime? reminderDate = existingGoal?.reminderDate;
-  final goalTypes = [
+
+  const categories = [
     'Emergency Fund',
-    'Vacation',
     'Debt Payoff',
-    'House',
     'Education',
+    'House',
+    'Vehicle',
+    'Vacation',
     'Investment',
     'General',
   ];
 
-  await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setModalState) {
-          final target = double.tryParse(targetController.text.trim()) ?? 0;
-          final current = double.tryParse(currentController.text.trim()) ?? 0;
-          final draft = SavingGoal(
-            id: existingGoal?.id ?? '',
-            title: titleController.text.trim(),
-            targetAmount: target,
-            currentAmount: current,
-            targetDate: targetDate,
-            category: goalType,
-            goalType: goalType,
-            isDebtGoal: isDebtGoal || goalType == 'Debt Payoff',
-            payoffStrategy: payoffStrategy,
-            reminderDate: reminderDate,
-          );
-          final monthlyTarget = draft.monthlyTarget;
-          final allocationWarning =
-              analytics.totalSaved -
-                  (existingGoal?.currentAmount ?? 0) +
-                  current >
-              analytics.profileSavings;
-          final budgetWarning =
-              analytics.remainingBudget > 0 &&
-              monthlyTarget > analytics.remainingBudget;
-          final invalid =
-              target <= 0 ||
-              current < 0 ||
-              current > target ||
-              allocationWarning ||
-              budgetWarning;
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final target = double.tryParse(targetController.text.trim()) ?? 0;
+            final current = double.tryParse(currentController.text.trim()) ?? 0;
+            final allocationAfterEdit =
+                summary.totalSaved -
+                (existingGoal?.currentAmount ?? 0) +
+                current;
+            final allocationWarning =
+                allocationAfterEdit > summary.availableSavings + 0.01;
+            final invalid =
+                titleController.text.trim().isEmpty ||
+                target <= 0 ||
+                current < 0 ||
+                current > target ||
+                allocationWarning;
+            final draft = SavingGoal(
+              id: existingGoal?.id ?? '',
+              title: titleController.text.trim(),
+              targetAmount: target,
+              currentAmount: current,
+              targetDate: targetDate,
+              category: category,
+              emoji: category,
+              goalType: category,
+              isDebtGoal: isDebtGoal,
+              payoffStrategy: payoffStrategy,
+              reminderDate: reminderDate,
+            );
 
-          return Container(
-            padding: EdgeInsets.fromLTRB(
-              24,
-              20,
-              24,
-              MediaQuery.of(context).viewInsets.bottom + 24,
-            ),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceFor(context),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-            ),
-            child: SingleChildScrollView(
+            return _BottomSheetFrame(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppTheme.borderFor(context),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
+                  _SheetHandle(),
                   Text(
-                    existingGoal == null ? 'Create Journey' : 'Edit Journey',
+                    existingGoal == null ? 'New goal' : 'Edit goal',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimaryFor(sheetContext),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _SheetMetricPanel(
-                    income: analytics.monthlyIncome,
-                    remainingBudget: analytics.remainingBudget,
-                    monthlyTarget: monthlyTarget,
+                  _SheetHint(
+                    leading: 'Pool left',
+                    value: CurrencyUtils.format(summary.unallocated),
                   ),
                   const SizedBox(height: 14),
-                  _field(
-                    titleController,
-                    'Journey title',
-                    onChanged: () {
-                      setModalState(() {});
-                    },
+                  _SheetField(
+                    controller: titleController,
+                    label: 'Goal name',
+                    icon: Icons.flag_rounded,
+                    onChanged: (_) => setSheetState(() {}),
                   ),
                   const SizedBox(height: 12),
-                  _field(
-                    targetController,
-                    'Target amount',
-                    isNumber: true,
-                    onChanged: () => setModalState(() {}),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SheetField(
+                          controller: targetController,
+                          label: 'Target',
+                          icon: Icons.track_changes_rounded,
+                          isNumber: true,
+                          onChanged: (_) => setSheetState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _SheetField(
+                          controller: currentController,
+                          label: 'Saved now',
+                          icon: Icons.account_balance_wallet_rounded,
+                          isNumber: true,
+                          onChanged: (_) => setSheetState(() {}),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
-                  _field(
-                    currentController,
-                    'Current allocation',
-                    isNumber: true,
-                    onChanged: () => setModalState(() {}),
+                  DropdownButtonFormField<String>(
+                    initialValue: categories.contains(category)
+                        ? category
+                        : 'General',
+                    decoration: const InputDecoration(
+                      labelText: 'Type',
+                      prefixIcon: Icon(Icons.category_rounded),
+                    ),
+                    items: categories
+                        .map(
+                          (item) => DropdownMenuItem<String>(
+                            value: item,
+                            child: Text(item),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setSheetState(() {
+                      category = value ?? 'General';
+                      isDebtGoal = category == 'Debt Payoff';
+                    }),
                   ),
                   const SizedBox(height: 12),
-                  InkWell(
+                  _PickerTile(
+                    icon: Icons.event_rounded,
+                    label: 'Target date',
+                    value: DateFormat('MMM dd, yyyy').format(targetDate),
                     onTap: () async {
                       final picked = await showDatePicker(
-                        context: context,
+                        context: sheetContext,
                         initialDate: targetDate,
-                        firstDate: DateTime(today.year, today.month, today.day),
+                        firstDate: firstDate,
                         lastDate: DateTime(2100),
                       );
                       if (picked != null) {
-                        setModalState(() => targetDate = picked);
+                        setSheetState(() => targetDate = picked);
                       }
                     },
-                    child: _PickerBox(
-                      label:
-                          'Target ${DateFormat('MMM dd, yyyy').format(targetDate)}',
-                    ),
                   ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: goalTypes.map((item) {
-                      final selected = item == goalType;
-                      return ChoiceChip(
-                        label: Text(item),
-                        selected: selected,
-                        onSelected: (_) => setModalState(() {
-                          goalType = item;
-                          isDebtGoal = item == 'Debt Payoff';
-                        }),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     value: isDebtGoal,
-                    activeThumbColor: AppTheme.primary,
-                    title: const Text('Debt management journey'),
-                    onChanged: (value) => setModalState(() {
+                    activeThumbColor: AppTheme.primaryFor(sheetContext),
+                    title: const Text('Debt payoff goal'),
+                    onChanged: (value) => setSheetState(() {
                       isDebtGoal = value;
-                      if (value) goalType = 'Debt Payoff';
+                      if (value) category = 'Debt Payoff';
                     }),
                   ),
                   if (isDebtGoal) ...[
@@ -1603,42 +1126,41 @@ Future<void> _showGoalEditor(
                           label: Text(item),
                           selected: payoffStrategy == item,
                           onSelected: (_) =>
-                              setModalState(() => payoffStrategy = item),
+                              setSheetState(() => payoffStrategy = item),
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 12),
-                    InkWell(
+                    _PickerTile(
+                      icon: Icons.notifications_active_rounded,
+                      label: 'Reminder',
+                      value: reminderDate == null
+                          ? 'Not set'
+                          : DateFormat('MMM dd, yyyy').format(reminderDate!),
                       onTap: () async {
                         final picked = await showDatePicker(
-                          context: context,
-                          initialDate: reminderDate ?? DateTime.now(),
-                          firstDate: DateTime.now(),
+                          context: sheetContext,
+                          initialDate: reminderDate ?? firstDate,
+                          firstDate: firstDate,
                           lastDate: DateTime(2100),
                         );
                         if (picked != null) {
-                          setModalState(() => reminderDate = picked);
+                          setSheetState(() => reminderDate = picked);
                         }
                       },
-                      child: _PickerBox(
-                        label: reminderDate == null
-                            ? 'Add debt payment reminder'
-                            : 'Reminder ${DateFormat('MMM dd, yyyy').format(reminderDate!)}',
-                      ),
                     ),
                   ],
-                  if (allocationWarning || budgetWarning) ...[
+                  if (allocationWarning) ...[
                     const SizedBox(height: 12),
-                    _ValidationBanner(
-                      message: allocationWarning
-                          ? 'Savings cannot be over-allocated. Reduce current allocation or add savings first.'
-                          : 'Monthly target is above remaining budget. Adjust budget or choose a later date.',
+                    const _NoticeBanner(
+                      message:
+                          'This allocation is higher than the available savings pool.',
                     ),
                   ],
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: invalid
                           ? null
                           : () async {
@@ -1653,414 +1175,450 @@ Future<void> _showGoalEditor(
                                 if (existingGoal == null) {
                                   await firestoreService.addSavingGoal(goal);
                                 } else {
+                                  final data = goal.toMap();
+                                  if (reminderDate == null) {
+                                    data['reminderDate'] = null;
+                                  }
                                   await firestoreService.updateSavingGoal(
                                     existingGoal.id,
-                                    goal.toMap(),
+                                    data,
                                   );
                                 }
-                                if (context.mounted) Navigator.pop(context);
+                                if (sheetContext.mounted) {
+                                  Navigator.pop(sheetContext);
+                                }
                               } on FinanceValidationException catch (error) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(error.message),
-                                      backgroundColor: const Color(0xFFBA1A1A),
-                                    ),
+                                if (sheetContext.mounted) {
+                                  _showSnack(
+                                    sheetContext,
+                                    error.message,
+                                    isError: true,
                                   );
                                 }
                               }
                             },
-                      child: Text(
-                        existingGoal == null
-                            ? 'Save Journey'
-                            : 'Update Journey',
+                      icon: const Icon(Icons.check_rounded),
+                      label: Text(
+                        existingGoal == null ? 'Save goal' : 'Update goal',
                       ),
                     ),
                   ),
                 ],
               ),
+            );
+          },
+        );
+      },
+    );
+  } finally {
+    titleController.dispose();
+    targetController.dispose();
+    currentController.dispose();
+  }
+}
+
+Future<void> _showContributionSheet(
+  BuildContext context,
+  FirestoreService firestoreService,
+  SavingGoal goal,
+  _SavingsSummary summary,
+) async {
+  final controller = TextEditingController();
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _BottomSheetFrame(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SheetHandle(),
+              Text(
+                'Add money',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimaryFor(sheetContext),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                goal.title,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(sheetContext),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _SheetHint(
+                leading: 'Available',
+                value: CurrencyUtils.format(summary.unallocated),
+              ),
+              const SizedBox(height: 14),
+              _ContributionQuickAmounts(
+                goal: goal,
+                available: summary.unallocated,
+                onSelected: (amount) {
+                  controller.text = CurrencyUtils.exact(amount);
+                  controller.selection = TextSelection.collapsed(
+                    offset: controller.text.length,
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+              _SheetField(
+                controller: controller,
+                label: 'Amount',
+                icon: Icons.add_card_rounded,
+                isNumber: true,
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final amount =
+                          double.tryParse(controller.text.trim()) ?? 0;
+                      await firestoreService.addContribution(goal.id, amount);
+                      if (!sheetContext.mounted) return;
+                      Navigator.pop(sheetContext);
+                      _showSnack(sheetContext, 'Money added to ${goal.title}');
+                    } on FinanceValidationException catch (error) {
+                      if (sheetContext.mounted) {
+                        _showSnack(sheetContext, error.message, isError: true);
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Add contribution'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  } finally {
+    controller.dispose();
+  }
+}
+
+void _showGoalDetailSheet(
+  BuildContext context, {
+  required FirestoreService firestoreService,
+  required SavingGoal goal,
+  required _SavingsSummary summary,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) {
+      return _BottomSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SheetHandle(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _GoalIcon(goal: goal),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        goal.title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimaryFor(sheetContext),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _goalSubtitle(goal),
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textSecondaryFor(sheetContext),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          );
-        },
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _SmallStat(
+                    label: 'Remaining',
+                    value: CurrencyUtils.format(goal.remaining),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SmallStat(
+                    label: 'Each month',
+                    value: CurrencyUtils.format(goal.monthlyTarget),
+                  ),
+                ),
+              ],
+            ),
+            if (goal.isDebtGoal) ...[
+              const SizedBox(height: 10),
+              _SheetHint(leading: 'Payoff plan', value: goal.payoffStrategy),
+            ],
+            const SizedBox(height: 18),
+            Text(
+              'Recent contributions',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimaryFor(sheetContext),
+              ),
+            ),
+            const SizedBox(height: 10),
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: firestoreService.getContributions(goal.id),
+              builder: (context, snapshot) {
+                final contributions =
+                    snapshot.data ?? const <Map<String, dynamic>>[];
+                if (contributions.isEmpty) {
+                  return Text(
+                    'No contributions yet.',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondaryFor(sheetContext),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  );
+                }
+                return Column(
+                  children: contributions.take(3).map((item) {
+                    final amount = (item['amount'] as num).toDouble();
+                    final date = item['date'] as DateTime;
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.savings_rounded),
+                      title: Text(CurrencyUtils.format(amount)),
+                      subtitle: Text(DateFormat('MMM dd, yyyy').format(date)),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: goal.remaining <= 0
+                        ? null
+                        : () {
+                            Navigator.pop(sheetContext);
+                            _showContributionSheet(
+                              context,
+                              firestoreService,
+                              goal,
+                              summary,
+                            );
+                          },
+                    icon: const Icon(Icons.add_card_rounded),
+                    label: const Text('Add money'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IconButton.outlined(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _showGoalEditor(
+                      context,
+                      firestoreService: firestoreService,
+                      summary: summary,
+                      existingGoal: goal,
+                    );
+                  },
+                  icon: const Icon(Icons.edit_rounded),
+                  tooltip: 'Edit goal',
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     },
   );
 }
 
-Future<void> _showContributionDialog(
-  BuildContext context,
-  FirestoreService firestoreService,
-  SavingGoal goal,
-  _SavingsAnalytics analytics,
-) async {
-  final controller = TextEditingController();
-  await showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text('Add contribution to ${goal.title}'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Unallocated savings available: ${CurrencyUtils.format(analytics.unallocatedSavings)}',
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Amount in PKR'),
-          ),
-        ],
+class _BottomSheetFrame extends StatelessWidget {
+  const _BottomSheetFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            try {
-              final amount = double.tryParse(controller.text.trim()) ?? 0;
-              await firestoreService.addContribution(goal.id, amount);
-              if (context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      goal.currentAmount + amount >= goal.targetAmount
-                          ? 'Milestone celebrated'
-                          : 'Contribution added to journey',
-                    ),
-                    backgroundColor: const Color(0xFF059669),
-                  ),
-                );
-              }
-            } on FinanceValidationException catch (error) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(error.message),
-                    backgroundColor: const Color(0xFFBA1A1A),
-                  ),
-                );
-              }
-            }
-          },
-          child: const Text('Add'),
-        ),
-      ],
-    ),
-  );
-}
-
-void _showWhatIfSheet(
-  BuildContext context, {
-  required _SavingsAnalytics analytics,
-}) {
-  final incomeCtrl = TextEditingController();
-  final expenseCtrl = TextEditingController();
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setModalState) {
-        final extraIncome = double.tryParse(incomeCtrl.text.trim()) ?? 0;
-        final extraExpense = double.tryParse(expenseCtrl.text.trim()) ?? 0;
-        final futureIncome = analytics.monthlyIncome + extraIncome;
-        final futureBudget =
-            (analytics.remainingBudget + extraIncome - extraExpense)
-                .clamp(0, double.infinity)
-                .toDouble();
-        final futureRate = futureIncome <= 0
-            ? 0.0
-            : (analytics.monthlyNeed / futureIncome) * 100;
-        return Container(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            20,
-            24,
-            MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceFor(context),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'What If Simulation',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _field(
-                  incomeCtrl,
-                  'Income increase',
-                  isNumber: true,
-                  onChanged: () => setModalState(() {}),
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  expenseCtrl,
-                  'Extra expense',
-                  isNumber: true,
-                  onChanged: () => setModalState(() {}),
-                ),
-                const SizedBox(height: 16),
-                _SheetMetricPanel(
-                  income: futureIncome,
-                  remainingBudget: futureBudget,
-                  monthlyTarget: analytics.monthlyNeed,
-                  savingsRate: futureRate,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    ),
-  );
-}
-
-void _showTimelineSheet(
-  BuildContext context, {
-  required _SavingsAnalytics analytics,
-}) {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent,
-    builder: (context) => Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
       decoration: BoxDecoration(
         color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: SingleChildScrollView(child: child),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 42,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 18),
+        decoration: BoxDecoration(
+          color: AppTheme.borderFor(context),
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetField extends StatelessWidget {
+  const _SheetField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.isNumber = false,
+    this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final bool isNumber;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: isNumber
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.text,
+      onChanged: onChanged,
+      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+    );
+  }
+}
+
+class _PickerTile extends StatelessWidget {
+  const _PickerTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceFor(context),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.borderFor(context)),
+        ),
+        child: Row(
           children: [
-            Text(
-              'Financial Timeline',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (analytics.goals.isEmpty)
-              Text(
-                'Create journeys to see projected milestones.',
-                style: GoogleFonts.inter(
-                  color: AppTheme.textSecondaryFor(context),
-                ),
-              )
-            else
-              ...analytics.goals
-                  .take(6)
-                  .map(
-                    (goal) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _SignalRow(
-                        icon: goal.isDebtGoal
-                            ? Icons.credit_card_rounded
-                            : Icons.flag_rounded,
-                        title: goal.title,
-                        value: DateFormat('MMM yyyy').format(goal.targetDate),
-                        body:
-                            '${CurrencyUtils.format(goal.remaining)} remaining, ${CurrencyUtils.format(goal.monthlyTarget)} monthly target.',
-                      ),
+            Icon(icon, color: AppTheme.primaryFor(context)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondaryFor(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimaryFor(context),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),
-    ),
-  );
-}
-
-Widget _field(
-  TextEditingController controller,
-  String label, {
-  bool isNumber = false,
-  VoidCallback? onChanged,
-}) {
-  return TextField(
-    controller: controller,
-    keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-    onChanged: (_) => onChanged?.call(),
-    decoration: InputDecoration(labelText: label),
-  );
-}
-
-class _PickerBox extends StatelessWidget {
-  const _PickerBox({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.calendar_month_rounded, color: AppTheme.primary, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-class _SheetMetricPanel extends StatelessWidget {
-  const _SheetMetricPanel({
-    required this.income,
-    required this.remainingBudget,
-    required this.monthlyTarget,
-    this.savingsRate,
-  });
+class _SheetHint extends StatelessWidget {
+  const _SheetHint({required this.leading, required this.value});
 
-  final double income;
-  final double remainingBudget;
-  final double monthlyTarget;
-  final double? savingsRate;
-
-  @override
-  Widget build(BuildContext context) {
-    final rate =
-        savingsRate ?? (income <= 0 ? 0 : (monthlyTarget / income) * 100);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Column(
-        children: [
-          _metric(context, 'Income', CurrencyUtils.format(income)),
-          _metric(
-            context,
-            'Remaining budget',
-            CurrencyUtils.format(remainingBudget),
-          ),
-          _metric(
-            context,
-            'Monthly target',
-            CurrencyUtils.format(monthlyTarget),
-          ),
-          _metric(context, 'Savings rate', '${rate.toStringAsFixed(0)}%'),
-        ],
-      ),
-    );
-  }
-
-  Widget _metric(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondaryFor(context),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              color: AppTheme.primary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ValidationBanner extends StatelessWidget {
-  const _ValidationBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.isDark(context)
-            ? AppTheme.error.withValues(alpha: 0.14)
-            : const Color(0xFFFFF1F2),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.error.withValues(alpha: 0.28)),
-      ),
-      child: Text(
-        message,
-        style: GoogleFonts.inter(
-          color: const Color(0xFFBE123C),
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryPill extends StatelessWidget {
-  const _SummaryPill({required this.label, required this.value});
-
-  final String label;
+  final String leading;
   final String value;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.surfaceCardFor(context),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 12,
+          Expanded(
+            child: Text(
+              leading,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondaryFor(context),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const SizedBox(height: 6),
           Text(
             value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
+              color: AppTheme.textPrimaryFor(context),
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -2068,4 +1626,104 @@ class _SummaryPill extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ContributionQuickAmounts extends StatelessWidget {
+  const _ContributionQuickAmounts({
+    required this.goal,
+    required this.available,
+    required this.onSelected,
+  });
+
+  final SavingGoal goal;
+  final double available;
+  final ValueChanged<double> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final rawValues = <double>[
+      if (goal.monthlyTarget > 0) goal.monthlyTarget,
+      if (goal.remaining > 0) goal.remaining,
+      if (available > 0) available,
+    ];
+    final values = <double>[];
+    for (final raw in rawValues) {
+      final value = raw.clamp(0, goal.remaining).toDouble();
+      final isDuplicate = values.any(
+        (existing) => (existing - value).abs() < 0.01,
+      );
+      if (value > 0 && !isDuplicate) values.add(value);
+    }
+
+    if (values.isEmpty) return const SizedBox.shrink();
+
+    String labelFor(double amount) {
+      if ((amount - goal.monthlyTarget).abs() < 0.01) return 'Monthly';
+      if ((amount - goal.remaining).abs() < 0.01) return 'Finish';
+      return 'Pool left';
+    }
+
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final amount = values[index];
+          return ActionChip(
+            avatar: const Icon(Icons.flash_on_rounded, size: 15),
+            label: Text('${labelFor(amount)} ${CurrencyUtils.format(amount)}'),
+            onPressed: () => onSelected(amount),
+            labelStyle: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+            visualDensity: VisualDensity.compact,
+          );
+        },
+      ),
+    );
+  }
+}
+
+List<SavingGoal> _sortGoals(List<SavingGoal> goals) {
+  return [...goals]..sort((a, b) {
+    final aDone = a.remaining <= 0;
+    final bDone = b.remaining <= 0;
+    if (aDone != bDone) return aDone ? 1 : -1;
+    return a.targetDate.compareTo(b.targetDate);
+  });
+}
+
+String _goalSubtitle(SavingGoal goal) {
+  if (goal.remaining <= 0) return 'Completed';
+  if (goal.daysLeft < 0) return 'Past target date';
+  if (goal.daysLeft == 0) return 'Due today';
+  return '${goal.daysLeft} days left';
+}
+
+IconData _categoryIcon(String category) {
+  final key = category.toLowerCase();
+  if (key.contains('education')) return Icons.school_rounded;
+  if (key.contains('house')) return Icons.home_rounded;
+  if (key.contains('vehicle')) return Icons.directions_car_rounded;
+  if (key.contains('vacation')) return Icons.flight_takeoff_rounded;
+  if (key.contains('investment')) return Icons.trending_up_rounded;
+  if (key.contains('emergency')) return Icons.health_and_safety_rounded;
+  return Icons.savings_rounded;
+}
+
+String _monthKey(DateTime date) {
+  return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+}
+
+void _showSnack(BuildContext context, String message, {bool isError = false}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: isError ? AppTheme.error : AppTheme.success,
+    ),
+  );
 }

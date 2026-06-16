@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -16,7 +15,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
 import '../../utils/finance_consistency_utils.dart';
 
-enum _PeriodMode { daily, weekly, monthly, yearly }
+enum _PeriodMode { monthly, weekly, daily, yearly }
 
 class AIBudgetAdvisorPage extends StatefulWidget {
   const AIBudgetAdvisorPage({super.key});
@@ -35,206 +34,221 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
     final firestoreService = context.watch<AuthService>().firestoreService;
 
     if (firestoreService == null) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final period = _BudgetPeriod.from(_periodMode, _anchorDate);
     _scheduleCarryForward(context, firestoreService, period);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: StreamBuilder<List<FinancialTransaction>>(
-        stream: firestoreService.getTransactions(),
-        builder: (context, transactionSnapshot) {
-          final transactions =
-              transactionSnapshot.data ?? const <FinancialTransaction>[];
-          final periodTransactions = transactions
-              .where((txn) => period.contains(txn.date))
-              .toList();
+      backgroundColor: AppTheme.backgroundFor(context),
+      body: SafeArea(
+        child: StreamBuilder<List<FinancialTransaction>>(
+          stream: firestoreService.getTransactions(),
+          builder: (context, transactionSnapshot) {
+            final transactions =
+                transactionSnapshot.data ?? const <FinancialTransaction>[];
+            final periodTransactions = transactions
+                .where((transaction) => period.contains(transaction.date))
+                .toList();
 
-          return StreamBuilder<List<SavingGoal>>(
-            stream: firestoreService.getSavingGoals(),
-            builder: (context, goalsSnapshot) {
-              final goals = goalsSnapshot.data ?? const <SavingGoal>[];
+            return StreamBuilder<Map<String, dynamic>>(
+              stream: firestoreService.getUserProfile(),
+              builder: (context, profileSnapshot) {
+                final profile = profileSnapshot.data ?? const {};
 
-              return StreamBuilder<Map<String, dynamic>>(
-                stream: firestoreService.getUserProfile(),
-                builder: (context, profileSnapshot) {
-                  final profile = profileSnapshot.data ?? const {};
+                return StreamBuilder<List<BudgetPlan>>(
+                  stream: firestoreService.getBudgetPlans(monthKey: period.key),
+                  builder: (context, budgetSnapshot) {
+                    final budgets = budgetSnapshot.data ?? const <BudgetPlan>[];
 
-                  return StreamBuilder<List<BudgetPlan>>(
-                    stream: firestoreService.getBudgetPlans(
-                      monthKey: period.key,
-                    ),
-                    builder: (context, budgetSnapshot) {
-                      final budgets =
-                          budgetSnapshot.data ?? const <BudgetPlan>[];
-                      final analytics = _BudgetAnalytics.from(
-                        budgets: budgets,
-                        periodTransactions: periodTransactions,
-                        allTransactions: transactions,
-                        goals: goals,
-                        profile: profile,
-                        period: period,
-                      );
+                    return StreamBuilder<List<SavingGoal>>(
+                      stream: firestoreService.getSavingGoals(),
+                      builder: (context, goalSnapshot) {
+                        final goals = goalSnapshot.data ?? const <SavingGoal>[];
+                        final analytics = _BudgetAnalytics.from(
+                          budgets: budgets,
+                          periodTransactions: periodTransactions,
+                          allTransactions: transactions,
+                          goals: goals,
+                          profile: profile,
+                          period: period,
+                        );
 
-                      return SafeArea(
-                        child: CustomScrollView(
+                        if (budgetSnapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            !budgetSnapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        return ListView(
                           physics: const BouncingScrollPhysics(),
-                          slivers: [
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  20,
-                                  20,
-                                  20,
-                                  0,
-                                ),
-                                child: _BudgetHeader(
-                                  period: period,
-                                  mode: _periodMode,
-                                  onBack: () => Navigator.pop(context),
-                                  onPrevious: () => setState(
-                                    () => _anchorDate = period.shift(
-                                      _periodMode,
-                                      -1,
-                                    ),
-                                  ),
-                                  onNext: () => setState(
-                                    () => _anchorDate = period.shift(
-                                      _periodMode,
-                                      1,
-                                    ),
-                                  ),
-                                  onModeChanged: (mode) => setState(() {
-                                    _periodMode = mode;
-                                    _anchorDate = DateTime.now();
-                                  }),
-                                ),
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+                          children: [
+                            _BudgetHeader(
+                              period: period,
+                              mode: _periodMode,
+                              onPrevious: () => setState(
+                                () =>
+                                    _anchorDate = period.shift(_periodMode, -1),
+                              ),
+                              onNext: () => setState(
+                                () =>
+                                    _anchorDate = period.shift(_periodMode, 1),
+                              ),
+                              onModeChanged: (mode) => setState(() {
+                                _periodMode = mode;
+                                _anchorDate = DateTime.now();
+                              }),
+                            ),
+                            const SizedBox(height: 16),
+                            _BudgetStatusCard(
+                              analytics: analytics,
+                              onEdit: () => _showBudgetEditor(
+                                context,
+                                firestoreService,
+                                analytics: analytics,
+                                budgets: budgets,
+                              ),
+                              onAutoBudget: () => _showAutoBudgetPreview(
+                                context,
+                                firestoreService,
+                                analytics: analytics,
+                                budgets: budgets,
+                              ),
+                              onUseSavings: analytics.isOverBudget
+                                  ? () => _confirmSavingsPull(
+                                      context,
+                                      firestoreService,
+                                      analytics,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            _BudgetSnapshotRow(analytics: analytics),
+                            if (analytics.warning != null) ...[
+                              const SizedBox(height: 12),
+                              _NoticeBanner(message: analytics.warning!),
+                            ],
+                            const SizedBox(height: 16),
+                            _BudgetActions(
+                              onEdit: () => _showBudgetEditor(
+                                context,
+                                firestoreService,
+                                analytics: analytics,
+                                budgets: budgets,
+                              ),
+                              onAutoBudget: () => _showAutoBudgetPreview(
+                                context,
+                                firestoreService,
+                                analytics: analytics,
+                                budgets: budgets,
                               ),
                             ),
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(
-                                20,
-                                20,
-                                20,
-                                120,
-                              ),
-                              sliver: SliverList(
-                                delegate: SliverChildListDelegate([
-                                  _OverviewCard(analytics: analytics),
-                                  const SizedBox(height: 14),
-                                  if (analytics.isOverBudget)
-                                    _BudgetWarningCard(
-                                      analytics: analytics,
-                                      onAdjust: () => _showBudgetEditor(
-                                        context,
-                                        firestoreService,
-                                        analytics: analytics,
-                                        budgets: budgets,
-                                      ),
-                                      onUseSavings: () => _confirmSavingsPull(
-                                        context,
-                                        firestoreService,
-                                        analytics,
-                                      ),
-                                    ),
-                                  if (analytics.isOverBudget)
-                                    const SizedBox(height: 14),
-                                  _NarrativeCard(analytics: analytics),
-                                  const SizedBox(height: 24),
-                                  _QuickActions(
-                                    onAddCategory: () => _showBudgetEditor(
+                            const SizedBox(height: 22),
+                            _SectionTitle(
+                              title: 'Categories',
+                              trailing: '${budgets.length} planned',
+                            ),
+                            const SizedBox(height: 12),
+                            if (budgets.isEmpty)
+                              _EmptyBudgetState(
+                                onCreate: () => _showBudgetEditor(
+                                  context,
+                                  firestoreService,
+                                  analytics: analytics,
+                                  budgets: budgets,
+                                ),
+                                onAutoBudget: () => _showAutoBudgetPreview(
+                                  context,
+                                  firestoreService,
+                                  analytics: analytics,
+                                  budgets: budgets,
+                                ),
+                              )
+                            else
+                              ..._sortBudgets(budgets, analytics).map(
+                                (budget) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _BudgetCategoryCard(
+                                    budget: budget,
+                                    analytics: analytics,
+                                    onEdit: () => _showBudgetEditor(
                                       context,
                                       firestoreService,
                                       analytics: analytics,
                                       budgets: budgets,
                                     ),
-                                    onEditBudget: () => _showBudgetEditor(
-                                      context,
-                                      firestoreService,
-                                      analytics: analytics,
-                                      budgets: budgets,
-                                    ),
-                                    onAutoBudget: () => _showAutoBudgetPreview(
-                                      context,
-                                      firestoreService,
-                                      analytics: analytics,
-                                      budgets: budgets,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  _SectionTitle(
-                                    title: '${period.modeLabel} Budget Plans',
-                                  ),
-                                  const SizedBox(height: 14),
-                                  if (budgets.isEmpty)
-                                    _EmptyBudgetState(
-                                      onCreate: () => _showBudgetEditor(
-                                        context,
-                                        firestoreService,
-                                        analytics: analytics,
-                                        budgets: budgets,
-                                      ),
-                                    )
-                                  else
-                                    ...budgets.map(
-                                      (budget) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        child: _BudgetPlanCard(
-                                          budget: budget,
-                                          analytics: analytics,
-                                          onEdit: () => _showBudgetEditor(
+                                    onUseSavings:
+                                        analytics.isCategoryOverBudget(
+                                          budget.category,
+                                        )
+                                        ? () => _confirmSavingsPull(
                                             context,
                                             firestoreService,
-                                            analytics: analytics,
-                                            budgets: budgets,
-                                          ),
-                                          onUseSavings:
-                                              analytics.isCategoryOverBudget(
-                                                budget.category,
-                                              )
-                                              ? () => _confirmSavingsPull(
-                                                  context,
-                                                  firestoreService,
-                                                  analytics,
-                                                  category: budget.category,
-                                                )
-                                              : null,
-                                          onDelete: () => firestoreService
-                                              .deleteBudgetPlan(budget.id),
-                                        ),
-                                      ),
+                                            analytics,
+                                            category: budget.category,
+                                          )
+                                        : null,
+                                    onDelete: () => _confirmDeleteBudget(
+                                      context,
+                                      firestoreService,
+                                      budget,
                                     ),
-                                  const SizedBox(height: 24),
-                                  const _SectionTitle(title: 'Category Rings'),
-                                  const SizedBox(height: 14),
-                                  _CategoryRings(analytics: analytics),
-                                  const SizedBox(height: 24),
-                                  const _SectionTitle(
-                                    title: 'Savings & Goal Alignment',
                                   ),
-                                  const SizedBox(height: 14),
-                                  _GoalAlignmentPanel(analytics: analytics),
-                                  const SizedBox(height: 24),
-                                  const _SectionTitle(title: 'Budget Brain'),
-                                  const SizedBox(height: 14),
-                                  _BrainSignals(analytics: analytics),
-                                ]),
+                                ),
                               ),
+                            const SizedBox(height: 22),
+                            _SectionTitle(
+                              title: 'This period',
+                              trailing: '${periodTransactions.length} txns',
                             ),
+                            const SizedBox(height: 12),
+                            _PeriodDetailsCard(analytics: analytics),
                           ],
-                        ),
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        child: ElevatedButton.icon(
+          onPressed: () async {
+            final budgets = await firestoreService
+                .getBudgetPlans(monthKey: period.key)
+                .first;
+            final transactions = await firestoreService.getTransactions().first;
+            final profile = await firestoreService.getUserProfile().first;
+            final goals = await firestoreService.getSavingGoals().first;
+            final analytics = _BudgetAnalytics.from(
+              budgets: budgets,
+              periodTransactions: transactions
+                  .where((transaction) => period.contains(transaction.date))
+                  .toList(),
+              allTransactions: transactions,
+              goals: goals,
+              profile: profile,
+              period: period,
+            );
+            if (!context.mounted) return;
+            _showBudgetEditor(
+              context,
+              firestoreService,
+              analytics: analytics,
+              budgets: budgets,
+            );
+          },
+          icon: const Icon(Icons.tune_rounded),
+          label: const Text('Edit budget'),
+        ),
       ),
     );
   }
@@ -255,9 +269,9 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
       final approved = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Move leftover budget to Savings?'),
+          title: const Text('Move leftover to savings?'),
           content: Text(
-            '${CurrencyUtils.format(leftover)} is left from ${period.label}. Move it to Savings now?',
+            '${CurrencyUtils.format(leftover)} is left from ${period.label}.',
           ),
           actions: [
             TextButton(
@@ -266,7 +280,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Move to Savings'),
+              child: const Text('Move'),
             ),
           ],
         ),
@@ -290,57 +304,72 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
         ? analytics.overBudgetAmount
         : analytics.categoryOverage(category);
     if (amount <= 0) return;
+
     final approved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Use Savings for budget?'),
+        title: const Text('Use savings?'),
         content: Text(
-          'Expenses are over budget by ${CurrencyUtils.format(amount)}. Pull this amount from Savings to support the ${analytics.period.modeLabel.toLowerCase()} budget?',
+          'Move ${CurrencyUtils.format(amount)} from savings to cover this budget pressure?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('No'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Yes'),
+            child: const Text('Use savings'),
           ),
         ],
       ),
     );
-    if (approved != true || !mounted) return;
+
+    if (approved != true) return;
     try {
       await firestoreService.pullSavingsForBudgetOverage(
         amount: amount,
         periodType: analytics.period.modeName,
         periodKey: analytics.period.key,
         reason: category == null
-            ? 'Budget overage support for ${analytics.period.label}'
-            : '$category overage support for ${analytics.period.label}',
+            ? 'Budget support for ${analytics.period.label}'
+            : '$category support for ${analytics.period.label}',
       );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Savings support transfer recorded'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
+      if (!context.mounted) return;
+      _showSnack(context, 'Savings support recorded');
     } on FinanceValidationException catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error.message),
-            backgroundColor: const Color(0xFFBA1A1A),
-          ),
-        );
-      }
+      if (!context.mounted) return;
+      _showSnack(context, error.message, isError: true);
     }
+  }
+
+  Future<void> _confirmDeleteBudget(
+    BuildContext context,
+    FirestoreService firestoreService,
+    BudgetPlan budget,
+  ) async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete category?'),
+        content: Text('Remove the ${budget.category} budget?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true) return;
+    await firestoreService.deleteBudgetPlan(budget.id);
+    if (!context.mounted) return;
+    _showSnack(context, '${budget.category} budget deleted');
   }
 
   void _showBudgetEditor(
@@ -349,11 +378,11 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
     required _BudgetAnalytics analytics,
     required List<BudgetPlan> budgets,
   }) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _CategoryBudgetManagerSheet(
+      builder: (context) => _BudgetEditorSheet(
         firestoreService: firestoreService,
         budgets: budgets,
         analytics: analytics,
@@ -368,11 +397,11 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
     required List<BudgetPlan> budgets,
   }) {
     final suggestions = _AutoBudgetGenerator.generate(analytics);
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _AutoBudgetPreviewSheet(
+      builder: (context) => _AutoBudgetSheet(
         suggestions: suggestions,
         analytics: analytics,
         onApply: () async {
@@ -383,31 +412,15 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
               budgets,
               suggestions,
             );
-            if (context.mounted) {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Suggested budget applied.')),
-              );
-            }
+            if (!context.mounted) return;
+            Navigator.pop(context);
+            _showSnack(context, 'Suggested budget applied');
           } on FinanceValidationException catch (error) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(error.message),
-                  backgroundColor: AppTheme.error,
-                ),
-              );
-            }
+            if (!context.mounted) return;
+            _showSnack(context, error.message, isError: true);
           } catch (_) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Could not apply the suggested budget. Please try again.',
-                  ),
-                ),
-              );
-            }
+            if (!context.mounted) return;
+            _showSnack(context, 'Could not apply budget', isError: true);
           }
         },
       ),
@@ -424,30 +437,32 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
       0,
       (total, suggestion) => total + suggestion.amount,
     );
-    if (total > analytics.projectedIncome) {
+    if (analytics.projectedIncome > 0 && total > analytics.projectedIncome) {
       throw FinanceValidationException(
-        'Suggested budget total cannot exceed projected income.',
+        'Budget total cannot exceed projected income.',
       );
     }
+
     final existingByCategory = {
       for (final budget in budgets) budget.category: budget,
     };
     final suggestedCategories = {
       for (final suggestion in suggestions) suggestion.category,
     };
+
     for (final existing in budgets.where(
       (budget) => !suggestedCategories.contains(budget.category),
     )) {
       await firestoreService.deleteBudgetPlan(existing.id);
     }
+
     final ordered = [...suggestions]
       ..sort((a, b) {
         final oldA = existingByCategory[a.category]?.allocatedAmount ?? 0;
         final oldB = existingByCategory[b.category]?.allocatedAmount ?? 0;
-        final deltaA = a.amount - oldA;
-        final deltaB = b.amount - oldB;
-        return deltaA.compareTo(deltaB);
+        return (a.amount - oldA).compareTo(b.amount - oldB);
       });
+
     for (final suggestion in ordered) {
       final existing = existingByCategory[suggestion.category];
       final budget = BudgetPlan(
@@ -460,7 +475,7 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
         periodKey: analytics.period.key,
         periodType: analytics.period.modeName,
         createdAt: DateTime.now(),
-        allocationMode: 'ai',
+        allocationMode: 'auto',
         isDebtPayment: existing?.isDebtPayment ?? false,
         reminderDate: existing?.reminderDate,
       );
@@ -541,9 +556,23 @@ class _BudgetPeriod {
     }
   }
 
-  bool contains(DateTime date) {
-    return !date.isBefore(start) && date.isBefore(end);
-  }
+  bool contains(DateTime date) => !date.isBefore(start) && date.isBefore(end);
+
+  bool get isClosed => end.isBefore(DateTime.now());
+
+  String get modeName => switch (mode) {
+    _PeriodMode.daily => 'daily',
+    _PeriodMode.weekly => 'weekly',
+    _PeriodMode.monthly => 'monthly',
+    _PeriodMode.yearly => 'yearly',
+  };
+
+  String get modeLabel => switch (mode) {
+    _PeriodMode.daily => 'Daily',
+    _PeriodMode.weekly => 'Weekly',
+    _PeriodMode.monthly => 'Monthly',
+    _PeriodMode.yearly => 'Yearly',
+  };
 
   DateTime shift(_PeriodMode mode, int step) {
     switch (mode) {
@@ -557,14 +586,10 @@ class _BudgetPeriod {
         return DateTime(start.year + step);
     }
   }
-
-  bool get isClosed => DateTime.now().isAfter(end);
-  String get modeName => mode.name;
-  String get modeLabel => mode.name[0].toUpperCase() + mode.name.substring(1);
 }
 
 class _BudgetAnalytics {
-  _BudgetAnalytics({
+  const _BudgetAnalytics({
     required this.budgets,
     required this.periodTransactions,
     required this.allTransactions,
@@ -597,12 +622,11 @@ class _BudgetAnalytics {
     required _BudgetPeriod period,
   }) {
     final periodIncome = periodTransactions
-        .where((txn) => txn.type == 'income')
-        .fold<double>(0, (total, txn) => total + txn.amount);
-    final monthlyProfileIncome = ((profile['monthlyIncome'] ?? 0) as num)
-        .toDouble();
+        .where((transaction) => transaction.type == 'income')
+        .fold<double>(0, (total, transaction) => total + transaction.amount);
+    final profileIncome = ((profile['monthlyIncome'] ?? 0) as num).toDouble();
     final projectedIncome = FinanceConsistencyUtils.resolvePeriodIncome(
-      profileMonthlyIncome: monthlyProfileIncome,
+      profileMonthlyIncome: profileIncome,
       transactionIncome: periodIncome,
       periodType: period.modeName,
     );
@@ -611,18 +635,22 @@ class _BudgetAnalytics {
       (total, budget) => total + budget.allocatedAmount,
     );
     final totalSpent = periodTransactions
-        .where((txn) => txn.type == 'expense')
-        .fold<double>(0, (total, txn) => total + txn.amount);
+        .where((transaction) => transaction.type == 'expense')
+        .fold<double>(0, (total, transaction) => total + transaction.amount);
     final categorySpend = <String, double>{};
-    for (final txn in periodTransactions.where(
-      (txn) => txn.type == 'expense',
+    for (final transaction in periodTransactions.where(
+      (transaction) => transaction.type == 'expense',
     )) {
-      categorySpend[txn.category] =
-          (categorySpend[txn.category] ?? 0) + txn.amount;
+      final category = transaction.linkedBudgetCategory?.isNotEmpty == true
+          ? transaction.linkedBudgetCategory!
+          : transaction.category;
+      categorySpend[category] =
+          (categorySpend[category] ?? 0) + transaction.amount;
     }
     final profileSavings =
         ((profile['savingsBalance'] ?? 0) as num).toDouble() +
         ((profile['extraSavingsBalance'] ?? 0) as num).toDouble();
+
     return _BudgetAnalytics(
       budgets: budgets,
       periodTransactions: periodTransactions,
@@ -639,35 +667,24 @@ class _BudgetAnalytics {
 
   double get remainingBudget =>
       (totalBudgeted - totalSpent).clamp(0, double.infinity).toDouble();
-  double get availableToPlan =>
-      (projectedIncome - totalBudgeted).clamp(0, double.infinity).toDouble();
   double get overBudgetAmount =>
       (totalSpent - totalBudgeted).clamp(0, double.infinity).toDouble();
-  bool get isOverBudget => overBudgetAmount > 0;
+  double get availableToPlan =>
+      (projectedIncome - totalBudgeted).clamp(0, double.infinity).toDouble();
+  double get unplannedSpending => categorySpend.entries
+      .where((entry) => allocatedForCategory(entry.key) <= 0)
+      .fold<double>(0, (total, entry) => total + entry.value);
   double get spendingRatio =>
-      totalBudgeted == 0 ? 0 : (totalSpent / totalBudgeted).clamp(0.0, 2.0);
-  double get planRatio => projectedIncome == 0
+      totalBudgeted <= 0 ? 0 : (totalSpent / totalBudgeted).clamp(0.0, 2.0);
+  double get planRatio => projectedIncome <= 0
       ? 0
       : (totalBudgeted / projectedIncome).clamp(0.0, 2.0);
-  double get savingsRate {
-    if (projectedIncome <= 0) return 0;
-    final saved = projectedIncome - totalSpent;
-    return ((saved > 0 ? saved : 0) / projectedIncome) * 100;
-  }
-
-  int get healthScore {
-    var score = 100;
-    if (projectedIncome > 0) {
-      score -= ((totalSpent / projectedIncome).clamp(0.0, 1.4) * 32).round();
-      score -= ((totalBudgeted / projectedIncome).clamp(0.0, 1.2) * 18).round();
-    } else if (totalSpent > 0 || totalBudgeted > 0) {
-      score -= 42;
-    }
-    if (isOverBudget) score -= 18;
-    if (goals.where((goal) => goal.remaining > 0).isEmpty) score -= 6;
-    if (profileSavings <= 0) score -= 8;
-    return score.clamp(0, 100);
-  }
+  bool get isOverBudget => overBudgetAmount > 0;
+  bool get isOverPlanned =>
+      projectedIncome > 0 && totalBudgeted > projectedIncome + 0.01;
+  int get overCategoryCount =>
+      budgets.where((budget) => isCategoryOverBudget(budget.category)).length;
+  int get activeGoalCount => goals.where((goal) => goal.remaining > 0).length;
 
   double spentForCategory(String category) => categorySpend[category] ?? 0;
 
@@ -683,43 +700,94 @@ class _BudgetAnalytics {
   bool isCategoryOverBudget(String category) => categoryOverage(category) > 0;
 
   double get goalPressure {
-    if (goals.isEmpty || projectedIncome <= 0) return 0;
-    final target = goals.fold<double>(0, (total, goal) {
-      final days = math.max(goal.daysLeft, 1);
-      final dailyNeed = goal.remaining / days;
-      return total + _periodNeed(dailyNeed);
+    if (goals.isEmpty) return 0;
+    return goals.where((goal) => goal.remaining > 0).fold<double>(0, (
+      total,
+      goal,
+    ) {
+      final dailyNeed = goal.remaining / math.max(goal.daysLeft, 1);
+      return total +
+          switch (period.mode) {
+            _PeriodMode.daily => dailyNeed,
+            _PeriodMode.weekly => dailyNeed * 7,
+            _PeriodMode.monthly => dailyNeed * 30,
+            _PeriodMode.yearly => dailyNeed * 365,
+          };
     });
-    return target;
   }
 
-  double _periodNeed(double dailyNeed) {
-    switch (period.mode) {
-      case _PeriodMode.daily:
-        return dailyNeed;
-      case _PeriodMode.weekly:
-        return dailyNeed * 7;
-      case _PeriodMode.yearly:
-        return dailyNeed * 365;
-      case _PeriodMode.monthly:
-        return dailyNeed * 30;
+  String get statusLabel {
+    if (totalBudgeted <= 0) return 'Setup needed';
+    if (isOverBudget) return 'Over budget';
+    if (spendingRatio >= 0.85) return 'Close to limit';
+    return 'On track';
+  }
+
+  String get decisionTitle {
+    if (projectedIncome <= 0) return 'Add income first';
+    if (totalBudgeted <= 0) return 'Create a spending plan';
+    if (isOverBudget) return 'Budget pressure detected';
+    if (isOverPlanned) return 'Plan exceeds income';
+    if (overCategoryCount > 0) return 'Category limit crossed';
+    if (unplannedSpending > 0) return 'Unplanned spending found';
+    if (availableToPlan > 0) return 'Assign remaining income';
+    if (spendingRatio >= 0.85) return 'Close to your limit';
+    return 'Budget is working';
+  }
+
+  String get primaryActionLabel {
+    if (projectedIncome <= 0) return 'Review setup';
+    if (totalBudgeted <= 0) return 'Auto-budget';
+    if (isOverBudget && profileSavings > 0) return 'Use savings support';
+    if (isOverBudget || isOverPlanned || overCategoryCount > 0) {
+      return 'Adjust budget';
     }
+    if (unplannedSpending > 0) return 'Add missing category';
+    if (availableToPlan > 0) return 'Plan remaining';
+    return 'Review categories';
   }
 
-  List<MapEntry<String, double>> get topCategories {
-    final entries = categorySpend.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return entries.take(5).toList();
+  Color statusColor(BuildContext context) {
+    if (isOverBudget || isOverPlanned) return AppTheme.error;
+    if (spendingRatio >= 0.85 || totalBudgeted <= 0) return AppTheme.warning;
+    return AppTheme.success;
   }
 
-  int get activeDebtBudgets =>
-      budgets.where((budget) => budget.isDebtPayment).length;
+  String get nextAction {
+    if (projectedIncome <= 0) return 'Add income so budgets can be validated.';
+    if (totalBudgeted <= 0) {
+      return 'Create a starter budget or use Auto-budget.';
+    }
+    if (isOverBudget) {
+      return 'Reduce spending or use savings support deliberately.';
+    }
+    if (overCategoryCount > 0) {
+      return 'Adjust categories that crossed their limit.';
+    }
+    if (availableToPlan > 0) {
+      return 'You still have ${CurrencyUtils.format(availableToPlan)} unplanned.';
+    }
+    return 'Keep recording expenses against these categories.';
+  }
+
+  String? get warning {
+    if (isOverPlanned) {
+      return 'Budget total is higher than projected income. Reduce allocations.';
+    }
+    if (unplannedSpending > 0) {
+      return '${CurrencyUtils.format(unplannedSpending)} was spent without a planned category.';
+    }
+    if (profileSavings <= 0 && isOverBudget) {
+      return 'Savings support is unavailable because no savings balance is recorded.';
+    }
+    return null;
+  }
 }
 
 class _BudgetHeader extends StatelessWidget {
   const _BudgetHeader({
     required this.period,
     required this.mode,
-    required this.onBack,
     required this.onPrevious,
     required this.onNext,
     required this.onModeChanged,
@@ -727,7 +795,6 @@ class _BudgetHeader extends StatelessWidget {
 
   final _BudgetPeriod period;
   final _PeriodMode mode;
-  final VoidCallback onBack;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final ValueChanged<_PeriodMode> onModeChanged;
@@ -737,362 +804,220 @@ class _BudgetHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          'Budget',
+          style: GoogleFonts.plusJakartaSans(
+            color: AppTheme.textPrimaryFor(context),
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Plan income, control spending, protect savings',
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 14),
         Row(
           children: [
-            Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
-              child: IconButton(
-                icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                color: AppTheme.primary,
-                onPressed: onBack,
-              ),
+            IconButton.outlined(
+              onPressed: onPrevious,
+              icon: const Icon(Icons.chevron_left_rounded),
+              tooltip: 'Previous period',
             ),
-            const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                'AI Budget Advisor',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).colorScheme.onSurface,
+              child: Center(
+                child: Text(
+                  period.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppTheme.textPrimaryFor(context),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
+            ),
+            IconButton.outlined(
+              onPressed: onNext,
+              icon: const Icon(Icons.chevron_right_rounded),
+              tooltip: 'Next period',
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Text(
-          'Budget is the central brain for income, transactions, savings, debt payments, and goals.',
-          style: GoogleFonts.inter(
-            color:
-                (Theme.of(context).textTheme.bodyMedium?.color ??
-                AppTheme.textSecondaryFor(context)),
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 18),
-        _PeriodSwitcher(
-          period: period,
-          mode: mode,
-          onPrevious: onPrevious,
-          onNext: onNext,
-          onModeChanged: onModeChanged,
-        ),
+        const SizedBox(height: 8),
+        _PeriodChips(mode: mode, onChanged: onModeChanged),
       ],
     );
   }
 }
 
-class _PeriodSwitcher extends StatelessWidget {
-  const _PeriodSwitcher({
-    required this.period,
-    required this.mode,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onModeChanged,
-  });
+class _PeriodChips extends StatelessWidget {
+  const _PeriodChips({required this.mode, required this.onChanged});
 
-  final _BudgetPeriod period;
   final _PeriodMode mode;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-  final ValueChanged<_PeriodMode> onModeChanged;
+  final ValueChanged<_PeriodMode> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: onPrevious,
-                icon: Icon(Icons.chevron_left_rounded),
-                color: AppTheme.primary,
-              ),
-              Expanded(
-                child: Text(
-                  period.label,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: onNext,
-                icon: Icon(Icons.chevron_right_rounded),
-                color: AppTheme.primary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: _PeriodMode.values
-                .map(
-                  (item) => Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: GestureDetector(
-                        onTap: () => onModeChanged(item),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            color: mode == item
-                                ? AppTheme.primary
-                                : AppTheme.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            item.name[0].toUpperCase() + item.name.substring(1),
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              color: mode == item
-                                  ? Colors.white
-                                  : AppTheme.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _PeriodMode.values.map((item) {
+          final selected = item == mode;
+          final label = switch (item) {
+            _PeriodMode.monthly => 'Month',
+            _PeriodMode.weekly => 'Week',
+            _PeriodMode.daily => 'Day',
+            _PeriodMode.yearly => 'Year',
+          };
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(label),
+              selected: selected,
+              onSelected: (_) => onChanged(item),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 }
 
-class _OverviewCard extends StatelessWidget {
-  const _OverviewCard({required this.analytics});
-
-  final _BudgetAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            analytics.isOverBudget
-                ? 'Budget needs attention'
-                : 'Available to plan',
-            style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.75),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            CurrencyUtils.format(
-              analytics.isOverBudget
-                  ? analytics.overBudgetAmount
-                  : analytics.availableToPlan,
-            ),
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _WhiteProgress(
-            value: analytics.planRatio.clamp(0.0, 1.0),
-            label: 'Planned vs projected income',
-          ),
-          const SizedBox(height: 12),
-          _WhiteProgress(
-            value: analytics.spendingRatio.clamp(0.0, 1.0),
-            label: 'Transactions vs budget',
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _SummaryStat(
-                label: 'Income',
-                value: CurrencyUtils.format(analytics.projectedIncome),
-              ),
-              _SummaryStat(
-                label: 'Budgeted',
-                value: CurrencyUtils.format(analytics.totalBudgeted),
-              ),
-              _SummaryStat(
-                label: 'Health',
-                value: '${analytics.healthScore}/100',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WhiteProgress extends StatelessWidget {
-  const _WhiteProgress({required this.value, required this.label});
-
-  final double value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            color: Colors.white.withValues(alpha: 0.74),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 7),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: value,
-            minHeight: 10,
-            backgroundColor: Colors.white.withValues(alpha: 0.22),
-            color: AppTheme.primary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BudgetWarningCard extends StatelessWidget {
-  const _BudgetWarningCard({
+class _BudgetStatusCard extends StatelessWidget {
+  const _BudgetStatusCard({
     required this.analytics,
-    required this.onAdjust,
+    required this.onEdit,
+    required this.onAutoBudget,
     required this.onUseSavings,
   });
 
   final _BudgetAnalytics analytics;
-  final VoidCallback onAdjust;
-  final VoidCallback onUseSavings;
+  final VoidCallback onEdit;
+  final VoidCallback onAutoBudget;
+  final VoidCallback? onUseSavings;
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
+    final color = analytics.statusColor(context);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _StatusPill(label: analytics.statusLabel, color: color),
+          const SizedBox(height: 12),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Icon(Icons.warning_amber_rounded, color: Color(0xFFF97316)),
-              const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  'Transactions exceeded budget',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w800,
+                child: _AmountBlock(
+                  label: analytics.isOverBudget ? 'Over by' : 'Left to spend',
+                  value: CurrencyUtils.format(
+                    analytics.isOverBudget
+                        ? analytics.overBudgetAmount
+                        : analytics.remainingBudget,
                   ),
+                ),
+              ),
+              Text(
+                '${(analytics.spendingRatio * 100).clamp(0, 200).toStringAsFixed(0)}%',
+                style: GoogleFonts.plusJakartaSans(
+                  color: color,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'You are over by ${CurrencyUtils.format(analytics.overBudgetAmount)}. Adjust the budget or confirm a Savings support transfer.',
-            style: GoogleFonts.inter(
-              color:
-                  (Theme.of(context).textTheme.bodyMedium?.color ??
-                  AppTheme.textSecondaryFor(context)),
-              height: 1.45,
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: analytics.spendingRatio.clamp(0.0, 1.0),
+              minHeight: 9,
+              backgroundColor: AppTheme.mutedFillFor(context),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onAdjust,
-                  icon: Icon(Icons.tune_rounded),
-                  label: const Text('Adjust Budget'),
-                ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: color.withValues(
+                alpha: AppTheme.isDark(context) ? 0.18 : 0.08,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onUseSavings,
-                  icon: Icon(Icons.savings_rounded),
-                  label: const Text('Use Savings'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: BorderSide(color: Theme.of(context).dividerColor),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NarrativeCard extends StatelessWidget {
-  const _NarrativeCard({required this.analytics});
-
-  final _BudgetAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = _narrative();
-    return _Panel(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.auto_awesome_rounded, color: AppTheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.18)),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Weekly narrative',
+                  analytics.decisionTitle,
                   style: GoogleFonts.plusJakartaSans(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimaryFor(context),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 5),
                 Text(
-                  text,
+                  analytics.nextAction,
                   style: GoogleFonts.inter(
-                    color:
-                        (Theme.of(context).textTheme.bodyMedium?.color ??
-                        AppTheme.textSecondaryFor(context)),
-                    height: 1.45,
+                    color: AppTheme.textSecondaryFor(context),
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                    fontSize: 12,
                   ),
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _primaryAction(),
+                    icon: Icon(_primaryIcon(), size: 18),
+                    label: Text(analytics.primaryActionLabel),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      textStyle: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                if (onUseSavings != null &&
+                    analytics.primaryActionLabel != 'Use savings support') ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onUseSavings,
+                      icon: const Icon(Icons.savings_rounded),
+                      label: const Text('Use savings support'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1101,59 +1026,58 @@ class _NarrativeCard extends StatelessWidget {
     );
   }
 
-  String _narrative() {
-    if (analytics.periodTransactions.isEmpty && analytics.budgets.isEmpty) {
-      return 'No budget movement yet. Start with Auto-Budget or Add Category and FinEase will sync transactions, savings, and goals here.';
+  VoidCallback _primaryAction() {
+    if (analytics.projectedIncome <= 0) return onEdit;
+    if (analytics.totalBudgeted <= 0) return onAutoBudget;
+    if (analytics.isOverBudget && analytics.profileSavings > 0) {
+      return onUseSavings ?? onEdit;
     }
-    if (analytics.isOverBudget) {
-      return 'Urgency is rising: spending is ahead of the plan. A small budget adjustment or savings support can rebalance this period.';
+    return onEdit;
+  }
+
+  IconData _primaryIcon() {
+    if (analytics.projectedIncome <= 0) return Icons.tune_rounded;
+    if (analytics.totalBudgeted <= 0) return Icons.auto_awesome_rounded;
+    if (analytics.isOverBudget && analytics.profileSavings > 0) {
+      return Icons.savings_rounded;
     }
-    if (analytics.spendingRatio < 0.65 && analytics.totalBudgeted > 0) {
-      return 'Good control this period. You are staying under budget while keeping room for savings and goals.';
-    }
-    if (analytics.goalPressure > analytics.projectedIncome * 0.2) {
-      return 'Goals need meaningful funding this period. Keep discretionary categories lean so target dates stay realistic.';
-    }
-    return 'On track for 3 weeks: spending momentum is steady and the budget is still guiding transactions well.';
+    return Icons.tune_rounded;
   }
 }
 
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({
-    required this.onAddCategory,
-    required this.onEditBudget,
-    required this.onAutoBudget,
-  });
+class _BudgetSnapshotRow extends StatelessWidget {
+  const _BudgetSnapshotRow({required this.analytics});
 
-  final VoidCallback onAddCategory;
-  final VoidCallback onEditBudget;
-  final VoidCallback onAutoBudget;
+  final _BudgetAnalytics analytics;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: _ActionButton(
-            label: 'Add Category',
-            icon: Icons.add_rounded,
-            onTap: onAddCategory,
+          child: _BudgetMiniStat(
+            label: 'Income',
+            value: CurrencyUtils.format(analytics.projectedIncome),
+            icon: Icons.payments_rounded,
+            color: AppTheme.primaryFor(context),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
-          child: _ActionButton(
-            label: 'Edit Budget',
-            icon: Icons.edit_outlined,
-            onTap: onEditBudget,
+          child: _BudgetMiniStat(
+            label: 'Planned',
+            value: CurrencyUtils.format(analytics.totalBudgeted),
+            icon: Icons.account_balance_wallet_rounded,
+            color: analytics.isOverPlanned ? AppTheme.error : AppTheme.success,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
-          child: _ActionButton(
-            label: 'Auto-Budget',
-            icon: Icons.auto_awesome_rounded,
-            onTap: onAutoBudget,
+          child: _BudgetMiniStat(
+            label: 'Spent',
+            value: CurrencyUtils.format(analytics.totalSpent),
+            icon: Icons.receipt_long_rounded,
+            color: analytics.isOverBudget ? AppTheme.error : AppTheme.warning,
           ),
         ),
       ],
@@ -1161,81 +1085,109 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
+class _BudgetMiniStat extends StatelessWidget {
+  const _BudgetMiniStat({
     required this.label,
+    required this.value,
     required this.icon,
-    required this.onTap,
+    required this.color,
   });
 
   final String label;
+  final String value;
   final IconData icon;
-  final VoidCallback onTap;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: AppTheme.primary),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimaryFor(context),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title});
+class _BudgetActions extends StatelessWidget {
+  const _BudgetActions({required this.onEdit, required this.onAutoBudget});
 
-  final String title;
+  final VoidCallback onEdit;
+  final VoidCallback onAutoBudget;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: GoogleFonts.plusJakartaSans(
-        color: Theme.of(context).colorScheme.onSurface,
-        fontSize: 20,
-        fontWeight: FontWeight.w800,
-      ),
+    return Row(
+      children: [
+        Expanded(
+          child: _ActionTile(
+            icon: Icons.tune_rounded,
+            label: 'Edit',
+            onTap: onEdit,
+            color: AppTheme.primaryFor(context),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ActionTile(
+            icon: Icons.auto_awesome_rounded,
+            label: 'Auto-budget',
+            onTap: onAutoBudget,
+            color: AppTheme.success,
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _BudgetPlanCard extends StatelessWidget {
-  const _BudgetPlanCard({
+class _BudgetCategoryCard extends StatelessWidget {
+  const _BudgetCategoryCard({
     required this.budget,
     required this.analytics,
     required this.onEdit,
+    required this.onUseSavings,
     required this.onDelete,
-    this.onUseSavings,
   });
 
   final BudgetPlan budget;
   final _BudgetAnalytics analytics;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
   final VoidCallback? onUseSavings;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1244,127 +1196,120 @@ class _BudgetPlanCard extends StatelessWidget {
         .clamp(0, double.infinity)
         .toDouble();
     final over = analytics.categoryOverage(budget.category);
-    final progress = budget.allocatedAmount == 0
+    final progress = budget.allocatedAmount <= 0
         ? 0.0
         : (spent / budget.allocatedAmount).clamp(0.0, 1.0);
-    final isUrgent =
-        budget.reminderDate != null &&
-        budget.reminderDate!.difference(DateTime.now()).inDays <= 3;
+    final isOver = over > 0;
+    final color = isOver
+        ? AppTheme.error
+        : progress >= 0.85
+        ? AppTheme.warning
+        : AppTheme.primaryFor(context);
 
-    return _Panel(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Icon(_categoryIcon(budget.category), color: color),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            budget.title,
-                            style: GoogleFonts.plusJakartaSans(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        if (budget.isDebtPayment)
-                          _Tag(label: 'Debt', color: const Color(0xFFF97316)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
                     Text(
                       budget.category,
-                      style: GoogleFonts.inter(
-                        color:
-                            (Theme.of(context).textTheme.bodyMedium?.color ??
-                            AppTheme.textSecondaryFor(context)),
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.textPrimaryFor(context),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
+                    if (budget.isDebtPayment)
+                      Text(
+                        'Debt payment',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.warning,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: onEdit,
-                icon: Icon(Icons.edit_outlined, color: AppTheme.primary),
-              ),
-              IconButton(
-                onPressed: onDelete,
-                icon: Icon(Icons.delete_outline_rounded, color: AppTheme.error),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') onEdit();
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Edit budgets')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
               ),
             ],
           ),
-          if (budget.notes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              budget.notes,
-              style: GoogleFonts.inter(
-                color:
-                    (Theme.of(context).textTheme.bodyMedium?.color ??
-                    AppTheme.textSecondaryFor(context)),
-                height: 1.5,
-              ),
-            ),
-          ],
-          if (budget.reminderDate != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              '${isUrgent ? 'Urgent: ' : ''}Reminder ${DateFormat('MMM dd').format(budget.reminderDate!)}',
-              style: GoogleFonts.inter(
-                color: isUrgent ? const Color(0xFFF97316) : AppTheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
-              backgroundColor: Theme.of(context).dividerColor,
-              color: over > 0 ? AppTheme.error : AppTheme.primary,
+              backgroundColor: AppTheme.mutedFillFor(context),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                child: _BudgetFigure(
-                  label: 'Allocated',
-                  value: CurrencyUtils.format(budget.allocatedAmount),
+                child: Text(
+                  '${CurrencyUtils.format(spent)} of ${CurrencyUtils.format(budget.allocatedAmount)}',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondaryFor(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              Expanded(
-                child: _BudgetFigure(
-                  label: 'Spent',
-                  value: CurrencyUtils.format(spent),
-                ),
-              ),
-              Expanded(
-                child: _BudgetFigure(
-                  label: over > 0 ? 'Over' : 'Remaining',
-                  value: CurrencyUtils.format(over > 0 ? over : remaining),
+              Text(
+                isOver
+                    ? '${CurrencyUtils.format(over)} over'
+                    : '${CurrencyUtils.format(remaining)} left',
+                style: GoogleFonts.inter(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-          if (over > 0 && onUseSavings != null) ...[
-            const SizedBox(height: 14),
+          if (budget.reminderDate != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Reminder ${DateFormat('MMM dd').format(budget.reminderDate!)}',
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondaryFor(context),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (onUseSavings != null) ...[
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onUseSavings,
-                icon: Icon(Icons.savings_rounded),
-                label: const Text('Pull from Savings'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: BorderSide(color: Theme.of(context).dividerColor),
-                ),
+                icon: const Icon(Icons.savings_rounded),
+                label: const Text('Cover from savings'),
               ),
             ),
           ],
@@ -1374,273 +1319,42 @@ class _BudgetPlanCard extends StatelessWidget {
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag({required this.label, required this.color});
+class _PeriodDetailsCard extends StatelessWidget {
+  const _PeriodDetailsCard({required this.analytics});
 
-  final String label;
-  final Color color;
+  final _BudgetAnalytics analytics;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _BudgetFigure extends StatelessWidget {
-  const _BudgetFigure({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            color:
-                (Theme.of(context).textTheme.bodyMedium?.color ??
-                AppTheme.textSecondaryFor(context)),
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.plusJakartaSans(
-            color: Theme.of(context).colorScheme.onSurface,
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CategoryRings extends StatelessWidget {
-  const _CategoryRings({required this.analytics});
-
-  final _BudgetAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    if (analytics.budgets.isEmpty) {
-      return _Panel(
-        child: Text(
-          'Create budgets to see category-wise progress rings.',
-          style: GoogleFonts.inter(
-            color:
-                (Theme.of(context).textTheme.bodyMedium?.color ??
-                AppTheme.textSecondaryFor(context)),
-          ),
-        ),
-      );
-    }
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: analytics.budgets.map((budget) {
-        final spent = analytics.spentForCategory(budget.category);
-        final progress = budget.allocatedAmount == 0
-            ? 0.0
-            : (spent / budget.allocatedAmount).clamp(0.0, 1.0);
-        final over = analytics.isCategoryOverBudget(budget.category);
-        return SizedBox(
-          width: 160,
-          child: _Panel(
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 92,
-                  child: PieChart(
-                    PieChartData(
-                      centerSpaceRadius: 30,
-                      sectionsSpace: 0,
-                      sections: [
-                        PieChartSectionData(
-                          value: math.max(progress, 0.02),
-                          color: over ? AppTheme.error : AppTheme.primary,
-                          radius: 10,
-                          showTitle: false,
-                        ),
-                        PieChartSectionData(
-                          value: math.max(1 - progress, 0.02),
-                          color: Theme.of(context).dividerColor,
-                          radius: 10,
-                          showTitle: false,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Text(
-                  budget.category,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(progress * 100).round()}% used',
-                  style: GoogleFonts.inter(
-                    color:
-                        (Theme.of(context).textTheme.bodyMedium?.color ??
-                        AppTheme.textSecondaryFor(context)),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _GoalAlignmentPanel extends StatelessWidget {
-  const _GoalAlignmentPanel({required this.analytics});
-
-  final _BudgetAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SignalRow(
-            icon: Icons.savings_rounded,
-            title: 'Savings pressure',
-            value: CurrencyUtils.format(analytics.goalPressure),
-            body:
-                'Needed this period to keep active goal target dates realistic.',
+          _DetailRow(
+            label: 'Projected income',
+            value: CurrencyUtils.format(analytics.projectedIncome),
           ),
-          const SizedBox(height: 14),
-          _SignalRow(
-            icon: Icons.account_balance_wallet_rounded,
-            title: 'Savings balance',
+          _DetailRow(
+            label: 'Budgeted',
+            value: CurrencyUtils.format(analytics.totalBudgeted),
+          ),
+          _DetailRow(
+            label: 'Spent',
+            value: CurrencyUtils.format(analytics.totalSpent),
+          ),
+          _DetailRow(
+            label: 'Unplanned spend',
+            value: CurrencyUtils.format(analytics.unplannedSpending),
+          ),
+          _DetailRow(
+            label: 'Savings pool',
             value: CurrencyUtils.format(analytics.profileSavings),
-            body: 'Savings can support budget shocks only with confirmation.',
-          ),
-          if (analytics.goals.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            ...analytics.goals
-                .take(3)
-                .map(
-                  (goal) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _GoalMini(goal: goal),
-                  ),
-                ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _GoalMini extends StatelessWidget {
-  const _GoalMini({required this.goal});
-
-  final SavingGoal goal;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                goal.title,
-                style: GoogleFonts.inter(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            Text(
-              '${(goal.progress * 100).round()}%',
-              style: GoogleFonts.inter(
-                color: AppTheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 7),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: goal.progress,
-            minHeight: 7,
-            backgroundColor: Theme.of(context).dividerColor,
-            color: AppTheme.primary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BrainSignals extends StatelessWidget {
-  const _BrainSignals({required this.analytics});
-
-  final _BudgetAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
-      child: Column(
-        children: [
-          _SignalRow(
-            icon: Icons.health_and_safety_rounded,
-            title: 'Financial Health Score',
-            value: '${analytics.healthScore}/100',
-            body: analytics.healthScore >= 75
-                ? 'Strong planning rhythm.'
-                : 'Budget needs a lighter expense load.',
-          ),
-          const SizedBox(height: 14),
-          _SignalRow(
-            icon: Icons.trending_up_rounded,
-            title: 'Momentum',
-            value: analytics.isOverBudget ? 'High risk' : 'On track',
-            body: analytics.isOverBudget
-                ? 'Spending is moving faster than planned.'
-                : 'Positive reinforcement: you are staying under budget.',
-          ),
-          const SizedBox(height: 14),
-          _SignalRow(
-            icon: Icons.credit_card_rounded,
-            title: 'Debt budgets',
-            value: '${analytics.activeDebtBudgets}',
-            body:
-                'Debt categories can carry reminders so payments stay visible.',
+            last: true,
           ),
         ],
       ),
@@ -1648,164 +1362,8 @@ class _BrainSignals extends StatelessWidget {
   }
 }
 
-class _SignalRow extends StatelessWidget {
-  const _SignalRow({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: AppTheme.primary),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: GoogleFonts.plusJakartaSans(
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                body,
-                style: GoogleFonts.inter(
-                  color:
-                      (Theme.of(context).textTheme.bodyMedium?.color ??
-                      AppTheme.textSecondaryFor(context)),
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SummaryStat extends StatelessWidget {
-  const _SummaryStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: GoogleFonts.plusJakartaSans(
-            color: AppTheme.primary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmptyBudgetState extends StatelessWidget {
-  const _EmptyBudgetState({required this.onCreate});
-
-  final VoidCallback onCreate;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
-      child: Column(
-        children: [
-          Icon(
-            Icons.account_balance_wallet_outlined,
-            color: Colors.white,
-            size: 48,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Create period budgets for categories, debt payments, savings, and goal protection.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              color:
-                  (Theme.of(context).textTheme.bodyMedium?.color ??
-                  AppTheme.textSecondaryFor(context)),
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: onCreate,
-            child: const Text('Create First Budget'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Panel extends StatelessWidget {
-  const _Panel({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _CategoryBudgetManagerSheet extends StatefulWidget {
-  const _CategoryBudgetManagerSheet({
+class _BudgetEditorSheet extends StatefulWidget {
+  const _BudgetEditorSheet({
     required this.firestoreService,
     required this.budgets,
     required this.analytics,
@@ -1816,13 +1374,11 @@ class _CategoryBudgetManagerSheet extends StatefulWidget {
   final _BudgetAnalytics analytics;
 
   @override
-  State<_CategoryBudgetManagerSheet> createState() =>
-      _CategoryBudgetManagerSheetState();
+  State<_BudgetEditorSheet> createState() => _BudgetEditorSheetState();
 }
 
-class _CategoryBudgetManagerSheetState
-    extends State<_CategoryBudgetManagerSheet> {
-  final _inputs = <String, _CategoryBudgetInput>{};
+class _BudgetEditorSheetState extends State<_BudgetEditorSheet> {
+  final _inputs = <String, _BudgetInput>{};
   bool _saving = false;
 
   @override
@@ -1833,7 +1389,7 @@ class _CategoryBudgetManagerSheetState
           .where((budget) => budget.category == category)
           .cast<BudgetPlan?>()
           .firstWhere((budget) => budget != null, orElse: () => null);
-      _inputs[category] = _CategoryBudgetInput(existing);
+      _inputs[category] = _BudgetInput(existing);
     }
   }
 
@@ -1845,94 +1401,74 @@ class _CategoryBudgetManagerSheetState
     super.dispose();
   }
 
-  double get _totalAmount =>
+  double get _total =>
       _inputs.values.fold<double>(0, (total, input) => total + input.amount);
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final income = widget.analytics.projectedIncome;
-    final remaining = (income - _totalAmount)
-        .clamp(0, double.infinity)
-        .toDouble();
-    final exceedsIncome = _totalAmount > income;
+    final exceedsIncome =
+        widget.analytics.projectedIncome > 0 &&
+        _total > widget.analytics.projectedIncome;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, bottomInset + 20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).dividerColor,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '${widget.analytics.period.modeLabel} Category Budgeting',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Projected income is ${CurrencyUtils.format(income)}. Budget total cannot exceed this amount.',
-                style: GoogleFonts.inter(
-                  color:
-                      (Theme.of(context).textTheme.bodyMedium?.color ??
-                      AppTheme.textSecondaryFor(context)),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _SheetTotals(
-                income: income,
-                totalAmount: _totalAmount,
-                remaining: remaining,
-              ),
-              if (exceedsIncome) ...[
-                const SizedBox(height: 12),
-                const _ValidationBanner(
-                  message:
-                      'Budget total exceeds projected income. Reduce categories before saving.',
-                ),
-              ],
-              const SizedBox(height: 16),
-              ...AppConstants.budgetCategories.map(
-                (category) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _CategoryBudgetRow(
-                    category: category,
-                    input: _inputs[category]!,
-                    onChanged: () => setState(() {}),
-                    onPickReminder: () => _pickReminder(category),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saving || exceedsIncome ? null : _save,
-                  child: Text(_saving ? 'Saving...' : 'Save Budget Brain'),
-                ),
-              ),
-            ],
+    return _SheetFrame(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SheetHandle(),
+          Text(
+            'Edit budget',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
+          const SizedBox(height: 12),
+          _SheetTotals(
+            income: widget.analytics.projectedIncome,
+            total: _total,
+            remaining: (widget.analytics.projectedIncome - _total)
+                .clamp(0, double.infinity)
+                .toDouble(),
+          ),
+          if (exceedsIncome) ...[
+            const SizedBox(height: 12),
+            const _NoticeBanner(
+              message: 'Budget total is higher than projected income.',
+            ),
+          ],
+          const SizedBox(height: 14),
+          ...AppConstants.budgetCategories.map(
+            (category) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _BudgetInputRow(
+                category: category,
+                input: _inputs[category]!,
+                onChanged: () => setState(() {}),
+                onPickReminder: () => _pickReminder(category),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _saving || exceedsIncome ? null : _save,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.check_rounded),
+              label: Text(_saving ? 'Saving...' : 'Save budget'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1950,24 +1486,18 @@ class _CategoryBudgetManagerSheetState
   }
 
   Future<void> _save() async {
-    final income = widget.analytics.projectedIncome;
-    if (_totalAmount > income) {
-      _showError('Budget total cannot exceed projected income.');
-      return;
-    }
     setState(() => _saving = true);
     try {
       final existingByCategory = {
         for (final budget in widget.budgets) budget.category: budget,
       };
       final changes = <_BudgetSaveChange>[];
+
       for (final category in AppConstants.budgetCategories) {
         final input = _inputs[category]!;
         final existing = existingByCategory[category];
         if (input.amount <= 0) {
-          if (existing != null) {
-            changes.add(_BudgetSaveChange.delete(existing));
-          }
+          if (existing != null) changes.add(_BudgetSaveChange.delete(existing));
           continue;
         }
         final budget = BudgetPlan(
@@ -1976,8 +1506,8 @@ class _CategoryBudgetManagerSheetState
           category: category,
           allocatedAmount: input.amount,
           notes: input.isDebtPayment
-              ? 'Debt payment budget with reminder'
-              : 'Manual ${widget.analytics.period.modeName} allocation',
+              ? 'Debt payment budget'
+              : '${widget.analytics.period.modeLabel} budget',
           monthKey: widget.analytics.period.key,
           periodKey: widget.analytics.period.key,
           periodType: widget.analytics.period.modeName,
@@ -2002,28 +1532,326 @@ class _CategoryBudgetManagerSheetState
           );
         }
       }
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      Navigator.pop(context);
     } on FinanceValidationException catch (error) {
-      if (mounted) {
-        _showError(error.message);
-        setState(() => _saving = false);
-      }
+      if (!mounted) return;
+      _showSnack(context, error.message, isError: true);
+      setState(() => _saving = false);
     } catch (_) {
-      if (mounted) {
-        _showError('Could not save budgets. Please check your connection.');
-        setState(() => _saving = false);
-      }
+      if (!mounted) return;
+      _showSnack(context, 'Could not save budget', isError: true);
+      setState(() => _saving = false);
     }
   }
+}
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFFBA1A1A),
+class _BudgetInput {
+  _BudgetInput(BudgetPlan? budget)
+    : controller = TextEditingController(
+        text: budget == null || budget.allocatedAmount == 0
+            ? ''
+            : budget.allocatedAmount.toStringAsFixed(0),
+      ),
+      isDebtPayment = budget?.isDebtPayment ?? false,
+      reminderDate = budget?.reminderDate;
+
+  final TextEditingController controller;
+  bool isDebtPayment;
+  DateTime? reminderDate;
+
+  double get amount {
+    final value = double.tryParse(controller.text.trim()) ?? 0;
+    return value.isFinite && value > 0 ? value : 0;
+  }
+
+  void dispose() => controller.dispose();
+}
+
+class _BudgetInputRow extends StatelessWidget {
+  const _BudgetInputRow({
+    required this.category,
+    required this.input,
+    required this.onChanged,
+    required this.onPickReminder,
+  });
+
+  final String category;
+  final _BudgetInput input;
+  final VoidCallback onChanged;
+  final VoidCallback onPickReminder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCardFor(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                _categoryIcon(category),
+                color: AppTheme.primaryFor(context),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  category,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppTheme.textPrimaryFor(context),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Switch(
+                value: input.isDebtPayment,
+                activeThumbColor: AppTheme.primaryFor(context),
+                onChanged: (value) {
+                  input.isDebtPayment = value;
+                  onChanged();
+                },
+              ),
+            ],
+          ),
+          TextField(
+            controller: input.controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => onChanged(),
+            decoration: const InputDecoration(
+              labelText: 'Amount',
+              prefixText: 'PKR ',
+            ),
+          ),
+          if (input.isDebtPayment) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: onPickReminder,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceFor(context),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.borderFor(context)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.notifications_active_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        input.reminderDate == null
+                            ? 'Add reminder'
+                            : 'Reminder ${DateFormat('MMM dd').format(input.reminderDate!)}',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textSecondaryFor(context),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
+
+class _AutoBudgetGenerator {
+  static List<_BudgetSuggestion> generate(_BudgetAnalytics analytics) {
+    final income = analytics.projectedIncome;
+    if (income <= 0) return const [];
+    final savingsAmount = math
+        .max(income * 0.12, analytics.goalPressure)
+        .clamp(0, income * 0.25)
+        .toDouble();
+    final remaining = (income - savingsAmount)
+        .clamp(0, double.infinity)
+        .toDouble();
+    final categories = AppConstants.budgetCategories
+        .where((category) => category != 'Savings')
+        .toList();
+    final history = <String, double>{};
+    for (final transaction in analytics.allTransactions.where(
+      (transaction) => transaction.type == 'expense',
+    )) {
+      final category =
+          AppConstants.budgetCategories.contains(transaction.category)
+          ? transaction.category
+          : 'Others';
+      history[category] = (history[category] ?? 0) + transaction.amount;
+    }
+    final historyTotal = history.values.fold<double>(
+      0,
+      (total, value) => total + value,
+    );
+    final suggestions = <_BudgetSuggestion>[];
+
+    for (final category in categories) {
+      final share = historyTotal > 0
+          ? (history[category] ?? 0) / historyTotal
+          : 1 / categories.length;
+      final amount = remaining * share;
+      if (amount > 0) {
+        suggestions.add(
+          _BudgetSuggestion(
+            category: category,
+            amount: amount,
+            reason: historyTotal > 0
+                ? 'Based on past spending'
+                : 'Balanced starter amount',
+          ),
+        );
+      }
+    }
+
+    if (savingsAmount > 0) {
+      suggestions.add(
+        _BudgetSuggestion(
+          category: 'Savings',
+          amount: savingsAmount,
+          reason: analytics.activeGoalCount > 0
+              ? 'Protects active saving goals'
+              : 'Builds a savings buffer',
+        ),
+      );
+    }
+    return suggestions;
+  }
+}
+
+class _AutoBudgetSheet extends StatelessWidget {
+  const _AutoBudgetSheet({
+    required this.suggestions,
+    required this.analytics,
+    required this.onApply,
+  });
+
+  final List<_BudgetSuggestion> suggestions;
+  final _BudgetAnalytics analytics;
+  final Future<void> Function() onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = suggestions.fold<double>(
+      0,
+      (total, suggestion) => total + suggestion.amount,
+    );
+    final valid =
+        suggestions.isNotEmpty &&
+        (analytics.projectedIncome <= 0 || total <= analytics.projectedIncome);
+
+    return _SheetFrame(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SheetHandle(),
+          Text(
+            'Auto-budget',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'A starter plan from income, spending history, and savings goals.',
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _SheetTotals(
+            income: analytics.projectedIncome,
+            total: total,
+            remaining: (analytics.projectedIncome - total)
+                .clamp(0, double.infinity)
+                .toDouble(),
+          ),
+          const SizedBox(height: 14),
+          if (suggestions.isEmpty)
+            const _NoticeBanner(message: 'Add income first to generate a plan.')
+          else
+            ...suggestions.map(
+              (suggestion) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      _categoryIcon(suggestion.category),
+                      color: AppTheme.primaryFor(context),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            suggestion.category,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: AppTheme.textPrimaryFor(context),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            suggestion.reason,
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textSecondaryFor(context),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      CurrencyUtils.format(suggestion.amount),
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.textPrimaryFor(context),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: valid ? onApply : null,
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Apply plan'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetSuggestion {
+  const _BudgetSuggestion({
+    required this.category,
+    required this.amount,
+    required this.reason,
+  });
+
+  final String category;
+  final double amount;
+  final String reason;
 }
 
 class _BudgetSaveChange {
@@ -2059,103 +1887,146 @@ class _BudgetSaveChange {
   }
 }
 
-class _CategoryBudgetInput {
-  _CategoryBudgetInput(BudgetPlan? budget)
-    : amountController = TextEditingController(
-        text: budget == null || budget.allocatedAmount == 0
-            ? ''
-            : budget.allocatedAmount.toStringAsFixed(0),
-      ),
-      isDebtPayment = budget?.isDebtPayment ?? false,
-      reminderDate = budget?.reminderDate;
+class _AmountBlock extends StatelessWidget {
+  const _AmountBlock({required this.label, required this.value});
 
-  final TextEditingController amountController;
-  bool isDebtPayment;
-  DateTime? reminderDate;
+  final String label;
+  final String value;
 
-  double get amount {
-    final value = double.tryParse(amountController.text.trim()) ?? 0;
-    return value.isFinite && value > 0 ? value : 0;
-  }
-
-  void dispose() {
-    amountController.dispose();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+            color: AppTheme.textPrimaryFor(context),
+            fontSize: 27,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
   }
 }
 
-class _SheetTotals extends StatelessWidget {
-  const _SheetTotals({
-    required this.income,
-    required this.totalAmount,
-    required this.remaining,
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.color,
   });
 
-  final double income;
-  final double totalAmount;
-  final double remaining;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceFor(context),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.borderFor(context)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimaryFor(context),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.trailing});
+
+  final String title;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Text(
+          trailing,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Column(
-        children: [
-          _totalRow(context, 'Projected income', CurrencyUtils.format(income)),
-          _totalRow(context, 'Budget total', CurrencyUtils.format(totalAmount)),
-          _totalRow(
-            context,
-            'Remaining to plan',
-            CurrencyUtils.format(remaining),
-            highlight: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _totalRow(
-    BuildContext context,
-    String label,
-    String value, {
-    bool highlight = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                color:
-                    (Theme.of(context).textTheme.bodyMedium?.color ??
-                    AppTheme.textSecondaryFor(context)),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              color: highlight
-                  ? AppTheme.primary
-                  : Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
 }
 
-class _ValidationBanner extends StatelessWidget {
-  const _ValidationBanner({required this.message});
+class _NoticeBanner extends StatelessWidget {
+  const _NoticeBanner({required this.message});
 
   final String message;
 
@@ -2165,332 +2036,242 @@ class _ValidationBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F2),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        color: AppTheme.warningFillFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.25)),
       ),
       child: Text(
         message,
         style: GoogleFonts.inter(
-          color: const Color(0xFFBE123C),
+          color: AppTheme.textPrimaryFor(context),
           fontWeight: FontWeight.w700,
+          height: 1.35,
         ),
       ),
     );
   }
 }
 
-class _CategoryBudgetRow extends StatelessWidget {
-  const _CategoryBudgetRow({
-    required this.category,
-    required this.input,
-    required this.onChanged,
-    required this.onPickReminder,
-  });
+class _EmptyBudgetState extends StatelessWidget {
+  const _EmptyBudgetState({required this.onCreate, required this.onAutoBudget});
 
-  final String category;
-  final _CategoryBudgetInput input;
-  final VoidCallback onChanged;
-  final VoidCallback onPickReminder;
+  final VoidCallback onCreate;
+  final VoidCallback onAutoBudget;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
       ),
       child: Column(
         children: [
+          Icon(
+            Icons.account_balance_wallet_rounded,
+            color: AppTheme.primaryFor(context),
+            size: 40,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'No budget yet',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Start with Auto-budget or enter your own category limits.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
-                child: Text(
-                  category,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                child: OutlinedButton(
+                  onPressed: onCreate,
+                  child: const Text('Manual'),
                 ),
               ),
-              Switch(
-                value: input.isDebtPayment,
-                activeThumbColor: AppTheme.primary,
-                onChanged: (value) {
-                  input.isDebtPayment = value;
-                  onChanged();
-                },
-              ),
-              Text(
-                'Debt',
-                style: GoogleFonts.inter(
-                  color:
-                      (Theme.of(context).textTheme.bodyMedium?.color ??
-                      AppTheme.textSecondaryFor(context)),
-                  fontWeight: FontWeight.w700,
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onAutoBudget,
+                  child: const Text('Auto'),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: input.amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (_) => onChanged(),
-            decoration: const InputDecoration(
-              labelText: 'Budget amount',
-              prefixText: 'PKR ',
-            ),
-          ),
-          if (input.isDebtPayment) ...[
-            const SizedBox(height: 10),
-            InkWell(
-              onTap: onPickReminder,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.notifications_active_rounded,
-                      color: AppTheme.primary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      input.reminderDate == null
-                          ? 'Add payment reminder'
-                          : 'Reminder ${DateFormat('MMM dd, yyyy').format(input.reminderDate!)}',
-                      style: GoogleFonts.inter(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-class _AutoBudgetGenerator {
-  static List<_BudgetSuggestion> generate(_BudgetAnalytics analytics) {
-    final income = analytics.projectedIncome;
-    if (income <= 0) return const [];
-    final goalReserve = analytics.goalPressure
-        .clamp(0, income * 0.25)
-        .toDouble();
-    final savingsAmount = math.max(income * 0.12, goalReserve);
-    final remaining = (income - savingsAmount)
-        .clamp(0, double.infinity)
-        .toDouble();
-    final categories = AppConstants.budgetCategories
-        .where((category) => category != 'Savings')
-        .toList();
-    final historicalSpend = <String, double>{};
-    for (final transaction in analytics.allTransactions.where(
-      (txn) => txn.type == 'expense',
-    )) {
-      historicalSpend[transaction.category] =
-          (historicalSpend[transaction.category] ?? 0) + transaction.amount;
-    }
-    final totalHistory = historicalSpend.values.fold<double>(
-      0,
-      (total, amount) => total + amount,
-    );
-    final suggestions = <_BudgetSuggestion>[];
-    for (final category in categories) {
-      final share = totalHistory > 0
-          ? (historicalSpend[category] ?? 0) / totalHistory
-          : 1 / categories.length;
-      final amount = remaining * share;
-      if (amount > 0) {
-        suggestions.add(
-          _BudgetSuggestion(
-            category: category,
-            amount: amount,
-            reason: totalHistory > 0
-                ? 'Suggested from past transaction patterns'
-                : 'Balanced starter allocation',
-          ),
-        );
-      }
-    }
-    suggestions.add(
-      _BudgetSuggestion(
-        category: 'Savings',
-        amount: savingsAmount,
-        reason: 'Protects active goals and savings rate',
-      ),
-    );
-    return suggestions;
-  }
-}
-
-class _BudgetSuggestion {
-  const _BudgetSuggestion({
-    required this.category,
-    required this.amount,
-    required this.reason,
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.last = false,
   });
 
-  final String category;
-  final double amount;
-  final String reason;
-}
-
-class _AutoBudgetPreviewSheet extends StatelessWidget {
-  const _AutoBudgetPreviewSheet({
-    required this.suggestions,
-    required this.analytics,
-    required this.onApply,
-  });
-
-  final List<_BudgetSuggestion> suggestions;
-  final _BudgetAnalytics analytics;
-  final Future<void> Function() onApply;
+  final String label;
+  final String value;
+  final bool last;
 
   @override
   Widget build(BuildContext context) {
-    final total = suggestions.fold<double>(
-      0,
-      (total, suggestion) => total + suggestion.amount,
-    );
-    final isValid = total <= analytics.projectedIncome;
     return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: BoxDecoration(
+        border: last
+            ? null
+            : Border(bottom: BorderSide(color: AppTheme.borderFor(context))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondaryFor(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetFrame extends StatelessWidget {
+  const _SheetFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.92,
+      ),
       padding: EdgeInsets.fromLTRB(
         20,
-        16,
+        14,
         20,
         MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       decoration: BoxDecoration(
         color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).dividerColor,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'AI Auto-Budget Preview',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Generated from projected income, past transactions, and active goals.',
-                style: GoogleFonts.inter(
-                  color:
-                      (Theme.of(context).textTheme.bodyMedium?.color ??
-                      AppTheme.textSecondaryFor(context)),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _SheetTotals(
-                income: analytics.projectedIncome,
-                totalAmount: total,
-                remaining: (analytics.projectedIncome - total)
-                    .clamp(0, double.infinity)
-                    .toDouble(),
-              ),
-              if (!isValid) ...[
-                const SizedBox(height: 12),
-                const _ValidationBanner(
-                  message:
-                      'Suggestions exceed projected income and cannot apply.',
-                ),
-              ],
-              const SizedBox(height: 16),
-              if (suggestions.isEmpty)
-                Text(
-                  'Add income first so FinEase can generate a safe budget.',
-                  style: GoogleFonts.inter(
-                    color:
-                        (Theme.of(context).textTheme.bodyMedium?.color ??
-                        AppTheme.textSecondaryFor(context)),
-                  ),
-                )
-              else
-                ...suggestions.map(
-                  (suggestion) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                suggestion.category,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Text(
-                                suggestion.reason,
-                                style: GoogleFonts.inter(
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          CurrencyUtils.format(suggestion.amount),
-                          style: GoogleFonts.plusJakartaSans(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: isValid && suggestions.isNotEmpty ? onApply : null,
-                  icon: Icon(Icons.check_rounded),
-                  label: const Text('Apply Suggested Budget'),
-                ),
-              ),
-            ],
-          ),
+      child: SafeArea(top: false, child: SingleChildScrollView(child: child)),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 42,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 18),
+        decoration: BoxDecoration(
+          color: AppTheme.borderFor(context),
+          borderRadius: BorderRadius.circular(999),
         ),
       ),
     );
   }
+}
+
+class _SheetTotals extends StatelessWidget {
+  const _SheetTotals({
+    required this.income,
+    required this.total,
+    required this.remaining,
+  });
+
+  final double income;
+  final double total;
+  final double remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCardFor(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          _DetailRow(label: 'Income', value: CurrencyUtils.format(income)),
+          _DetailRow(label: 'Budget total', value: CurrencyUtils.format(total)),
+          _DetailRow(
+            label: 'Left unplanned',
+            value: CurrencyUtils.format(remaining),
+            last: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+List<BudgetPlan> _sortBudgets(
+  List<BudgetPlan> budgets,
+  _BudgetAnalytics analytics,
+) {
+  return [...budgets]..sort((a, b) {
+    final overCompare = analytics
+        .categoryOverage(b.category)
+        .compareTo(analytics.categoryOverage(a.category));
+    if (overCompare != 0) return overCompare;
+    return analytics
+        .spentForCategory(b.category)
+        .compareTo(analytics.spentForCategory(a.category));
+  });
+}
+
+IconData _categoryIcon(String category) {
+  final key = category.toLowerCase();
+  if (key.contains('electricity')) return Icons.bolt_rounded;
+  if (key.contains('grocery')) return Icons.shopping_basket_rounded;
+  if (key.contains('education')) return Icons.school_rounded;
+  if (key.contains('transport')) return Icons.directions_bus_rounded;
+  if (key.contains('entertainment')) return Icons.movie_rounded;
+  if (key.contains('health')) return Icons.local_hospital_rounded;
+  if (key.contains('saving')) return Icons.savings_rounded;
+  return Icons.category_rounded;
+}
+
+void _showSnack(BuildContext context, String message, {bool isError = false}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: isError ? AppTheme.error : AppTheme.success,
+    ),
+  );
 }

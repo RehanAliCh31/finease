@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
+import '../../app_constants.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 import 'signup_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -469,47 +472,8 @@ class _LoginPageState extends State<LoginPage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 30),
-                      // Logo
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _primary.withValues(alpha: 0.35),
-                              blurRadius: 24,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          'assets/logo/logo.png',
-                          width: 44,
-                          height: 44,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      Text(
-                        'Welcome back',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Securely access your financial world.',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: Theme.of(context).textTheme.bodyMedium?.color,
-                          height: 1.5,
-                        ),
-                      ),
+                      const SizedBox(height: 18),
+                      const _AuthHero(),
 
                       // Lockout warning banner
                       if (_isCurrentlyLockedOut) ...[
@@ -517,7 +481,7 @@ class _LoginPageState extends State<LoginPage>
                         _buildLockoutBanner(),
                       ],
 
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 32),
 
                       // ── Email ──
                       _fieldLabel(context, 'Email Address'),
@@ -526,7 +490,10 @@ class _LoginPageState extends State<LoginPage>
                         controller: _emailCtrl,
                         focusNode: _emailFocus,
                         keyboardType: TextInputType.emailAddress,
-                        style: GoogleFonts.inter(fontSize: 15, color: Theme.of(context).colorScheme.onSurface),
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         validator: _emailTouched ? _validateEmail : null,
                         onChanged: (_) => setState(() => _emailTouched = true),
@@ -569,7 +536,10 @@ class _LoginPageState extends State<LoginPage>
                         controller: _passCtrl,
                         focusNode: _passFocus,
                         obscureText: !_showPass,
-                        style: GoogleFonts.inter(fontSize: 15, color: Theme.of(context).colorScheme.onSurface),
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         validator: _passTouched ? _validatePassword : null,
                         onChanged: (_) => setState(() => _passTouched = true),
@@ -688,7 +658,9 @@ class _LoginPageState extends State<LoginPage>
                                 Text(
                                   'New to FinEase? ',
                                   style: GoogleFonts.inter(
-                                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                                    color: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium?.color,
                                     fontSize: 13,
                                   ),
                                 ),
@@ -743,40 +715,41 @@ class _LoginPageState extends State<LoginPage>
     ),
   );
 
-  InputDecoration _fieldDeco(BuildContext context, String hint, IconData icon, {Widget? suffix}) =>
-      InputDecoration(
-        hintText: hint,
-        hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 14),
-        prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
-        suffixIcon: suffix,
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Theme.of(context).dividerColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Theme.of(context).dividerColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _error, width: 1.2),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _error, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 16,
-        ),
-        errorStyle: GoogleFonts.inter(fontSize: 11, color: _error),
-      );
+  InputDecoration _fieldDeco(
+    BuildContext context,
+    String hint,
+    IconData icon, {
+    Widget? suffix,
+  }) => InputDecoration(
+    hintText: hint,
+    hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 14),
+    prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
+    suffixIcon: suffix,
+    filled: true,
+    fillColor: Theme.of(context).colorScheme.surface,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: Theme.of(context).dividerColor),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: Theme.of(context).dividerColor),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _primary, width: 1.5),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _error, width: 1.2),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _error, width: 1.5),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    errorStyle: GoogleFonts.inter(fontSize: 11, color: _error),
+  );
 
   Widget _buildLockoutBanner() {
     return Container(
@@ -816,11 +789,7 @@ class _LoginPageState extends State<LoginPage>
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: Color(0xFFF97316),
-            size: 16,
-          ),
+          Icon(Icons.warning_amber_rounded, color: Color(0xFFF97316), size: 16),
           const SizedBox(width: 8),
           Text(
             '$remaining attempt${remaining == 1 ? '' : 's'} remaining before lockout',
@@ -871,11 +840,7 @@ class _LoginPageState extends State<LoginPage>
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.lock_open_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
+                  Icon(Icons.lock_open_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     'Login to Account',
@@ -912,7 +877,11 @@ class _LoginPageState extends State<LoginPage>
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
             children: [
-              Icon(icon, color: Theme.of(context).colorScheme.onSurface, size: 28),
+              Icon(
+                icon,
+                color: Theme.of(context).colorScheme.onSurface,
+                size: 28,
+              ),
               const SizedBox(height: 8),
               Text(
                 label,
@@ -953,6 +922,218 @@ class _LoginPageState extends State<LoginPage>
           style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[400]),
         ),
       ],
+    );
+  }
+}
+
+class _AuthHero extends StatelessWidget {
+  const _AuthHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, (1 - value) * 16),
+          child: Transform.scale(
+            scale: 0.97 + (value * 0.03),
+            alignment: Alignment.topCenter,
+            child: child,
+          ),
+        ),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Theme.of(context).dividerColor),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primary.withValues(alpha: 0.10),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final tight = constraints.maxWidth < 340;
+            final illustration = _HeroIllustration(tight: tight);
+            final copy = _HeroCopy(tight: tight);
+
+            if (tight) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: illustration),
+                  const SizedBox(height: 14),
+                  copy,
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                illustration,
+                const SizedBox(width: 14),
+                Expanded(child: copy),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroIllustration extends StatelessWidget {
+  const _HeroIllustration({required this.tight});
+
+  final bool tight;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = tight ? 86.0 : 94.0;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: size - 10,
+            height: size - 10,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.18),
+              ),
+            ),
+            child: Image.asset(
+              'assets/logo/logo.png',
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.account_balance_wallet_rounded,
+                color: AppTheme.primary,
+                size: 42,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 8,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppTheme.success,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.surface,
+                  width: 3,
+                ),
+              ),
+              child: const Icon(
+                Icons.trending_up_rounded,
+                color: Colors.white,
+                size: 17,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroCopy extends StatelessWidget {
+  const _HeroCopy({required this.tight});
+
+  final bool tight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppConstants.appName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: tight ? 29 : 34,
+            fontWeight: FontWeight.w800,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Budget, forecast, save, and get financial guidance from one mobile-first dashboard.',
+          maxLines: tight ? 3 : 4,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            height: 1.4,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: const [
+            _HeroProofPill(
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Budget',
+            ),
+            _HeroProofPill(icon: Icons.query_stats_rounded, label: 'Forecast'),
+            _HeroProofPill(icon: Icons.shield_outlined, label: 'Safety'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroProofPill extends StatelessWidget {
+  const _HeroProofPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppTheme.primary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -107,7 +107,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
         _validatingConfig = false;
         _aiReady = false;
         _configError =
-            'Chatbot API key is missing. Add GEMINI_API_KEY in .env and restart FinEase.';
+            'Chatbot API key is missing. Set MODELS_API_TOKEN or GITHUB_MODELS_TOKEN and restart FinEase.';
       });
       return;
     }
@@ -321,11 +321,7 @@ class _ConfigBlocker extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.key_off_rounded,
-                color: AppTheme.error,
-                size: 44,
-              ),
+              Icon(Icons.key_off_rounded, color: AppTheme.error, size: 44),
               const SizedBox(height: 14),
               Text(
                 'Chatbot unavailable',
@@ -347,7 +343,7 @@ class _ConfigBlocker extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: Icon(Icons.refresh_rounded),
-                label: const Text('Recheck API Key'),
+                label: const Text('Recheck AI key'),
               ),
             ],
           ),
@@ -384,7 +380,9 @@ class _Bubble extends StatelessWidget {
                 : const Radius.circular(4),
           ),
           boxShadow: AppTheme.softShadow,
-          border: isUser ? null : Border.all(color: AppTheme.borderFor(context)),
+          border: isUser
+              ? null
+              : Border.all(color: AppTheme.borderFor(context)),
         ),
         child: Text(
           message.text,
@@ -497,11 +495,7 @@ class _InputBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: AppTheme.cardShadow,
               ),
-              child: Icon(
-                Icons.send_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: Icon(Icons.send_rounded, color: Colors.white, size: 20),
             ),
           ),
         ],

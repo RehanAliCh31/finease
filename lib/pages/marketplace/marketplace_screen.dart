@@ -1,23 +1,15 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/marketplace_models.dart';
 import '../../models/saving_goal.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/currency_utils.dart';
 import '../../widgets/app_config_gate.dart';
-import '../../models/marketplace_models.dart';
 import 'partner_detail_screen.dart';
-import 'widgets/search_filter_card.dart';
-import 'widgets/insights_banner.dart';
-import 'widgets/skeleton.dart';
-import 'widgets/empty_state.dart';
-import 'widgets/partner_product_card.dart';
-import 'widgets/featured_partner_card.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -27,19 +19,12 @@ class MarketplaceScreen extends StatefulWidget {
 }
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
-  static const _searchDebounce = Duration(milliseconds: 450);
-
   final TextEditingController _searchController = TextEditingController();
-  final Set<String> _selectedTags = <String>{};
-  final Set<String> _comparedPartnerIds = <String>{};
-  final Set<String> _impressionLoggedIds = <String>{};
-
+  final Set<String> _comparedIds = {};
   String _category = 'All';
-  Timer? _searchTimer;
 
   @override
   void dispose() {
-    _searchTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -51,403 +36,150 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     return AppFeatureGate(
       enabled: (config) => config.marketplaceEnabled,
       blockedTitle: 'Marketplace is paused',
-      blockedMessage:
-          'Partner marketplace access is temporarily paused by FinEase admin.',
+      blockedMessage: 'Partner marketplace access is paused by admin.',
       blockedIcon: Icons.storefront_outlined,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundFor(context),
-        bottomNavigationBar: _CompareTray(
-          count: _comparedPartnerIds.length,
-          onCompare: firestoreService == null
-              ? null
-              : () => _openComparisonSheet(context, firestoreService),
-          onClear: _comparedPartnerIds.isEmpty
-              ? null
-              : () => setState(_comparedPartnerIds.clear),
-        ),
-        body: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverAppBar(
-              expandedHeight: 235,
-              pinned: true,
-              backgroundColor: AppTheme.primary,
-              flexibleSpace: FlexibleSpaceBar(
-                background: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.primary,
-                        AppTheme.primary,
-                        AppTheme.secondary,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              'FinEase marketplace intelligence',
-                              style: GoogleFonts.inter(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            'Financial opportunities built for trust and action.',
-                            style: GoogleFonts.plusJakartaSans(
-                              color: Colors.white,
-                              fontSize: 28,
-                              height: 1.15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Discover curated financing, insurance, education, and income partners. Compare the fit in-app before you continue anywhere else.',
-                            style: GoogleFonts.inter(
-                              color: Colors.white.withValues(alpha: 0.78),
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: firestoreService == null
-                  ? const SizedBox.shrink()
-                  : StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: firestoreService.getMarketplacePartners(),
-                      builder: (context, partnerSnapshot) {
-                        if (partnerSnapshot.connectionState ==
-                                ConnectionState.waiting &&
-                            !partnerSnapshot.hasData) {
-                          return const MarketplaceSkeleton();
-                        }
+        body: SafeArea(
+          child: firestoreService == null
+              ? const Center(child: CircularProgressIndicator())
+              : StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: firestoreService.getMarketplacePartners(),
+                  builder: (context, partnerSnapshot) {
+                    return StreamBuilder<Map<String, dynamic>>(
+                      stream: firestoreService.getUserProfile(),
+                      builder: (context, profileSnapshot) {
+                        return StreamBuilder<List<SavingGoal>>(
+                          stream: firestoreService.getSavingGoals(),
+                          builder: (context, goalSnapshot) {
+                            if (partnerSnapshot.connectionState ==
+                                    ConnectionState.waiting &&
+                                !partnerSnapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
 
-                        final rawPartners = partnerSnapshot.data ?? const [];
-                        final partners = rawPartners
-                            .map(MarketplacePartner.fromMap)
-                            .toList();
-
-                        return StreamBuilder<Map<String, dynamic>>(
-                          stream: firestoreService.getUserProfile(),
-                          builder: (context, profileSnapshot) {
+                            final partners = (partnerSnapshot.data ?? const [])
+                                .map(MarketplacePartner.fromMap)
+                                .toList();
                             final profile =
                                 profileSnapshot.data ??
                                 const <String, dynamic>{};
-                            return StreamBuilder<List<SavingGoal>>(
-                              stream: firestoreService.getSavingGoals(),
-                              builder: (context, goalsSnapshot) {
-                                final goals =
-                                    goalsSnapshot.data ?? const <SavingGoal>[];
-                                final viewModel = _MarketplaceViewModel.build(
-                                  partners: partners,
-                                  profile: profile,
-                                  goals: goals,
-                                  category: _category,
-                                  query: _searchController.text,
-                                  selectedTags: _selectedTags,
-                                );
+                            final goals =
+                                goalSnapshot.data ?? const <SavingGoal>[];
+                            final model = _MarketplaceModel.from(
+                              partners: partners,
+                              profile: profile,
+                              goals: goals,
+                              query: _searchController.text,
+                              category: _category,
+                            );
 
-                                _logVisibleImpressions(
-                                  firestoreService: firestoreService,
-                                  partners: viewModel.filtered,
-                                );
-
-                                return Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    16,
-                                    16,
-                                    140,
+                            return ListView(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                20,
+                                16,
+                                20,
+                                120,
+                              ),
+                              children: [
+                                _MarketplaceHeader(
+                                  count: model.filtered.length,
+                                  onCompare: _comparedIds.length < 2
+                                      ? null
+                                      : () => _showCompareSheet(
+                                          context,
+                                          partners,
+                                          firestoreService,
+                                        ),
+                                ),
+                                const SizedBox(height: 16),
+                                _BestMatchCard(
+                                  partner: model.bestMatch,
+                                  onOpen: model.bestMatch == null
+                                      ? null
+                                      : () => _openPartner(
+                                          model.bestMatch!,
+                                          firestoreService,
+                                        ),
+                                ),
+                                const SizedBox(height: 14),
+                                _SearchBox(
+                                  controller: _searchController,
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                                const SizedBox(height: 10),
+                                _CategoryChips(
+                                  categories: model.categories,
+                                  selected: _category,
+                                  onSelected: (value) {
+                                    setState(() => _category = value);
+                                    firestoreService.logMarketplaceEvent(
+                                      'marketplace_category_selected',
+                                      payload: {'category': value},
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 22),
+                                _SectionTitle(
+                                  title: 'Matches',
+                                  trailing: '${_comparedIds.length}/3 compared',
+                                ),
+                                const SizedBox(height: 12),
+                                if (model.filtered.isEmpty)
+                                  const _EmptyMarketplace()
+                                else
+                                  ...model.filtered.map(
+                                    (partner) => Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
+                                      child: _PartnerCard(
+                                        partner: partner,
+                                        compared: _comparedIds.contains(
+                                          partner.id,
+                                        ),
+                                        onOpen: () => _openPartner(
+                                          partner,
+                                          firestoreService,
+                                        ),
+                                        onCompare: () =>
+                                            _toggleCompare(partner),
+                                      ),
+                                    ),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      MarketplaceInsightsBanner(
-                                        verifiedCount: viewModel.verifiedCount,
-                                        averageTrustScore:
-                                            viewModel.averageTrustScore,
-                                        liveCount: viewModel.filtered.length,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      SearchAndFilterCard(
-                                        queryController: _searchController,
-                                        categories: viewModel.categories,
-                                        selectedCategory: _category,
-                                        selectedTags: _selectedTags,
-                                        suggestedTags: viewModel.suggestedTags,
-                                        onCategorySelected: (value) {
-                                          setState(() => _category = value);
-                                          firestoreService.logMarketplaceEvent(
-                                            'marketplace_category_selected',
-                                            payload: {'category': value},
-                                          );
-                                        },
-                                        onTagToggle: (tag) {
-                                          setState(() {
-                                            if (_selectedTags.contains(tag)) {
-                                              _selectedTags.remove(tag);
-                                            } else {
-                                              _selectedTags.add(tag);
-                                            }
-                                          });
-                                          firestoreService.logMarketplaceEvent(
-                                            'marketplace_tag_toggled',
-                                            payload: {
-                                              'tag': tag,
-                                              'selected': _selectedTags
-                                                  .contains(tag),
-                                            },
-                                          );
-                                        },
-                                        onQueryChanged: (value) {
-                                          setState(() {});
-                                          _searchTimer?.cancel();
-                                          _searchTimer = Timer(
-                                            _searchDebounce,
-                                            () {
-                                              firestoreService
-                                                  .logMarketplaceEvent(
-                                                    'marketplace_search',
-                                                    payload: {
-                                                      'query': value.trim(),
-                                                    },
-                                                  );
-                                            },
-                                          );
-                                        },
-                                        onClearFilters: () {
-                                          setState(() {
-                                            _category = 'All';
-                                            _selectedTags.clear();
-                                            _searchController.clear();
-                                          });
-                                          firestoreService.logMarketplaceEvent(
-                                            'marketplace_filters_cleared',
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 24),
-                                      if (viewModel.featured.isNotEmpty) ...[
-                                        _SectionHeader(
-                                          title: 'Featured opportunities',
-                                          subtitle:
-                                              'High-trust offers with the strongest upside signals.',
-                                        ),
-                                        const SizedBox(height: 12),
-                                        SizedBox(
-                                          height: 248,
-                                          child: ListView.separated(
-                                            scrollDirection: Axis.horizontal,
-                                            itemCount:
-                                                viewModel.featured.length,
-                                            separatorBuilder: (_, index) =>
-                                                const SizedBox(width: 14),
-                                            itemBuilder: (context, index) {
-                                              final partner =
-                                                  viewModel.featured[index];
-                                              return FeaturedPartnerCard(
-                                                partner: partner,
-                                                onTap: () => _openDetail(
-                                                  context,
-                                                  firestoreService,
-                                                  partner,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(height: 24),
-                                      ],
-                                      if (viewModel.recommended.isNotEmpty) ...[
-                                        _SectionHeader(
-                                          title: 'Recommended for you',
-                                          subtitle:
-                                              viewModel.recommendationReason,
-                                        ),
-                                        const SizedBox(height: 12),
-                                        ...viewModel.recommended.map(
-                                          (partner) => Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 14,
-                                            ),
-                                            child: PartnerProductCard(
-                                              partner: partner,
-                                              isCompared: _comparedPartnerIds
-                                                  .contains(partner.id),
-                                              onTap: () => _openDetail(
-                                                context,
-                                                firestoreService,
-                                                partner,
-                                              ),
-                                              onCompareToggle: () =>
-                                                  _toggleCompare(
-                                                    firestoreService,
-                                                    partner,
-                                                  ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                      ],
-                                      if (viewModel.trending.isNotEmpty) ...[
-                                        _SectionHeader(
-                                          title: 'Trending partners',
-                                          subtitle:
-                                              'Popular options users are reviewing most often.',
-                                        ),
-                                        const SizedBox(height: 12),
-                                        SizedBox(
-                                          height: 170,
-                                          child: ListView.separated(
-                                            scrollDirection: Axis.horizontal,
-                                            itemCount:
-                                                viewModel.trending.length,
-                                            separatorBuilder: (_, index) =>
-                                                const SizedBox(width: 12),
-                                            itemBuilder: (context, index) {
-                                              final partner =
-                                                  viewModel.trending[index];
-                                              return _CompactOpportunityCard(
-                                                partner: partner,
-                                                onTap: () => _openDetail(
-                                                  context,
-                                                  firestoreService,
-                                                  partner,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(height: 24),
-                                      ],
-                                      if (viewModel.nearby.isNotEmpty) ...[
-                                        _SectionHeader(
-                                          title:
-                                              'Nearby and location-based offers',
-                                          subtitle:
-                                              'Partners with branch or service coordinates available.',
-                                        ),
-                                        const SizedBox(height: 12),
-                                        SizedBox(
-                                          height: 180,
-                                          child: ListView.separated(
-                                            scrollDirection: Axis.horizontal,
-                                            itemCount: viewModel.nearby.length,
-                                            separatorBuilder: (_, index) =>
-                                                const SizedBox(width: 12),
-                                            itemBuilder: (context, index) {
-                                              final partner =
-                                                  viewModel.nearby[index];
-                                              return _LocationOfferCard(
-                                                partner: partner,
-                                                onTap: () => _openDetail(
-                                                  context,
-                                                  firestoreService,
-                                                  partner,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(height: 24),
-                                      ],
-                                      _SectionHeader(
-                                        title: 'All opportunities',
-                                        subtitle:
-                                            '${viewModel.filtered.length} results across search, category, and trust filters.',
-                                      ),
-                                      const SizedBox(height: 12),
-                                      AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 250,
-                                        ),
-                                        child: viewModel.filtered.isEmpty
-                                            ? const MarketplaceEmptyState()
-                                            : Column(
-                                                key: ValueKey(
-                                                  '${viewModel.filtered.length}-$_category-${_selectedTags.length}-${_searchController.text}',
-                                                ),
-                                                children: viewModel.filtered
-                                                    .map(
-                                                      (partner) => Padding(
-                                                        padding:
-                                                            const EdgeInsets.only(
-                                                              bottom: 14,
-                                                            ),
-                                                        child: PartnerProductCard(
-                                                          partner: partner,
-                                                          isCompared:
-                                                              _comparedPartnerIds
-                                                                  .contains(
-                                                                    partner.id,
-                                                                  ),
-                                                          onTap: () =>
-                                                              _openDetail(
-                                                                context,
-                                                                firestoreService,
-                                                                partner,
-                                                              ),
-                                                          onCompareToggle: () =>
-                                                              _toggleCompare(
-                                                                firestoreService,
-                                                                partner,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    )
-                                                    .toList(),
-                                              ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
+                              ],
                             );
                           },
                         );
                       },
-                    ),
-            ),
-          ],
+                    );
+                  },
+                ),
         ),
       ),
     );
   }
 
-  void _openDetail(
-    BuildContext context,
-    FirestoreService firestoreService,
+  void _toggleCompare(MarketplacePartner partner) {
+    setState(() {
+      if (_comparedIds.contains(partner.id)) {
+        _comparedIds.remove(partner.id);
+      } else if (_comparedIds.length < 3) {
+        _comparedIds.add(partner.id);
+      }
+    });
+  }
+
+  void _openPartner(
     MarketplacePartner partner,
+    FirestoreService firestoreService,
   ) {
+    firestoreService.markMarketplacePartnerViewed(partner.id);
     firestoreService.logMarketplaceEvent(
-      'partner_detail_opened',
+      'marketplace_partner_opened',
       payload: {'partnerId': partner.id, 'category': partner.category},
     );
     Navigator.push(
@@ -456,585 +188,658 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         builder: (_) => PartnerDetailScreen(
           partner: partner,
           firestoreService: firestoreService,
-          isCompared: _comparedPartnerIds.contains(partner.id),
-          onToggleCompare: (value) => _toggleCompare(firestoreService, value),
+          isCompared: _comparedIds.contains(partner.id),
+          onToggleCompare: _toggleCompare,
         ),
       ),
     );
   }
 
-  void _toggleCompare(
-    FirestoreService firestoreService,
-    MarketplacePartner partner,
-  ) {
-    final alreadySelected = _comparedPartnerIds.contains(partner.id);
-    if (!alreadySelected && _comparedPartnerIds.length >= 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You can compare up to 3 partners at once.'),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      if (alreadySelected) {
-        _comparedPartnerIds.remove(partner.id);
-      } else {
-        _comparedPartnerIds.add(partner.id);
-      }
-    });
-
-    firestoreService.logMarketplaceEvent(
-      alreadySelected ? 'compare_remove' : 'compare_add',
-      payload: {'partnerId': partner.id, 'category': partner.category},
-    );
-  }
-
-  void _logVisibleImpressions({
-    required FirestoreService firestoreService,
-    required List<MarketplacePartner> partners,
-  }) {
-    final toLog = partners
-        .take(6)
-        .where((partner) => !_impressionLoggedIds.contains(partner.id))
-        .toList();
-    if (toLog.isEmpty) return;
-    _impressionLoggedIds.addAll(toLog.map((partner) => partner.id));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      for (final partner in toLog) {
-        firestoreService.logMarketplaceEvent(
-          'partner_impression',
-          payload: {'partnerId': partner.id, 'category': partner.category},
-        );
-      }
-    });
-  }
-
-  void _openComparisonSheet(
+  void _showCompareSheet(
     BuildContext context,
+    List<MarketplacePartner> partners,
     FirestoreService firestoreService,
   ) {
+    final selected = partners
+        .where((partner) => _comparedIds.contains(partner.id))
+        .toList();
+    firestoreService.saveMarketplaceComparisonHistory(
+      selected.map((partner) => partner.id).toList(),
+    );
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: firestoreService.getMarketplacePartners(),
-          builder: (context, snapshot) {
-            final partners = (snapshot.data ?? const [])
-                .map(MarketplacePartner.fromMap)
-                .where((partner) => _comparedPartnerIds.contains(partner.id))
-                .toList();
-
-            return _ComparisonSheet(
-              partners: partners,
-              onRemove: (partner) => _toggleCompare(firestoreService, partner),
-            );
-          },
-        );
-      },
-    );
-    firestoreService.logMarketplaceEvent(
-      'comparison_opened',
-      payload: {'count': _comparedPartnerIds.length},
+      builder: (context) => _CompareSheet(partners: selected),
     );
   }
 }
 
-class _MarketplaceViewModel {
-  _MarketplaceViewModel({
-    required this.categories,
-    required this.suggestedTags,
+class _MarketplaceModel {
+  const _MarketplaceModel({
     required this.filtered,
-    required this.featured,
-    required this.recommended,
-    required this.trending,
-    required this.nearby,
-    required this.recommendationReason,
-    required this.averageTrustScore,
-    required this.verifiedCount,
+    required this.categories,
+    required this.bestMatch,
   });
 
-  factory _MarketplaceViewModel.build({
+  final List<MarketplacePartner> filtered;
+  final List<String> categories;
+  final MarketplacePartner? bestMatch;
+
+  factory _MarketplaceModel.from({
     required List<MarketplacePartner> partners,
     required Map<String, dynamic> profile,
     required List<SavingGoal> goals,
-    required String category,
     required String query,
-    required Set<String> selectedTags,
+    required String category,
   }) {
-    final categories = <String>{
+    final categories = [
       'All',
-      ...partners.map((partner) => partner.category),
-    }.toList()..sort((a, b) => a == 'All' ? -1 : a.compareTo(b));
-
+      ...partners.map((partner) => partner.category).toSet().toList()..sort(),
+    ];
     final filtered =
         partners
             .where((partner) => partner.matchesCategory(category))
             .where((partner) => partner.matchesQuery(query))
-            .where((partner) => partner.matchesTags(selectedTags))
             .toList()
-          ..sort((a, b) => a.priority.compareTo(b.priority));
-
-    final featured = filtered
-        .where((partner) => partner.isFeatured)
-        .take(5)
-        .toList();
-    final trending = filtered
-        .where((partner) => partner.isTrending)
-        .take(6)
-        .toList();
-    final nearby = filtered
-        .where((partner) => partner.hasLocation)
-        .take(6)
-        .toList();
-
-    final recommended = [...filtered]
-      ..sort(
-        (a, b) => b
-            .relevanceScore(profile: profile, goals: goals)
-            .compareTo(a.relevanceScore(profile: profile, goals: goals)),
-      );
-
-    final avgTrust = partners.isEmpty
-        ? 0.0
-        : partners.fold<double>(0, (sum, partner) => sum + partner.trustScore) /
-              partners.length;
-    final verifiedCount = partners
-        .where((partner) => partner.isVerified)
-        .length;
-
-    return _MarketplaceViewModel(
-      categories: categories,
-      suggestedTags: MarketplacePartner.allSuggestedTags(
-        filtered.isEmpty ? partners : filtered,
-      ),
+          ..sort((a, b) {
+            final score = b
+                .relevanceScore(profile: profile, goals: goals)
+                .compareTo(a.relevanceScore(profile: profile, goals: goals));
+            if (score != 0) return score;
+            return b.trustScore.compareTo(a.trustScore);
+          });
+    return _MarketplaceModel(
       filtered: filtered,
-      featured: featured,
-      recommended: recommended.take(3).toList(),
-      trending: trending,
-      nearby: nearby,
-      recommendationReason: _buildRecommendationReason(profile, goals),
-      averageTrustScore: avgTrust,
-      verifiedCount: verifiedCount,
+      categories: categories,
+      bestMatch: filtered.isEmpty ? null : filtered.first,
     );
-  }
-
-  final List<String> categories;
-  final List<String> suggestedTags;
-  final List<MarketplacePartner> filtered;
-  final List<MarketplacePartner> featured;
-  final List<MarketplacePartner> recommended;
-  final List<MarketplacePartner> trending;
-  final List<MarketplacePartner> nearby;
-  final String recommendationReason;
-  final double averageTrustScore;
-  final int verifiedCount;
-
-  static String _buildRecommendationReason(
-    Map<String, dynamic> profile,
-    List<SavingGoal> goals,
-  ) {
-    final income = (profile['monthlyIncome'] as num?)?.toDouble() ?? 0;
-    final goalCategories = goals
-        .map((goal) => goal.category.toLowerCase())
-        .toSet();
-
-    if (goalCategories.contains('emergency')) {
-      return 'Based on your emergency savings focus, FinEase is prioritizing resilience, protection, and faster-access options.';
-    }
-    if (income > 0 && income < 250000) {
-      return 'Your current income profile suggests options with clearer approval paths, practical rates, and simpler onboarding.';
-    }
-    if (goalCategories.contains('travel') ||
-        goalCategories.contains('education')) {
-      return 'Your active goals point toward funding and growth opportunities that can improve flexibility over the next few months.';
-    }
-    return 'These partners are ranked using your current profile, active goals, and FinEase trust signals.';
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.subtitle});
+class _MarketplaceHeader extends StatelessWidget {
+  const _MarketplaceHeader({required this.count, required this.onCompare});
 
-  final String title;
-  final String subtitle;
+  final int count;
+  final VoidCallback? onCompare;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            color: AppTheme.textPrimaryFor(context),
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Marketplace',
+                style: GoogleFonts.plusJakartaSans(
+                  color: AppTheme.textPrimaryFor(context),
+                  fontSize: 27,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '$count verified financial options',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context), height: 1.45),
+        IconButton.filled(
+          onPressed: onCompare,
+          icon: const Icon(Icons.compare_arrows_rounded),
+          tooltip: 'Compare',
+          style: IconButton.styleFrom(
+            backgroundColor: onCompare == null
+                ? AppTheme.mutedFillFor(context)
+                : AppTheme.primaryFor(context),
+            foregroundColor: onCompare == null
+                ? AppTheme.textHintFor(context)
+                : Colors.white,
+          ),
         ),
       ],
     );
   }
 }
 
-class _CompactOpportunityCard extends StatelessWidget {
-  const _CompactOpportunityCard({required this.partner, required this.onTap});
+class _BestMatchCard extends StatelessWidget {
+  const _BestMatchCard({required this.partner, required this.onOpen});
 
-  final MarketplacePartner partner;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        width: 220,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceFor(context),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppTheme.borderFor(context)),
-          boxShadow: AppTheme.softShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              partner.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
-                color: AppTheme.textPrimaryFor(context),
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              partner.estimatedBenefit,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondaryFor(context),
-                fontSize: 13,
-                height: 1.45,
-              ),
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Icon(
-                  Icons.local_fire_department_rounded,
-                  color: Color(0xFFD97706),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    '${partner.reviewCount}+ reviews',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textPrimaryFor(context),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LocationOfferCard extends StatelessWidget {
-  const _LocationOfferCard({required this.partner, required this.onTap});
-
-  final MarketplacePartner partner;
-  final VoidCallback onTap;
+  final MarketplacePartner? partner;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        width: 250,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.location_on_rounded, color: Colors.white),
-            const SizedBox(height: 12),
-            Text(
-              partner.name,
-              style: GoogleFonts.plusJakartaSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              partner.locationLabel ??
-                  'Coordinates available for branch or service area',
-              style: GoogleFonts.inter(
-                color: Colors.white.withValues(alpha: 0.72),
-                height: 1.45,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              partner.approvalSpeed,
-              style: GoogleFonts.plusJakartaSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CompareTray extends StatelessWidget {
-  const _CompareTray({
-    required this.count,
-    required this.onCompare,
-    required this.onClear,
-  });
-
-  final int count;
-  final VoidCallback? onCompare;
-  final VoidCallback? onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      height: count == 0 ? 0 : 96,
-      child: count == 0
-          ? const SizedBox.shrink()
-          : SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: AppTheme.cardShadow,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '$count partner${count == 1 ? '' : 's'} ready to compare',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: onClear,
-                        child: const Text('Clear'),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: count >= 2 ? onCompare : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF0F172A),
-                        ),
-                        child: const Text('Compare'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-    );
-  }
-}
-
-class _ComparisonSheet extends StatelessWidget {
-  const _ComparisonSheet({required this.partners, required this.onRemove});
-
-  final List<MarketplacePartner> partners;
-  final ValueChanged<MarketplacePartner> onRemove;
-
-  @override
-  Widget build(BuildContext context) {
+    if (partner == null) {
+      return const SizedBox.shrink();
+    }
     return Container(
-      height: MediaQuery.of(context).size.height * 0.78,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundFor(context),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _StatusPill(label: 'Best match', color: AppTheme.success),
+          const SizedBox(height: 10),
+          Text(
+            partner!.name,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            partner!.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
           const SizedBox(height: 12),
-          Container(
-            width: 48,
-            height: 5,
-            decoration: BoxDecoration(
-              color: AppTheme.borderFor(context),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Compare partners',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: AppTheme.textPrimaryFor(context),
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Trust',
+                  value: partner!.trustScore.toStringAsFixed(0),
                 ),
-                Text(
-                  '${partners.length}/3 selected',
-                  style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context)),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MiniMetric(label: 'Rate', value: partner!.rateLabel),
+              ),
+            ],
           ),
-          Expanded(
-            child: partners.length < 2
-                ? Center(
-                    child: Text(
-                      'Select at least two partners to compare key details side by side.',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context)),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingTextStyle: GoogleFonts.plusJakartaSans(
-                        color: AppTheme.textPrimaryFor(context),
-                        fontWeight: FontWeight.w800,
-                      ),
-                      dataTextStyle: GoogleFonts.inter(
-                        color: AppTheme.textSecondaryFor(context),
-                        height: 1.4,
-                      ),
-                      columns: [
-                        const DataColumn(label: Text('Attribute')),
-                        ...partners.map(
-                          (partner) => DataColumn(
-                            label: SizedBox(
-                              width: 150,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(partner.name),
-                                  TextButton(
-                                    onPressed: () => onRemove(partner),
-                                    child: const Text('Remove'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                      rows: [
-                        _comparisonRow(
-                          'Category',
-                          partners,
-                          (partner) => partner.category,
-                        ),
-                        _comparisonRow(
-                          'Rates',
-                          partners,
-                          (partner) => partner.rateLabel,
-                        ),
-                        _comparisonRow(
-                          'Approval speed',
-                          partners,
-                          (partner) => partner.approvalSpeed,
-                        ),
-                        _comparisonRow(
-                          'Trust score',
-                          partners,
-                          (partner) =>
-                              '${partner.trustScore.toStringAsFixed(0)}/100',
-                        ),
-                        _comparisonRow(
-                          'User rating',
-                          partners,
-                          (partner) =>
-                              '${partner.rating.toStringAsFixed(1)} / 5',
-                        ),
-                        _comparisonRow(
-                          'Minimum income',
-                          partners,
-                          (partner) => partner.minimumIncome == null
-                              ? 'Not specified'
-                              : CurrencyUtils.format(partner.minimumIncome!),
-                        ),
-                        _comparisonRow(
-                          'Estimated benefit',
-                          partners,
-                          (partner) => partner.estimatedBenefit,
-                        ),
-                        _comparisonRow(
-                          'Eligibility',
-                          partners,
-                          (partner) => partner.eligibility.first,
-                        ),
-                        _comparisonRow(
-                          'Risk signal',
-                          partners,
-                          (partner) => partner.riskIndicators.first,
-                        ),
-                      ],
-                    ),
-                  ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onOpen,
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: Text(partner!.ctaLabel),
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  DataRow _comparisonRow(
-    String label,
-    List<MarketplacePartner> partners,
-    String Function(MarketplacePartner partner) valueBuilder,
-  ) {
-    return DataRow(
-      cells: [
-        DataCell(Text(label)),
-        ...partners.map(
-          (partner) => DataCell(
-            SizedBox(width: 150, child: Text(valueBuilder(partner))),
+class _PartnerCard extends StatelessWidget {
+  const _PartnerCard({
+    required this.partner,
+    required this.compared,
+    required this.onOpen,
+    required this.onCompare,
+  });
+
+  final MarketplacePartner partner;
+  final bool compared;
+  final VoidCallback onOpen;
+  final VoidCallback onCompare;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Color(partner.colorHex).withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  _partnerIcon(partner.category),
+                  color: Color(partner.colorHex),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      partner.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.textPrimaryFor(context),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${partner.category} • Trust ${partner.trustScore.toStringAsFixed(0)}',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondaryFor(context),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onCompare,
+                icon: Icon(
+                  compared
+                      ? Icons.check_circle_rounded
+                      : Icons.add_circle_outline_rounded,
+                ),
+                tooltip: compared ? 'Compared' : 'Compare',
+                color: compared
+                    ? AppTheme.success
+                    : AppTheme.primaryFor(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            partner.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoChip(label: partner.rateLabel),
+              _InfoChip(label: partner.approvalSpeed),
+              if (partner.isVerified) const _InfoChip(label: 'Verified'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: onOpen,
+              child: const Text('View details'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchBox extends StatelessWidget {
+  const _SearchBox({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      decoration: const InputDecoration(
+        labelText: 'Search loans, insurance, jobs',
+        prefixIcon: Icon(Icons.search_rounded),
+      ),
+    );
+  }
+}
+
+class _CategoryChips extends StatelessWidget {
+  const _CategoryChips({
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> categories;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories.map((category) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(category),
+              selected: category == selected,
+              onSelected: (_) => onSelected(category),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _CompareSheet extends StatelessWidget {
+  const _CompareSheet({required this.partners});
+
+  final List<MarketplacePartner> partners;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SheetHandle(),
+            Text(
+              'Compare',
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimaryFor(context),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...partners.map(
+              (partner) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _CompareRow(partner: partner),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompareRow extends StatelessWidget {
+  const _CompareRow({required this.partner});
+
+  final MarketplacePartner partner;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCardFor(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            partner.name,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _CompareLine(
+            label: 'Trust',
+            value: partner.trustScore.toStringAsFixed(0),
+          ),
+          _CompareLine(label: 'Rate', value: partner.rateLabel),
+          _CompareLine(label: 'Speed', value: partner.approvalSpeed),
+          if (partner.minimumIncome != null)
+            _CompareLine(
+              label: 'Income',
+              value: CurrencyUtils.format(partner.minimumIncome!),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompareLine extends StatelessWidget {
+  const _CompareLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondaryFor(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniMetric extends StatelessWidget {
+  const _MiniMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCardFor(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.trailing});
+
+  final String title;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Text(
+          trailing,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
     );
   }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.mutedFillFor(context),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: AppTheme.textSecondaryFor(context),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 42,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 18),
+        decoration: BoxDecoration(
+          color: AppTheme.borderFor(context),
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyMarketplace extends StatelessWidget {
+  const _EmptyMarketplace();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Text(
+        'No partners match this search.',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          color: AppTheme.textSecondaryFor(context),
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+IconData _partnerIcon(String category) {
+  final key = category.toLowerCase();
+  if (key.contains('loan')) return Icons.payments_rounded;
+  if (key.contains('insurance')) return Icons.health_and_safety_rounded;
+  if (key.contains('job')) return Icons.work_rounded;
+  if (key.contains('education')) return Icons.school_rounded;
+  if (key.contains('utilities')) return Icons.bolt_rounded;
+  return Icons.storefront_rounded;
 }

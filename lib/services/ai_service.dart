@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 
 import '../app_constants.dart';
 import '../models/budget_plan.dart';
@@ -17,50 +20,69 @@ class AIConfigurationException implements Exception {
 }
 
 class AIService {
-  AIService({String? apiKey, String? modelName})
-    : _apiKey = apiKey?.trim().isNotEmpty == true
-          ? apiKey!.trim()
-          : dotenv.env['GEMINI_API_KEY']?.trim() ?? '',
-      _modelName = modelName?.trim().isNotEmpty == true
-          ? modelName!.trim()
-          : dotenv.env['GEMINI_MODEL']?.trim().isNotEmpty == true
-          ? dotenv.env['GEMINI_MODEL']!.trim()
-          : AppConstants.geminiModel {
-    if (_apiKey.isNotEmpty) {
-      _model = GenerativeModel(model: _modelName, apiKey: _apiKey);
-    }
-  }
+  AIService({
+    String? apiKey,
+    String? githubModelsToken,
+    String? modelName,
+    String? proxyUrl,
+    http.Client? httpClient,
+  }) : _githubModelsToken = _firstNonEmpty([
+         githubModelsToken,
+         apiKey,
+         _defineGitHubModelsToken,
+         _defineModelsApiToken,
+         dotenv.env['GITHUB_MODELS_TOKEN'],
+         dotenv.env['MODELS_API_TOKEN'],
+       ]),
+       _modelName = _firstNonEmpty([
+         modelName,
+         _defineGitHubModelsModel,
+         dotenv.env['GITHUB_MODELS_MODEL'],
+         AppConstants.githubModelsModel,
+       ]),
+       _proxyUrl = _firstNonEmpty([
+         proxyUrl,
+         _defineAiProxyUrl,
+         dotenv.env['AI_PROXY_URL'],
+       ]),
+       _client = httpClient ?? http.Client();
 
-  final String _apiKey;
+  static const String _githubModelsEndpoint =
+      'https://models.github.ai/inference/chat/completions';
+  static const String _defineGitHubModelsToken = String.fromEnvironment(
+    'GITHUB_MODELS_TOKEN',
+  );
+  static const String _defineModelsApiToken = String.fromEnvironment(
+    'MODELS_API_TOKEN',
+  );
+  static const String _defineGitHubModelsModel = String.fromEnvironment(
+    'GITHUB_MODELS_MODEL',
+  );
+  static const String _defineAiProxyUrl = String.fromEnvironment(
+    'AI_PROXY_URL',
+  );
+
+  final String _githubModelsToken;
   final String _modelName;
-  GenerativeModel? _model;
+  final String _proxyUrl;
+  final http.Client _client;
 
-  bool get isConfigured => _apiKey.isNotEmpty;
+  bool get isConfigured =>
+      _proxyUrl.trim().isNotEmpty || _githubModelsToken.trim().isNotEmpty;
 
   Future<void> validateConfiguration() async {
-    _ensureConfigured();
-    try {
-      final response = await _model!.generateContent([
-        Content.text('Reply with exactly: OK'),
-      ]);
-      final text = response.text?.trim();
-      if (text == null || text.isEmpty) {
-        throw AIConfigurationException(
-          'The chatbot API key was accepted but returned an empty response.',
-        );
-      }
-    } catch (error) {
-      if (error is AIConfigurationException) rethrow;
+    final text = await _generate('Reply with exactly: OK');
+    if (text.trim().isEmpty) {
       throw AIConfigurationException(
-        'Invalid or inactive chatbot API key. Update GEMINI_API_KEY in .env and restart FinEase.',
+        'The chatbot key was accepted but returned an empty response.',
       );
     }
   }
 
   void _ensureConfigured() {
-    if (!isConfigured || _model == null) {
+    if (!isConfigured) {
       throw AIConfigurationException(
-        'AI is not configured. Add a valid GEMINI_API_KEY in .env and restart FinEase.',
+        'AI is not configured. Set MODELS_API_TOKEN or GITHUB_MODELS_TOKEN as a dart define, or set AI_PROXY_URL for a server proxy.',
       );
     }
   }
@@ -240,21 +262,119 @@ ${transactions.take(80).map((t) => '${t.type} | ${t.category} | ${CurrencyUtils.
 
   Future<String> _generate(String prompt) async {
     _ensureConfigured();
+
+    final useProxy = _proxyUrl.isNotEmpty;
+    final uri = Uri.parse(useProxy ? _proxyUrl : _githubModelsEndpoint);
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    if (!useProxy) {
+      headers['Authorization'] = 'Bearer $_githubModelsToken';
+      headers['X-GitHub-Api-Version'] = '2022-11-28';
+    }
+
+    final body = jsonEncode({
+      'model': _modelName,
+      'temperature': 0.35,
+      'max_tokens': 500,
+      'messages': [
+        {
+          'role': 'system',
+          'content':
+              'You are FinEase, a practical financial resilience assistant for users in Pakistan. Be concise, specific, and action-focused.',
+        },
+        {'role': 'user', 'content': prompt},
+      ],
+    });
+
     try {
-      final response = await _model!.generateContent([Content.text(prompt)]);
-      final text = response.text?.trim();
-      if (text == null || text.isEmpty) {
+      final response = await _client
+          .post(uri, headers: headers, body: body)
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
         throw AIConfigurationException(
-          'AI returned an empty response. Verify the $_modelName model and API key.',
+          'GitHub Models rejected the token. Check MODELS_API_TOKEN or GITHUB_MODELS_TOKEN, and confirm the token has Models access.',
         );
       }
-      return text.replaceAll('â€¢', '-');
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AIConfigurationException(
+          'AI request failed with status ${response.statusCode}. Check GITHUB_MODELS_MODEL, token access, and network.',
+        );
+      }
+
+      final decoded = jsonDecode(response.body);
+      final text = _extractText(decoded);
+      if (text.isEmpty) {
+        throw AIConfigurationException(
+          'AI returned an empty response. Verify the $_modelName model and token access.',
+        );
+      }
+
+      return text.replaceAll('\u2022', '-').trim();
     } on AIConfigurationException {
       rethrow;
+    } on TimeoutException {
+      throw AIConfigurationException(
+        'AI request timed out. Check the network and try again.',
+      );
     } catch (error) {
       throw AIConfigurationException(
-        'AI request failed. Check GEMINI_API_KEY, GEMINI_MODEL, billing/API access, and network. Details: $error',
+        'AI request failed. Check MODELS_API_TOKEN, GITHUB_MODELS_MODEL, AI_PROXY_URL, and network. Details: $error',
       );
     }
+  }
+
+  static String _extractText(dynamic decoded) {
+    if (decoded is! Map<String, dynamic>) return '';
+
+    final choices = decoded['choices'];
+    if (choices is List && choices.isNotEmpty) {
+      final first = choices.first;
+      if (first is Map<String, dynamic>) {
+        final message = first['message'];
+        if (message is Map<String, dynamic>) {
+          final content = message['content'];
+          if (content is String) return content.trim();
+          if (content is List) {
+            return content
+                .map((part) {
+                  if (part is String) return part;
+                  if (part is Map<String, dynamic>) {
+                    return part['text']?.toString() ?? '';
+                  }
+                  return '';
+                })
+                .join()
+                .trim();
+          }
+        }
+
+        final text = first['text'];
+        if (text is String) return text.trim();
+      }
+    }
+
+    for (final key in const ['text', 'content', 'answer', 'message']) {
+      final value = decoded[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    return '';
+  }
+
+  static String _firstNonEmpty(Iterable<String?> values) {
+    for (final value in values) {
+      final trimmed = value?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) {
+        return trimmed;
+      }
+    }
+    return '';
   }
 }

@@ -35,12 +35,13 @@ class WelfareProgramsPage extends StatelessWidget {
 
 class _WelfarePageContent extends StatefulWidget {
   const _WelfarePageContent();
+
   @override
   State<_WelfarePageContent> createState() => _WelfarePageContentState();
 }
 
 class _WelfarePageContentState extends State<_WelfarePageContent> {
-  final _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void dispose() {
@@ -54,84 +55,25 @@ class _WelfarePageContentState extends State<_WelfarePageContent> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundFor(context),
-      appBar: AppBar(
-        backgroundColor: AppTheme.backgroundFor(context),
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppTheme.textPrimaryFor(context),
-          ),
-          onPressed: () => Navigator.pop(context),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: provider.refresh,
+          color: AppTheme.primaryFor(context),
+          child: provider.isLoading
+              ? const _LoadingList()
+              : provider.error != null
+              ? _ErrorState(message: provider.error!, onRetry: provider.refresh)
+              : _ProgramList(searchController: _searchController),
         ),
-        title: Text(
-          'Financial Assistance',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
-        ),
-        actions: [
-          _BookmarkBadge(count: provider.bookmarkCount),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: provider.refresh,
-        color: AppTheme.primary,
-        child: provider.isLoading
-            ? const _LoadingSkeleton()
-            : provider.error != null
-            ? _ErrorState(message: provider.error!, onRetry: provider.refresh)
-            : _ProgramList(searchController: _searchController),
       ),
     );
   }
 }
-
-// ── Bookmark badge ──────────────────────────────────────────────────────────
-
-class _BookmarkBadge extends StatelessWidget {
-  const _BookmarkBadge({required this.count});
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(
-          Icons.bookmark_outline_rounded,
-          color: AppTheme.textPrimaryFor(context),
-        ),
-        if (count > 0)
-          Positioned(
-            top: -4,
-            right: -4,
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '$count',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ── Main list ───────────────────────────────────────────────────────────────
 
 class _ProgramList extends StatelessWidget {
   const _ProgramList({required this.searchController});
+
   final TextEditingController searchController;
 
   @override
@@ -139,325 +81,336 @@ class _ProgramList extends StatelessWidget {
     final provider = context.watch<WelfareProvider>();
     final filtered = provider.filteredPrograms;
     final recommended = provider.recommendedPrograms;
-    final hasFilters = provider.hasActiveFilters;
+    final showRecommended =
+        !provider.hasActiveFilters && recommended.isNotEmpty;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 116),
       children: [
-        const SizedBox(height: 6),
-        _HeroHeader(),
-        const SizedBox(height: 20),
-        _SearchBar(controller: searchController),
-        const SizedBox(height: 14),
-        _CategoryChips(),
-        const SizedBox(height: 10),
-        _TagChips(),
-        if (hasFilters)
-          _ActiveFilterBanner(provider: provider, controller: searchController),
-        const SizedBox(height: 20),
-
-        // Recommended section — only shown when no filter active
-        if (!hasFilters && recommended.isNotEmpty) ...[
-          _SectionHeader(
-            title: 'Recommended for You',
-            subtitle: 'Based on your profile and eligibility',
-            icon: Icons.auto_awesome_rounded,
-          ),
-          const SizedBox(height: 12),
+        _Header(bookmarkCount: provider.bookmarkCount),
+        const SizedBox(height: 18),
+        _SearchAndFilter(
+          controller: searchController,
+          activeFilterCount: provider.activeFilterCount,
+          onFilterTap: () => _openFilterSheet(context, searchController),
+        ),
+        const SizedBox(height: 12),
+        const _CategoryRail(),
+        if (provider.hasActiveFilters) ...[
+          const SizedBox(height: 10),
+          _ActiveFilters(controller: searchController),
+        ],
+        if (showRecommended) ...[
+          const SizedBox(height: 20),
+          const _SectionTitle(title: 'Best matches', subtitle: 'From profile'),
+          const SizedBox(height: 10),
           ...recommended.map(
-            (p) => _ProgramCard(program: p, isHighlighted: true),
+            (program) => _ProgramCard(program: program, recommended: true),
           ),
-          const SizedBox(height: 8),
-          Divider(color: AppTheme.borderFor(context)),
-          const SizedBox(height: 12),
-          _SectionHeader(
-            title: 'All Programs',
-            subtitle: '${filtered.length} programs found',
-            icon: Icons.list_alt_rounded,
+          const SizedBox(height: 10),
+          _SectionTitle(
+            title: 'All programs',
+            subtitle: '${filtered.length} found',
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+        ] else ...[
+          const SizedBox(height: 18),
+          _SectionTitle(
+            title: 'Programs',
+            subtitle: '${filtered.length} found',
+          ),
+          const SizedBox(height: 10),
         ],
-
         if (filtered.isEmpty)
-          _EmptyState(onClear: provider.clearFilters)
-        else ...[
-          ...filtered.map((p) => _ProgramCard(program: p)),
-        ],
-
-        const SizedBox(height: 20),
-        _ImpactBanner(count: filtered.length),
+          _EmptyState(onClear: () => _clearFilters(provider, searchController))
+        else
+          ...filtered.map((program) => _ProgramCard(program: program)),
       ],
     );
   }
 }
 
-// ── Hero header ─────────────────────────────────────────────────────────────
+class _Header extends StatelessWidget {
+  const _Header({required this.bookmarkCount});
 
-class _HeroHeader extends StatelessWidget {
+  final int bookmarkCount;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final canPop = Navigator.canPop(context);
+    return Row(
       children: [
-        Text(
-          'Verified support\nprograms',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.primary,
-            height: 1.15,
+        if (canPop) ...[
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back_rounded),
+            color: AppTheme.textPrimaryFor(context),
+            tooltip: 'Back',
+          ),
+          const SizedBox(width: 4),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Find support',
+                style: GoogleFonts.plusJakartaSans(
+                  color: AppTheme.textPrimaryFor(context),
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Verified aid, scholarships, health cover, and loans.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Discover real welfare, scholarship, health and loan programs in Pakistan.',
-          style: GoogleFonts.inter(
-            color: AppTheme.textSecondaryFor(context),
-            height: 1.5,
-          ),
-        ),
+        _BookmarkCount(count: bookmarkCount),
       ],
     );
   }
 }
 
-// ── Search bar ──────────────────────────────────────────────────────────────
+class _BookmarkCount extends StatelessWidget {
+  const _BookmarkCount({required this.count});
 
-class _SearchBar extends StatelessWidget {
-  const _SearchBar({required this.controller});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryFor(context).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.bookmark_rounded,
+            color: AppTheme.primaryFor(context),
+            size: 18,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '$count',
+            style: GoogleFonts.inter(
+              color: AppTheme.primaryFor(context),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchAndFilter extends StatelessWidget {
+  const _SearchAndFilter({
+    required this.controller,
+    required this.activeFilterCount,
+    required this.onFilterTap,
+  });
+
   final TextEditingController controller;
+  final int activeFilterCount;
+  final VoidCallback onFilterTap;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.read<WelfareProvider>();
-    return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: controller,
-      builder: (context, value, child) {
-        return TextField(
-          controller: controller,
-          onChanged: provider.setSearch,
-          decoration: InputDecoration(
-            hintText: 'Search by title, organization, tags or keywords…',
-            prefixIcon: Icon(Icons.search_rounded),
-            suffixIcon: value.text.isNotEmpty
-                ? IconButton(
-                    icon: Icon(Icons.close_rounded),
-                    onPressed: () {
-                      controller.clear();
-                      provider.setSearch('');
-                    },
-                  )
-                : null,
+    return Row(
+      children: [
+        Expanded(
+          child: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, child) {
+              return TextField(
+                controller: controller,
+                textInputAction: TextInputAction.search,
+                onChanged: provider.setSearch,
+                decoration: InputDecoration(
+                  hintText: 'Search program or need',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: value.text.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            controller.clear();
+                            provider.setSearch('');
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                          tooltip: 'Clear search',
+                        ),
+                ),
+              );
+            },
           ),
-        );
-      },
-    );
-  }
-}
-
-// ── Category chips ──────────────────────────────────────────────────────────
-
-class _CategoryChips extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<WelfareProvider>();
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _Chip(
-            label: 'All',
-            selected: provider.selectedCategory == null,
-            onTap: () => provider.setCategory(null),
-          ),
-          ...WelfareCategory.values.map(
-            (cat) => _Chip(
-              label: cat.displayName,
-              selected: provider.selectedCategory == cat,
-              onTap: () => provider.setCategory(cat),
+        ),
+        const SizedBox(width: 10),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              onPressed: onFilterTap,
+              icon: const Icon(Icons.tune_rounded),
+              color: AppTheme.primaryFor(context),
+              tooltip: 'Filters',
+              style: IconButton.styleFrom(
+                backgroundColor: AppTheme.surfaceFor(context),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: AppTheme.borderFor(context)),
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Tag chips ───────────────────────────────────────────────────────────────
-
-class _TagChips extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<WelfareProvider>();
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: kWelfareTags
-            .map(
-              (tag) => Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: GestureDetector(
-                  onTap: () => provider.toggleTag(tag),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: provider.selectedTags.contains(tag)
-                          ? AppTheme.primary.withValues(alpha: 0.12)
-                          : AppTheme.surfaceFor(context),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: provider.selectedTags.contains(tag)
-                            ? AppTheme.primary
-                            : AppTheme.borderFor(context),
-                      ),
-                    ),
-                    child: Text(
-                      '#$tag',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: provider.selectedTags.contains(tag)
-                            ? AppTheme.primary
-                            : AppTheme.textSecondaryFor(context),
-                      ),
+            if (activeFilterCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: CircleAvatar(
+                  radius: 9,
+                  backgroundColor: AppTheme.primaryFor(context),
+                  child: Text(
+                    '$activeFilterCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
               ),
-            )
-            .toList(),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CategoryRail extends StatelessWidget {
+  const _CategoryRail();
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<WelfareProvider>();
+    final items = <({String label, IconData icon, WelfareCategory? category})>[
+      (label: 'All', icon: Icons.apps_rounded, category: null),
+      ...WelfareCategory.values.map(
+        (category) => (
+          label: category.displayName,
+          icon: category.icon,
+          category: category,
+        ),
+      ),
+    ];
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final selected = provider.selectedCategory == item.category;
+          return ChoiceChip(
+            selected: selected,
+            onSelected: (_) => provider.setCategory(item.category),
+            avatar: Icon(
+              item.icon,
+              size: 17,
+              color: selected ? Colors.white : AppTheme.primaryFor(context),
+            ),
+            label: Text(item.label),
+            selectedColor: AppTheme.primaryFor(context),
+            backgroundColor: AppTheme.surfaceFor(context),
+            labelStyle: GoogleFonts.inter(
+              color: selected ? Colors.white : AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+              side: BorderSide(color: AppTheme.borderFor(context)),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-// ── Active filter banner ─────────────────────────────────────────────────────
+class _ActiveFilters extends StatelessWidget {
+  const _ActiveFilters({required this.controller});
 
-class _ActiveFilterBanner extends StatelessWidget {
-  const _ActiveFilterBanner({required this.provider, required this.controller});
-  final WelfareProvider provider;
   final TextEditingController controller;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Row(
-        children: [
-          Icon(
-            Icons.filter_list_rounded,
-            size: 14,
-            color: AppTheme.textSecondaryFor(context),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '${provider.activeFilterCount} filters active',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: AppTheme.textSecondaryFor(context),
-            ),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {
-              controller.clear();
-              provider.clearFilters();
-            },
-            child: Text(
-              'Clear all',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Generic chip ─────────────────────────────────────────────────────────────
-
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? AppTheme.primary : AppTheme.surfaceFor(context),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected ? AppTheme.primary : AppTheme.borderFor(context),
-            ),
-          ),
+    final provider = context.watch<WelfareProvider>();
+    return Row(
+      children: [
+        Icon(
+          Icons.filter_list_rounded,
+          size: 16,
+          color: AppTheme.textSecondaryFor(context),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
           child: Text(
-            label,
+            '${provider.activeFilterCount} filter${provider.activeFilterCount == 1 ? '' : 's'} active',
             style: GoogleFonts.inter(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              color: selected
-                  ? Colors.white
-                  : AppTheme.textSecondaryFor(context),
+              color: AppTheme.textSecondaryFor(context),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
-      ),
+        TextButton(
+          onPressed: () => _clearFilters(provider, controller),
+          child: const Text('Clear'),
+        ),
+      ],
     );
   }
 }
 
-// ── Section header ───────────────────────────────────────────────────────────
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.subtitle});
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
   final String title;
   final String subtitle;
-  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: AppTheme.primary),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            color: AppTheme.textPrimaryFor(context),
-            fontSize: 16,
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
-        const Spacer(),
         Text(
           subtitle,
           style: GoogleFonts.inter(
-            fontSize: 12,
             color: AppTheme.textSecondaryFor(context),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ],
@@ -465,266 +418,173 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ── Program card ─────────────────────────────────────────────────────────────
-
 class _ProgramCard extends StatelessWidget {
-  const _ProgramCard({required this.program, this.isHighlighted = false});
+  const _ProgramCard({required this.program, this.recommended = false});
+
   final WelfareProgram program;
-  final bool isHighlighted;
+  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WelfareProvider>();
     final bookmarked = provider.isBookmarked(program.id);
-    final appStatus = provider.applicationStatus(program.id);
+    final status = provider.applicationStatus(program.id);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChangeNotifierProvider.value(
-              value: provider,
-              child: WelfareProgramDetailPage(program: program),
-            ),
-          ),
-        ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _openDetail(context, provider, program),
         child: Container(
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppTheme.surfaceFor(context),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: isHighlighted
-                  ? AppTheme.primary.withValues(alpha: 0.3)
+              color: recommended
+                  ? AppTheme.primaryFor(context).withValues(alpha: 0.35)
                   : AppTheme.borderFor(context),
-              width: isHighlighted ? 1.5 : 1,
             ),
-            boxShadow: isHighlighted
-                ? AppTheme.cardShadow
-                : AppTheme.softShadow,
+            boxShadow: AppTheme.softShadow,
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (isHighlighted)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _IconBadge(
+                    icon: program.category.icon,
+                    color: program.category.badgeTextColor,
+                    background: program.category.badgeColor,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.07),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(17),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                program.category.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.primaryFor(context),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            if (recommended) const _RecommendedPill(),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          program.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            color: AppTheme.textPrimaryFor(context),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 17,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          program.organization,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: AppTheme.textSecondaryFor(context),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.auto_awesome_rounded,
-                        size: 12,
-                        color: AppTheme.primary,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Recommended for you',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => provider.toggleBookmark(program.id),
+                    icon: Icon(
+                      bookmarked
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_outline_rounded,
+                    ),
+                    color: bookmarked
+                        ? AppTheme.primaryFor(context)
+                        : AppTheme.textSecondaryFor(context),
+                    tooltip: bookmarked ? 'Remove bookmark' : 'Bookmark',
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                program.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  height: 1.45,
+                  fontSize: 13,
                 ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(9),
-                          decoration: BoxDecoration(
-                            color: program.category.badgeColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            program.category.icon,
-                            color: program.category.badgeTextColor,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: program.category.badgeColor,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  program.category.displayName,
-                                  style: GoogleFonts.inter(
-                                    color: program.category.badgeTextColor,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ),
-                              if (appStatus != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 3),
-                                  child: Text(
-                                    _statusLabel(appStatus),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      color: AppTheme.textSecondaryFor(context),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => provider.toggleBookmark(program.id),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              bookmarked
-                                  ? Icons.bookmark_rounded
-                                  : Icons.bookmark_outline_rounded,
-                              key: ValueKey(bookmarked),
-                              color: bookmarked
-                                  ? AppTheme.primary
-                                  : AppTheme.textSecondaryFor(context),
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MetaPill(
+                    icon: Icons.payments_outlined,
+                    label: program.estimatedSupportValue,
+                    color: AppTheme.success,
+                  ),
+                  _MetaPill(
+                    icon: Icons.speed_rounded,
+                    label: program.difficulty.label,
+                    color: program.difficulty.color,
+                  ),
+                  if (status != null)
+                    _MetaPill(
+                      icon: _statusIcon(status),
+                      label: _statusLabel(status),
+                      color: _statusColor(status),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      program.title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _openDetail(context, provider, program),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
+                      child: const Text('Details'),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      program.organization,
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppTheme.textSecondaryFor(context),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => UrlLauncherService.instance
+                          .launchExternalUrl(context, program.officialUrl),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
+                      child: const Text('Apply'),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      program.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondaryFor(context),
-                        height: 1.5,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _MetaPill(
-                          icon: Icons.payments_outlined,
-                          label: program.estimatedSupportValue,
-                          color: AppTheme.success,
-                        ),
-                        const SizedBox(width: 8),
-                        _MetaPill(
-                          icon: Icons.speed_rounded,
-                          label: program.difficulty.label,
-                          color: program.difficulty.color,
-                        ),
-                        if (program.isVerified) ...[
-                          const SizedBox(width: 8),
-                          _MetaPill(
-                            icon: Icons.verified_rounded,
-                            label: 'Verified',
-                            color: AppTheme.primary,
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChangeNotifierProvider.value(
-                                  value: provider,
-                                  child: WelfareProgramDetailPage(
-                                    program: program,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppTheme.primary),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: Text(
-                              'View Details',
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.primary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async => await UrlLauncherService
-                                .instance
-                                .launchExternalUrl(
-                                  context,
-                                  program.officialUrl,
-                                ),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: Text(
-                              'Apply Now',
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -732,14 +592,176 @@ class _ProgramCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _statusLabel(ApplicationStatus s) => switch (s) {
-    ApplicationStatus.saved => '🔖 Saved',
-    ApplicationStatus.applied => '✉️ Applied',
-    ApplicationStatus.inReview => '⏳ In Review',
-    ApplicationStatus.approved => '✅ Approved',
-    ApplicationStatus.rejected => '❌ Not Approved',
-  };
+class _RecommendedPill extends StatelessWidget {
+  const _RecommendedPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryFor(context).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'Match',
+        style: GoogleFonts.inter(
+          color: AppTheme.primaryFor(context),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterSheet extends StatelessWidget {
+  const _FilterSheet({required this.searchController});
+
+  final TextEditingController searchController;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<WelfareProvider>();
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.borderFor(context),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          _SectionTitle(
+            title: 'Filters',
+            subtitle: '${provider.activeFilterCount} active',
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Category',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _FilterChip(
+                label: 'All',
+                selected: provider.selectedCategory == null,
+                onTap: () => provider.setCategory(null),
+              ),
+              ...WelfareCategory.values.map(
+                (category) => _FilterChip(
+                  label: category.displayName,
+                  selected: provider.selectedCategory == category,
+                  onTap: () => provider.setCategory(category),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Needs',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: kWelfareTags
+                    .map(
+                      (tag) => _FilterChip(
+                        label: tag,
+                        selected: provider.selectedTags.contains(tag),
+                        onTap: () => provider.toggleTag(tag),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _clearFilters(provider, searchController),
+                  child: const Text('Clear'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Show results'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      onPressed: onTap,
+      label: Text(label),
+      avatar: selected
+          ? const Icon(Icons.check_rounded, size: 17, color: Colors.white)
+          : null,
+      backgroundColor: selected
+          ? AppTheme.primaryFor(context)
+          : AppTheme.mutedFillFor(context),
+      labelStyle: GoogleFonts.inter(
+        color: selected ? Colors.white : AppTheme.textPrimaryFor(context),
+        fontWeight: FontWeight.w800,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: BorderSide(color: AppTheme.borderFor(context)),
+      ),
+    );
+  }
 }
 
 class _MetaPill extends StatelessWidget {
@@ -748,6 +770,7 @@ class _MetaPill extends StatelessWidget {
     required this.label,
     required this.color,
   });
+
   final IconData icon;
   final String label;
   final Color color;
@@ -755,22 +778,22 @@ class _MetaPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
           Text(
             label,
             style: GoogleFonts.inter(
-              fontSize: 11,
               color: color,
-              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -779,81 +802,67 @@ class _MetaPill extends StatelessWidget {
   }
 }
 
-// ── Impact banner ─────────────────────────────────────────────────────────────
+class _IconBadge extends StatelessWidget {
+  const _IconBadge({
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
 
-class _ImpactBanner extends StatelessWidget {
-  const _ImpactBanner({required this.count});
-  final int count;
+  final IconData icon;
+  final Color color;
+  final Color background;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
-        gradient: AppTheme.cardGradient,
-        borderRadius: BorderRadius.circular(22),
+        color: background,
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Impact snapshot',
-            style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.75),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Compare real support pathways before you apply.',
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _ImpactStat(value: '$count', label: 'PROGRAMS'),
-              _ImpactStat(
-                value: '${WelfareCategory.values.length}',
-                label: 'CATEGORIES',
-              ),
-              const _ImpactStat(value: '100%', label: 'OFFICIAL'),
-            ],
-          ),
-        ],
-      ),
+      child: Icon(icon, color: color, size: 21),
     );
   }
 }
 
-class _ImpactStat extends StatelessWidget {
-  const _ImpactStat({required this.value, required this.label});
-  final String value;
-  final String label;
+class _LoadingList extends StatelessWidget {
+  const _LoadingList();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 116),
       children: [
-        Text(
-          value,
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 22,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 10,
+        const _SkeletonLine(width: 170, height: 34),
+        const SizedBox(height: 10),
+        const _SkeletonLine(width: double.infinity, height: 16),
+        const SizedBox(height: 22),
+        const _SkeletonLine(width: double.infinity, height: 54, radius: 14),
+        const SizedBox(height: 18),
+        ...List.generate(
+          4,
+          (_) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceFor(context),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppTheme.borderFor(context)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SkeletonLine(width: 190, height: 18),
+                  SizedBox(height: 10),
+                  _SkeletonLine(width: double.infinity, height: 12),
+                  SizedBox(height: 8),
+                  _SkeletonLine(width: 220, height: 12),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -861,70 +870,13 @@ class _ImpactStat extends StatelessWidget {
   }
 }
 
-// ── Loading skeleton ──────────────────────────────────────────────────────────
+class _SkeletonLine extends StatelessWidget {
+  const _SkeletonLine({
+    required this.width,
+    required this.height,
+    this.radius = 8,
+  });
 
-class _LoadingSkeleton extends StatelessWidget {
-  const _LoadingSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: List.generate(4, (_) => const _SkeletonCard()),
-    );
-  }
-}
-
-class _SkeletonCard extends StatelessWidget {
-  const _SkeletonCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.borderFor(context)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _Bone(width: 42, height: 42, radius: 12),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Bone(width: 80, height: 12),
-                  const SizedBox(height: 6),
-                  _Bone(width: 140, height: 18),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _Bone(width: double.infinity, height: 12),
-          const SizedBox(height: 6),
-          _Bone(width: 200, height: 12),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _Bone(width: 80, height: 26, radius: 8),
-              const SizedBox(width: 8),
-              _Bone(width: 70, height: 26, radius: 8),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Bone extends StatelessWidget {
-  const _Bone({required this.width, required this.height, this.radius = 6});
   final double width;
   final double height;
   final double radius;
@@ -942,98 +894,158 @@ class _Bone extends StatelessWidget {
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onClear});
+
   final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60),
-      child: Center(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.search_off_rounded,
-                size: 44,
-                color: AppTheme.primary,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            color: AppTheme.textHintFor(context),
+            size: 42,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'No programs found',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No programs found',
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-                color: AppTheme.textPrimaryFor(context),
-              ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Try clearing filters or searching a broader need.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              height: 1.4,
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Try adjusting your search or filters.',
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondaryFor(context),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton.icon(
-              onPressed: onClear,
-              icon: Icon(Icons.refresh_rounded),
-              label: const Text('Clear Filters'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(onPressed: onClear, child: const Text('Clear filters')),
+        ],
       ),
     );
   }
 }
 
-// ── Error state ───────────────────────────────────────────────────────────────
-
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.message, required this.onRetry});
+
   final String message;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 52,
-              color: AppTheme.textSecondaryFor(context),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondaryFor(context),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-            ),
-          ],
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 120),
+        Icon(Icons.wifi_off_rounded, size: 48, color: AppTheme.error),
+        const SizedBox(height: 16),
+        Text(
+          'Could not load programs',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.plusJakartaSans(
+            color: AppTheme.textPrimaryFor(context),
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ),
+      ],
     );
   }
+}
+
+void _openDetail(
+  BuildContext context,
+  WelfareProvider provider,
+  WelfareProgram program,
+) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ChangeNotifierProvider.value(
+        value: provider,
+        child: WelfareProgramDetailPage(program: program),
+      ),
+    ),
+  );
+}
+
+void _openFilterSheet(BuildContext context, TextEditingController controller) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => ChangeNotifierProvider.value(
+      value: context.read<WelfareProvider>(),
+      child: _FilterSheet(searchController: controller),
+    ),
+  );
+}
+
+void _clearFilters(WelfareProvider provider, TextEditingController controller) {
+  controller.clear();
+  provider.clearFilters();
+}
+
+String _statusLabel(ApplicationStatus status) {
+  return switch (status) {
+    ApplicationStatus.saved => 'Saved',
+    ApplicationStatus.applied => 'Applied',
+    ApplicationStatus.inReview => 'In review',
+    ApplicationStatus.approved => 'Approved',
+    ApplicationStatus.rejected => 'Not approved',
+  };
+}
+
+IconData _statusIcon(ApplicationStatus status) {
+  return switch (status) {
+    ApplicationStatus.saved => Icons.bookmark_rounded,
+    ApplicationStatus.applied => Icons.send_rounded,
+    ApplicationStatus.inReview => Icons.hourglass_top_rounded,
+    ApplicationStatus.approved => Icons.check_circle_rounded,
+    ApplicationStatus.rejected => Icons.cancel_rounded,
+  };
+}
+
+Color _statusColor(ApplicationStatus status) {
+  return switch (status) {
+    ApplicationStatus.saved => AppTheme.primary,
+    ApplicationStatus.applied => AppTheme.warning,
+    ApplicationStatus.inReview => AppTheme.warning,
+    ApplicationStatus.approved => AppTheme.success,
+    ApplicationStatus.rejected => AppTheme.error,
+  };
 }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 
 import '../app_constants.dart';
 import '../data/demo_finance_data.dart';
@@ -8,6 +9,17 @@ import '../models/app_config.dart';
 
 class BootstrapService {
   static Future<void> ensureSpecialAccounts() async {
+    try {
+      await _ensureSpecialAccounts().timeout(const Duration(seconds: 10));
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('FinEase bootstrap skipped: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+  }
+
+  static Future<void> _ensureSpecialAccounts() async {
     final bootstrapApp = await Firebase.initializeApp(
       name: 'finease-bootstrap',
       options: Firebase.app().options,
@@ -116,23 +128,41 @@ class BootstrapService {
     final batch = userRef.firestore.batch();
 
     for (final transaction in DemoFinanceData.sampleTransactions()) {
-      batch.set(userRef.collection('transactions').doc(), transaction.toMap());
+      batch.set(
+        userRef.collection('transactions').doc(transaction.id),
+        transaction.toMap(),
+        SetOptions(merge: true),
+      );
     }
 
     for (final budget in DemoFinanceData.sampleBudgetPlans()) {
       final map = budget.toMap();
       map['createdAt'] = FieldValue.serverTimestamp();
-      batch.set(userRef.collection('budget_plans').doc(), map);
+      batch.set(
+        userRef.collection('budget_plans').doc(budget.id),
+        map,
+        SetOptions(merge: true),
+      );
     }
 
     for (final goal in DemoFinanceData.sampleGoals()) {
       final map = goal.toMap();
       map['createdAt'] = FieldValue.serverTimestamp();
-      batch.set(userRef.collection('saving_goals').doc(), map);
+      batch.set(
+        userRef.collection('saving_goals').doc(goal.id),
+        map,
+        SetOptions(merge: true),
+      );
     }
 
     batch.set(userRef, DemoFinanceData.sampleProfile, SetOptions(merge: true));
     await batch.commit();
+  }
+
+  static Future<void> ensureDemoDataForUid(String uid) async {
+    if (uid.isEmpty) return;
+    final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+    await _seedDemoUserData(userRef);
   }
 
   static Future<void> _seedMarketplace(FirebaseFirestore db) async {

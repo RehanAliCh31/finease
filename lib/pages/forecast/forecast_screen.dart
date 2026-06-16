@@ -1,765 +1,1280 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../models/transaction.dart';
+import 'package:provider/provider.dart';
+
+import '../../models/budget_plan.dart';
 import '../../models/prediction_models.dart';
+import '../../models/transaction.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 import '../../services/prediction_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/currency_utils.dart';
+import '../../utils/finance_consistency_utils.dart';
+import '../budget/ai_budget_advisor_page.dart';
+import '../savings/savings_tracker_page.dart';
+import '../transactions/add_transaction_page.dart';
 
-class ForecastScreen extends StatefulWidget {
-  final List<FinancialTransaction> transactions;
-  final Map<String, double> budgets;
-  final double monthlyIncome;
-
+class ForecastScreen extends StatelessWidget {
   const ForecastScreen({
     super.key,
-    required this.transactions,
-    required this.budgets,
-    required this.monthlyIncome,
+    this.transactions,
+    this.budgets,
+    this.monthlyIncome,
   });
 
-  @override
-  State<ForecastScreen> createState() => _ForecastScreenState();
-}
+  final List<FinancialTransaction>? transactions;
+  final Map<String, double>? budgets;
+  final double? monthlyIncome;
 
-class _ForecastScreenState extends State<ForecastScreen>
-    with SingleTickerProviderStateMixin {
-  late final PredictionService _svc;
-  late final ForecastResult _forecast;
-  late final ForecastResult _savings;
-  late final List<BudgetWarning> _warnings;
-  late final AnimationController _anim;
-  int? _touchedIndex;
-
-  static const _primary = Color(0xFF2E3192);
-  static const _success = Color(0xFF059669);
-  static const _danger = Color(0xFFDC2626);
-  static const _predColor = Color(0xFF00C2A8); // teal for prediction bar
-
-  @override
-  void initState() {
-    super.initState();
-    _svc = PredictionService();
-    _forecast = _svc.predictNextMonthExpenses(widget.transactions);
-
-    final income = widget.monthlyIncome > 0 ? widget.monthlyIncome : 1.0;
-    _savings = _svc.forecastSavings(income, _forecast.categoryPredictions);
-
-    final now = DateTime.now();
-    final currentMonth = widget.transactions
-        .where((t) => t.date.year == now.year && t.date.month == now.month)
-        .toList();
-    _warnings = _svc.getBudgetWarnings(currentMonth, widget.budgets);
-
-    _anim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..forward();
-  }
-
-  @override
-  void dispose() {
-    _anim.dispose();
-    super.dispose();
-  }
-
-  // Build bar data for last 3 months + 1 prediction bar
-  List<_MonthBar> _buildBarData() {
-    final now = DateTime.now();
-    final months = <_MonthBar>[];
-    for (int offset = 3; offset >= 1; offset--) {
-      final dt = _monthOffset(now, -offset);
-      final total = _svc.getTotalForMonth(
-        widget.transactions,
-        dt.year,
-        dt.month,
-      );
-      months.add(
-        _MonthBar(
-          label: _monthAbbr(dt.month),
-          amount: total,
-          isPrediction: false,
-        ),
-      );
-    }
-    months.add(
-      _MonthBar(
-        label: 'Next\n${_monthAbbr(_monthOffset(now, 1).month)}',
-        amount: _forecast.totalPredicted,
-        isPrediction: true,
-      ),
-    );
-    return months;
-  }
+  bool get _hasProvidedData =>
+      transactions != null || budgets != null || monthlyIncome != null;
 
   @override
   Widget build(BuildContext context) {
-    final bars = _buildBarData();
-    final maxVal = bars.map((b) => b.amount).fold(0.0, (a, b) => a > b ? a : b);
+    if (_hasProvidedData) {
+      final data = _ForecastData.fromInputs(
+        transactions: transactions ?? const [],
+        budgets: budgets ?? const {},
+        monthlyIncome: monthlyIncome ?? 0,
+      );
+      return _ForecastScaffold(data: data);
+    }
 
+    final firestore = context.watch<AuthService>().firestoreService;
+    if (firestore == null) {
+      return const _ForecastScaffold(
+        child: _StateMessage(
+          icon: Icons.lock_outline_rounded,
+          title: 'Sign in to view forecast',
+          message: 'Your next-month outlook needs your private finance data.',
+        ),
+      );
+    }
+
+    return _ForecastLoader(firestore: firestore);
+  }
+}
+
+class _ForecastLoader extends StatelessWidget {
+  const _ForecastLoader({required this.firestore});
+
+  final FirestoreService firestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final monthKey = _monthKey(DateTime.now());
+
+    return StreamBuilder<List<FinancialTransaction>>(
+      stream: firestore.getTransactions(),
+      builder: (context, transactionSnapshot) {
+        if (transactionSnapshot.hasError) {
+          return _ForecastScaffold(child: _errorMessage());
+        }
+        if (!transactionSnapshot.hasData) {
+          return const _ForecastScaffold(child: _LoadingMessage());
+        }
+
+        return StreamBuilder<List<BudgetPlan>>(
+          stream: firestore.getBudgetPlans(monthKey: monthKey),
+          builder: (context, budgetSnapshot) {
+            if (budgetSnapshot.hasError) {
+              return _ForecastScaffold(child: _errorMessage());
+            }
+            if (!budgetSnapshot.hasData) {
+              return const _ForecastScaffold(child: _LoadingMessage());
+            }
+
+            return StreamBuilder<Map<String, dynamic>>(
+              stream: firestore.getUserProfile(),
+              builder: (context, profileSnapshot) {
+                if (profileSnapshot.hasError) {
+                  return _ForecastScaffold(child: _errorMessage());
+                }
+                if (!profileSnapshot.hasData) {
+                  return const _ForecastScaffold(child: _LoadingMessage());
+                }
+
+                final transactions = transactionSnapshot.data ?? const [];
+                final budgets = <String, double>{
+                  for (final budget in budgetSnapshot.data ?? const [])
+                    budget.category: budget.allocatedAmount,
+                };
+                final profile = profileSnapshot.data ?? const {};
+                final profileIncome = _number(profile['monthlyIncome']);
+                final transactionIncome = transactions
+                    .where(
+                      (txn) =>
+                          txn.type == 'income' && _isCurrentMonth(txn.date),
+                    )
+                    .fold(0.0, (sum, txn) => sum + txn.amount);
+                final income = FinanceConsistencyUtils.resolveMonthlyIncome(
+                  profileMonthlyIncome: profileIncome,
+                  transactionIncome: transactionIncome,
+                );
+
+                final data = _ForecastData.fromInputs(
+                  transactions: transactions,
+                  budgets: budgets,
+                  monthlyIncome: income,
+                );
+                return _ForecastScaffold(data: data);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _errorMessage() {
+    return const _StateMessage(
+      icon: Icons.cloud_off_rounded,
+      title: 'Forecast could not load',
+      message: 'Check your connection and try again in a moment.',
+    );
+  }
+}
+
+class _ForecastScaffold extends StatelessWidget {
+  const _ForecastScaffold({this.data, this.child});
+
+  final _ForecastData? data;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundFor(context),
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                const SizedBox(height: 12),
-
-                // ── Savings highlight card ──────────────────────────────
-                _buildSavingsCard(),
-                const SizedBox(height: 20),
-
-                // ── Monthly bar chart ───────────────────────────────────
-                _sectionHeader(
-                  Icons.bar_chart_rounded,
-                  'Monthly Overview',
-                  'Last 3 months + forecast',
-                ),
-                const SizedBox(height: 12),
-                _buildBarChart(bars, maxVal),
-                const SizedBox(height: 24),
-
-                // ── Budget warnings ─────────────────────────────────────
-                if (_warnings.isNotEmpty) ...[
-                  _sectionHeader(
-                    Icons.warning_amber_rounded,
-                    'Budget Alerts',
-                    '${_warnings.length} at risk',
-                    iconColor: _danger,
-                  ),
-                  const SizedBox(height: 12),
-                  ..._warnings.map(_buildWarningTile),
-                  const SizedBox(height: 24),
-                ],
-
-                // ── Category prediction table ───────────────────────────
-                _sectionHeader(
-                  Icons.table_chart_rounded,
-                  'Category Predictions',
-                  'Weighted 3-month forecast',
-                ),
-                const SizedBox(height: 12),
-                _buildCategoryTable(),
-                const SizedBox(height: 24),
-              ]),
-            ),
+      appBar: AppBar(
+        backgroundColor: AppTheme.surfaceFor(context),
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppTheme.textPrimaryFor(context),
+            size: 20,
           ),
-        ],
-      ),
-    );
-  }
-
-  // ── AppBar ─────────────────────────────────────────────────────────────────
-  SliverAppBar _buildAppBar() => SliverAppBar(
-    expandedHeight: 120,
-    floating: false,
-    pinned: true,
-    backgroundColor: _primary,
-    leading: IconButton(
-      icon: Icon(
-        Icons.arrow_back_ios_new_rounded,
-        color: Colors.white,
-        size: 20,
-      ),
-      onPressed: () => Navigator.pop(context),
-    ),
-    flexibleSpace: FlexibleSpaceBar(
-      titlePadding: const EdgeInsets.fromLTRB(20, 0, 0, 16),
-      title: Text(
-        'Spending Forecast',
-        style: GoogleFonts.plusJakartaSans(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+          onPressed: () => Navigator.maybePop(context),
         ),
-      ),
-      background: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF2E3192), Color(0xFF4B5BD6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 20, top: 20),
-            child: Icon(
-              Icons.auto_graph_rounded,
-              size: 64,
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-
-  // ── Savings Card ───────────────────────────────────────────────────────────
-  Widget _buildSavingsCard() {
-    final isPositive = _savings.predictedSavings >= 0;
-    final color = isPositive ? _success : _danger;
-    final pct = _savings.savingsPercentage;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isPositive
-              ? [const Color(0xFF059669), const Color(0xFF047857)]
-              : [const Color(0xFFDC2626), const Color(0xFFB91C1C)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.30),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Projected Savings',
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'PKR ${PredictionService.fmt(_savings.predictedSavings.abs())}',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isPositive
-                      ? '${pct.toStringAsFixed(1)}% of your monthly income'
-                      : 'You\'re spending more than you earn',
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.75),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isPositive ? Icons.savings_rounded : Icons.warning_rounded,
-              color: Colors.white,
-              size: 32,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Bar Chart ──────────────────────────────────────────────────────────────
-  Widget _buildBarChart(List<_MonthBar> bars, double maxVal) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, _) => Container(
-        height: 250,
-        padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceFor(context),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: _primary.withValues(alpha: 0.07),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Legend
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _LegendDot(color: _primary, label: 'Historical'),
-                const SizedBox(width: 16),
-                _LegendDot(color: _predColor, label: 'Predicted'),
-              ],
+            Text(
+              'Forecast',
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimaryFor(context),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: BarChart(
-                BarChartData(
-                  maxY: maxVal * 1.3,
-                  barTouchData: BarTouchData(
-                    touchCallback: (_, resp) {
-                      setState(() {
-                        _touchedIndex = resp?.spot?.touchedBarGroupIndex;
-                      });
-                    },
-                    touchTooltipData: BarTouchTooltipData(
-                      getTooltipColor: (g) => bars[g.x.toInt()].isPrediction
-                          ? _predColor
-                          : _primary,
-                      getTooltipItem: (group, gi, rod, ri) => BarTooltipItem(
-                        'PKR ${PredictionService.fmt(rod.toY)}',
-                        GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 50,
-                        getTitlesWidget: (v, _) => Text(
-                          _fmtK(v),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 36,
-                        getTitlesWidget: (v, _) {
-                          final i = v.toInt();
-                          if (i < 0 || i >= bars.length) {
-                            return const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              bars[i].label,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: bars[i].isPrediction
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: bars[i].isPrediction
-                                    ? _predColor
-                                    : const Color(0xFF64748B),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (_) => FlLine(
-                      color: const Color(0xFFE2E8F0),
-                      strokeWidth: 1,
-                      dashArray: [4, 4],
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: List.generate(bars.length, (i) {
-                    final bar = bars[i];
-                    final isTouched = _touchedIndex == i;
-                    final animVal = bar.amount * _anim.value;
-                    return BarChartGroupData(
-                      x: i,
-                      barRods: [
-                        BarChartRodData(
-                          toY: animVal,
-                          width: isTouched ? 20 : 16,
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(8),
-                          ),
-                          gradient: LinearGradient(
-                            colors: bar.isPrediction
-                                ? [
-                                    _predColor.withValues(alpha: 0.7),
-                                    _predColor,
-                                  ]
-                                : isTouched
-                                ? [
-                                    const Color(0xFF4B5BD6),
-                                    const Color(0xFF2E3192),
-                                  ]
-                                : [
-                                    const Color(0xFF818CF8),
-                                    const Color(0xFF4B5BD6),
-                                  ],
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
-                ),
-                duration: Duration.zero,
+            Text(
+              'Next month outlook',
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondaryFor(context),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
       ),
+      body: child ?? _ForecastContent(data: data!),
     );
   }
+}
 
-  // ── Warning Tile ───────────────────────────────────────────────────────────
-  Widget _buildWarningTile(BudgetWarning w) {
-    final progress = (w.currentSpend / w.budget).clamp(0.0, 1.5);
-    final isExceeded = w.daysUntilExceed == 0;
-    final color = isExceeded ? _danger : const Color(0xFFF59E0B);
+class _ForecastContent extends StatelessWidget {
+  const _ForecastContent({required this.data});
+
+  final _ForecastData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      children: [
+        _DecisionCard(data: data),
+        const SizedBox(height: 12),
+        _MetricGrid(data: data),
+        const SizedBox(height: 12),
+        _ActionPlanCard(data: data),
+        const SizedBox(height: 20),
+        if (!data.hasForecast) ...[
+          const _StateMessage(
+            icon: Icons.auto_graph_rounded,
+            title: 'Not enough history yet',
+            message:
+                'Add expenses from the last few months so FinEase can forecast the next month with confidence.',
+          ),
+        ] else ...[
+          const _SectionTitle(
+            icon: Icons.trending_up_rounded,
+            title: 'Likely spending',
+            subtitle: 'Top categories for next month',
+          ),
+          const SizedBox(height: 10),
+          ...data.topCategories.map(
+            (entry) => _CategoryForecastTile(
+              category: entry.key,
+              predicted: entry.value,
+              budget: data.budgets[entry.key],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _SectionTitle(
+            icon: data.warnings.isEmpty
+                ? Icons.verified_rounded
+                : Icons.warning_amber_rounded,
+            title: 'Budget risks',
+            subtitle: data.warnings.isEmpty
+                ? 'No current category is projected to break its limit'
+                : '${data.warnings.length} category needs attention',
+          ),
+          const SizedBox(height: 10),
+          if (data.warnings.isEmpty)
+            const _QuietTile(
+              icon: Icons.check_circle_rounded,
+              title: 'Budgets look steady',
+              message:
+                  'Keep logging expenses; the forecast will update as your spending changes.',
+            )
+          else
+            ...data.warnings.map(_WarningTile.new),
+          const SizedBox(height: 20),
+          const _SectionTitle(
+            icon: Icons.stacked_bar_chart_rounded,
+            title: 'Recent pattern',
+            subtitle: 'Last 3 months compared with forecast',
+          ),
+          const SizedBox(height: 10),
+          _MonthPattern(bars: data.monthBars),
+        ],
+      ],
+    );
+  }
+}
+
+class _DecisionCard extends StatelessWidget {
+  const _DecisionCard({required this.data});
+
+  final _ForecastData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final verdict = data.verdict;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: verdict.color.withValues(alpha: 0.22)),
+        boxShadow: AppTheme.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: color, size: 18),
-              const SizedBox(width: 8),
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: verdict.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(verdict.icon, color: verdict.color, size: 22),
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  w.message,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      verdict.title,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.textPrimaryFor(context),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      verdict.message,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondaryFor(context),
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Spent: PKR ${PredictionService.fmt(w.currentSpend)}',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: const Color(0xFF64748B),
+              Expanded(
+                child: _InlineAmount(
+                  label: 'Predicted spend',
+                  value: CurrencyUtils.format(data.forecast.totalPredicted),
                 ),
               ),
-              Text(
-                'Budget: PKR ${PredictionService.fmt(w.budget)}',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: const Color(0xFF64748B),
+              Container(
+                width: 1,
+                height: 42,
+                color: AppTheme.borderFor(context),
+              ),
+              Expanded(
+                child: _InlineAmount(
+                  label: 'Expected saving',
+                  value: CurrencyUtils.format(data.savings.predictedSavings),
+                  alignEnd: true,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              minHeight: 7,
-              backgroundColor: color.withValues(alpha: 0.12),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-          if (w.projectedOverspend > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                'Projected overspend: PKR ${PredictionService.fmt(w.projectedOverspend)}',
-                style: GoogleFonts.inter(
-                  fontSize: 10.5,
-                  color: _danger,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
+}
 
-  // ── Category Table ─────────────────────────────────────────────────────────
-  Widget _buildCategoryTable() {
-    final entries = _forecast.categoryPredictions.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({required this.data});
 
+  final _ForecastData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.52,
+      children: [
+        _MetricTile(
+          icon: Icons.payments_rounded,
+          label: 'Income',
+          value: data.monthlyIncome > 0
+              ? CurrencyUtils.format(data.monthlyIncome)
+              : 'Missing',
+          color: AppTheme.primary,
+        ),
+        _MetricTile(
+          icon: Icons.savings_rounded,
+          label: 'Savings rate',
+          value: data.monthlyIncome > 0
+              ? '${data.savings.savingsPercentage.toStringAsFixed(0)}%'
+              : 'Set income',
+          color: AppTheme.success,
+        ),
+        _MetricTile(
+          icon: Icons.receipt_long_rounded,
+          label: 'Categories',
+          value: '${data.forecast.categoryPredictions.length}',
+          color: const Color(0xFF4F46E5),
+        ),
+        _MetricTile(
+          icon: Icons.warning_amber_rounded,
+          label: 'At risk',
+          value: '${data.warnings.length}',
+          color: data.warnings.isEmpty ? AppTheme.success : AppTheme.warning,
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: _primary.withValues(alpha: 0.07),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: color, size: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppTheme.textPrimaryFor(context),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      child: Column(
+    );
+  }
+}
+
+class _ActionPlanCard extends StatelessWidget {
+  const _ActionPlanCard({required this.data});
+
+  final _ForecastData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = data.actionColor;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: AppTheme.isDark(context) ? 0.18 : 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Table header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceCardFor(context),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
+            child: Icon(data.actionIcon, color: color, size: 21),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    'Category',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
-                    ),
+                Text(
+                  data.actionTitle,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppTheme.textPrimaryFor(context),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Predicted',
-                    textAlign: TextAlign.right,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
-                    ),
+                const SizedBox(height: 5),
+                Text(
+                  data.actionMessage,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondaryFor(context),
+                    fontSize: 12,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Budget',
-                    textAlign: TextAlign.right,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Status',
-                    textAlign: TextAlign.right,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openAction(context),
+                    icon: Icon(data.actionIcon, size: 18),
+                    label: Text(data.actionLabel),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      textStyle: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          // Table rows
-          ...entries.asMap().entries.map((entry) {
-            final i = entry.key;
-            final cat = entry.value.key;
-            final pred = entry.value.value;
-            final budget = widget.budgets[cat];
-            final isLast = i == entries.length - 1;
-            final isOver = budget != null && pred > budget;
-
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: i.isEven
-                    ? AppTheme.surfaceFor(context)
-                    : AppTheme.surfaceCardFor(context),
-                borderRadius: isLast
-                    ? const BorderRadius.vertical(bottom: Radius.circular(20))
-                    : null,
-                border: !isLast
-                    ? Border(bottom: BorderSide(color: AppTheme.borderFor(context)))
-                    : null,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      cat,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimaryFor(context),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      'PKR ${PredictionService.fmt(pred)}',
-                      textAlign: TextAlign.right,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isOver ? _danger : _primary,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      budget != null
-                          ? 'PKR ${PredictionService.fmt(budget)}'
-                          : '—',
-                      textAlign: TextAlign.right,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: budget == null
-                              ? const Color(0xFFF1F5F9)
-                              : isOver
-                              ? _danger.withValues(alpha: 0.12)
-                              : _success.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          budget == null
-                              ? 'No budget'
-                              : isOver
-                              ? 'Over'
-                              : 'OK',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: budget == null
-                                ? const Color(0xFF64748B)
-                                : isOver
-                                ? _danger
-                                : _success,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
         ],
       ),
     );
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  Widget _sectionHeader(
-    IconData icon,
-    String title,
-    String subtitle, {
-    Color iconColor = _primary,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+  void _openAction(BuildContext context) {
+    final page = switch (data.actionTarget) {
+      _ForecastActionTarget.addTransaction => const AddTransactionPage(),
+      _ForecastActionTarget.budget => const AIBudgetAdvisorPage(),
+      _ForecastActionTarget.savings => const SavingsTrackerPage(),
+      _ForecastActionTarget.none => null,
+    };
+    if (page == null) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Keep logging transactions to improve the forecast.'),
+            behavior: SnackBarBehavior.floating,
           ),
-          child: Icon(icon, color: iconColor, size: 20),
+        );
+      return;
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
+}
+
+class _CategoryForecastTile extends StatelessWidget {
+  const _CategoryForecastTile({
+    required this.category,
+    required this.predicted,
+    required this.budget,
+  });
+
+  final String category;
+  final double predicted;
+  final double? budget;
+
+  @override
+  Widget build(BuildContext context) {
+    final limit = budget ?? 0;
+    final hasBudget = limit > 0;
+    final ratio = hasBudget ? predicted / limit : 0.0;
+    final color = !hasBudget
+        ? AppTheme.primary
+        : ratio >= 1
+        ? AppTheme.error
+        : ratio >= 0.85
+        ? AppTheme.warning
+        : AppTheme.success;
+    final progress = hasBudget ? ratio.clamp(0.0, 1.0) : 0.18;
+    final status = !hasBudget
+        ? 'No budget set'
+        : ratio >= 1
+        ? 'Over planned limit'
+        : ratio >= 0.85
+        ? 'Close to limit'
+        : 'Inside budget';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(_categoryIcon(category), color: color, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _categoryName(category),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimaryFor(context),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    CurrencyUtils.format(predicted),
+                    style: GoogleFonts.plusJakartaSans(
+                      color: AppTheme.textPrimaryFor(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    hasBudget ? 'of ${CurrencyUtils.format(limit)}' : 'next',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondaryFor(context),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 7,
+              backgroundColor: AppTheme.mutedFillFor(context),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WarningTile extends StatelessWidget {
+  const _WarningTile(this.warning);
+
+  final BudgetWarning warning;
+
+  @override
+  Widget build(BuildContext context) {
+    final alreadyOver = warning.daysUntilExceed <= 0;
+    final title = alreadyOver
+        ? '${_categoryName(warning.category)} is already over'
+        : '${_categoryName(warning.category)} may break in ${warning.daysUntilExceed} days';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.warningFillFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppTheme.warning,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimaryFor(context),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Projected over by ${CurrencyUtils.format(warning.projectedOverspend)}.',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondaryFor(context),
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthPattern extends StatelessWidget {
+  const _MonthPattern({required this.bars});
+
+  final List<_MonthBar> bars;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxAmount = bars.fold(0.0, (max, bar) {
+      return bar.amount > max ? bar.amount : max;
+    });
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        children: bars.map((bar) {
+          final factor = maxAmount <= 0 ? 0.0 : (bar.amount / maxAmount);
+          final color = bar.isForecast ? AppTheme.primary : AppTheme.success;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 48,
+                  child: Text(
+                    bar.label,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondaryFor(context),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: Stack(
+                      children: [
+                        Container(
+                          height: 10,
+                          color: AppTheme.mutedFillFor(context),
+                        ),
+                        FractionallySizedBox(
+                          widthFactor: factor.clamp(0.0, 1.0),
+                          child: Container(height: 10, color: color),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 86,
+                  child: Text(
+                    CurrencyUtils.format(bar.amount),
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimaryFor(context),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _InlineAmount extends StatelessWidget {
+  const _InlineAmount({
+    required this.label,
+    required this.value,
+    this.alignEnd = false,
+  });
+
+  final String label;
+  final String value;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimaryFor(context),
-              ),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
             ),
-            Text(
-              subtitle,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF64748B),
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );
   }
+}
 
-  DateTime _monthOffset(DateTime base, int months) {
-    int m = base.month + months;
-    int y = base.year;
-    while (m <= 0) {
-      m += 12;
-      y--;
-    }
-    while (m > 12) {
-      m -= 12;
-      y++;
-    }
-    final maxDay = DateTime(y, m + 1, 0).day;
-    return DateTime(y, m, base.day.clamp(1, maxDay));
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: AppTheme.primaryFor(context), size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  color: AppTheme.textPrimaryFor(context),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondaryFor(context),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuietTile extends StatelessWidget {
+  const _QuietTile({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.successFillFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.success.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.success, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimaryFor(context),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondaryFor(context),
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingMessage extends StatelessWidget {
+  const _LoadingMessage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: CircularProgressIndicator());
+  }
+}
+
+class _StateMessage extends StatelessWidget {
+  const _StateMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppTheme.mutedFillFor(context),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: AppTheme.primaryFor(context), size: 26),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimaryFor(context),
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondaryFor(context),
+                fontSize: 13,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ForecastData {
+  const _ForecastData({
+    required this.forecast,
+    required this.savings,
+    required this.warnings,
+    required this.budgets,
+    required this.monthlyIncome,
+    required this.monthBars,
+    required this.forecastBasis,
+  });
+
+  final ForecastResult forecast;
+  final ForecastResult savings;
+  final List<BudgetWarning> warnings;
+  final Map<String, double> budgets;
+  final double monthlyIncome;
+  final List<_MonthBar> monthBars;
+  final String forecastBasis;
+
+  bool get hasForecast => forecast.categoryPredictions.isNotEmpty;
+
+  List<MapEntry<String, double>> get topCategories {
+    final entries = forecast.categoryPredictions.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return entries.take(5).toList();
   }
 
-  String _monthAbbr(int m) => const [
+  _ForecastActionTarget get actionTarget {
+    if (!hasForecast || monthlyIncome <= 0) {
+      return _ForecastActionTarget.addTransaction;
+    }
+    if (savings.predictedSavings < 0 || warnings.isNotEmpty) {
+      return _ForecastActionTarget.budget;
+    }
+    if (savings.savingsPercentage < 10) {
+      return _ForecastActionTarget.savings;
+    }
+    return _ForecastActionTarget.none;
+  }
+
+  String get actionTitle {
+    if (!hasForecast) return 'Build forecast history';
+    if (monthlyIncome <= 0) return 'Add income to judge safety';
+    if (savings.predictedSavings < 0) return 'Fix next month before it starts';
+    if (warnings.isNotEmpty) return 'Protect risky categories';
+    if (savings.savingsPercentage < 10) return 'Savings margin is thin';
+    return 'Keep the pattern steady';
+  }
+
+  String get actionMessage {
+    if (!hasForecast) {
+      return 'Add recent expenses so FinEase can estimate next month instead of guessing.';
+    }
+    if (monthlyIncome <= 0) {
+      return 'Forecast can predict spending, but income is needed to judge whether next month is safe.';
+    }
+    if (savings.predictedSavings < 0) {
+      return 'Projected spending is higher than income. Reduce a top category or update the budget.';
+    }
+    if (warnings.isNotEmpty) {
+      return 'One or more current categories may break budget limits if spending continues.';
+    }
+    if (savings.savingsPercentage < 10) {
+      return 'You may stay positive, but the savings buffer is below a healthy margin.';
+    }
+    return '$forecastBasis. Keep logging transactions so this stays accurate.';
+  }
+
+  String get actionLabel {
+    return switch (actionTarget) {
+      _ForecastActionTarget.addTransaction => 'Add transaction',
+      _ForecastActionTarget.budget => 'Open budget',
+      _ForecastActionTarget.savings => 'Open savings',
+      _ForecastActionTarget.none => 'Got it',
+    };
+  }
+
+  IconData get actionIcon {
+    return switch (actionTarget) {
+      _ForecastActionTarget.addTransaction => Icons.add_rounded,
+      _ForecastActionTarget.budget => Icons.account_balance_wallet_rounded,
+      _ForecastActionTarget.savings => Icons.savings_rounded,
+      _ForecastActionTarget.none => Icons.check_circle_rounded,
+    };
+  }
+
+  Color get actionColor {
+    if (!hasForecast || monthlyIncome <= 0) return AppTheme.primary;
+    if (savings.predictedSavings < 0) return AppTheme.error;
+    if (warnings.isNotEmpty || savings.savingsPercentage < 10) {
+      return AppTheme.warning;
+    }
+    return AppTheme.success;
+  }
+
+  _Verdict get verdict {
+    if (!hasForecast) {
+      return const _Verdict(
+        title: 'Forecast needs history',
+        message: 'Log a few months of expenses to unlock a useful prediction.',
+        icon: Icons.history_rounded,
+        color: AppTheme.primary,
+      );
+    }
+    if (monthlyIncome <= 0) {
+      return const _Verdict(
+        title: 'Income is missing',
+        message: 'Add income so the forecast can judge savings risk.',
+        icon: Icons.payments_rounded,
+        color: AppTheme.warning,
+      );
+    }
+    if (savings.predictedSavings < 0) {
+      return const _Verdict(
+        title: 'Next month may go negative',
+        message: 'Cut one high category or raise income before month end.',
+        icon: Icons.priority_high_rounded,
+        color: AppTheme.error,
+      );
+    }
+    if (warnings.isNotEmpty) {
+      return const _Verdict(
+        title: 'Budget risk ahead',
+        message: 'You are safe overall, but one category may cross its limit.',
+        icon: Icons.warning_amber_rounded,
+        color: AppTheme.warning,
+      );
+    }
+    return const _Verdict(
+      title: 'Next month looks manageable',
+      message: 'Your predicted spend is within income and current budgets.',
+      icon: Icons.verified_rounded,
+      color: AppTheme.success,
+    );
+  }
+
+  factory _ForecastData.fromInputs({
+    required List<FinancialTransaction> transactions,
+    required Map<String, double> budgets,
+    required double monthlyIncome,
+  }) {
+    final service = PredictionService();
+    var forecast = service.predictNextMonthExpenses(transactions);
+    var forecastBasis = 'Based on the weighted last 3 months';
+    if (forecast.categoryPredictions.isEmpty) {
+      final fallback = _currentMonthRunRateForecast(transactions);
+      if (fallback.categoryPredictions.isNotEmpty) {
+        forecast = fallback;
+        forecastBasis = 'Based on this month\'s spending pace';
+      }
+    }
+    final savings = service.forecastSavings(
+      monthlyIncome,
+      forecast.categoryPredictions,
+    );
+    final currentMonthTransactions = transactions
+        .where((transaction) => _isCurrentMonth(transaction.date))
+        .toList();
+    final warnings = service.getBudgetWarnings(
+      currentMonthTransactions,
+      budgets,
+    );
+    final now = DateTime.now();
+    final bars = <_MonthBar>[
+      for (var offset = 3; offset >= 1; offset--)
+        _MonthBar(
+          label: _monthLabel(_monthOffset(now, -offset)),
+          amount: service.getTotalForMonth(
+            transactions,
+            _monthOffset(now, -offset).year,
+            _monthOffset(now, -offset).month,
+          ),
+          isForecast: false,
+        ),
+      _MonthBar(
+        label: 'Next',
+        amount: forecast.totalPredicted,
+        isForecast: true,
+      ),
+    ];
+
+    return _ForecastData(
+      forecast: forecast,
+      savings: savings,
+      warnings: warnings,
+      budgets: budgets,
+      monthlyIncome: monthlyIncome,
+      monthBars: bars,
+      forecastBasis: forecastBasis,
+    );
+  }
+}
+
+enum _ForecastActionTarget { addTransaction, budget, savings, none }
+
+class _Verdict {
+  const _Verdict({
+    required this.title,
+    required this.message,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final String message;
+  final IconData icon;
+  final Color color;
+}
+
+class _MonthBar {
+  const _MonthBar({
+    required this.label,
+    required this.amount,
+    required this.isForecast,
+  });
+
+  final String label;
+  final double amount;
+  final bool isForecast;
+}
+
+String _monthKey(DateTime date) {
+  return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+}
+
+DateTime _monthOffset(DateTime base, int months) {
+  var month = base.month + months;
+  var year = base.year;
+  while (month <= 0) {
+    month += 12;
+    year--;
+  }
+  while (month > 12) {
+    month -= 12;
+    year++;
+  }
+  final maxDay = DateTime(year, month + 1, 0).day;
+  return DateTime(year, month, base.day.clamp(1, maxDay).toInt());
+}
+
+String _monthLabel(DateTime date) {
+  const months = [
     'Jan',
     'Feb',
     'Mar',
@@ -772,51 +1287,79 @@ class _ForecastScreenState extends State<ForecastScreen>
     'Oct',
     'Nov',
     'Dec',
-  ][m - 1];
-
-  String _fmtK(double v) =>
-      v >= 1000 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0);
+  ];
+  return months[date.month - 1];
 }
 
-// ── Data classes ─────────────────────────────────────────────────────────────
-
-class _MonthBar {
-  final String label;
-  final double amount;
-  final bool isPrediction;
-  const _MonthBar({
-    required this.label,
-    required this.amount,
-    required this.isPrediction,
-  });
+bool _isCurrentMonth(DateTime date) {
+  final now = DateTime.now();
+  return date.year == now.year && date.month == now.month;
 }
 
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _LegendDot({required this.color, required this.label});
+double _number(Object? value) {
+  return value is num ? value.toDouble() : 0;
+}
 
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(3),
-        ),
-      ),
-      const SizedBox(width: 5),
-      Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          color: const Color(0xFF64748B),
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    ],
+ForecastResult _currentMonthRunRateForecast(
+  List<FinancialTransaction> transactions,
+) {
+  final now = DateTime.now();
+  final currentExpenses = transactions.where(
+    (transaction) =>
+        transaction.type == 'expense' && _isCurrentMonth(transaction.date),
   );
+  final totals = <String, double>{};
+  for (final transaction in currentExpenses) {
+    totals[transaction.category] =
+        (totals[transaction.category] ?? 0) + transaction.amount;
+  }
+  if (totals.isEmpty) {
+    return const ForecastResult(
+      categoryPredictions: {},
+      totalPredicted: 0,
+      predictedSavings: 0,
+      savingsPercentage: 0,
+    );
+  }
+  final daysPassed = now.day.clamp(1, 31);
+  final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+  final pace = daysInMonth / daysPassed;
+  final projected = {
+    for (final entry in totals.entries) entry.key: entry.value * pace,
+  };
+  final total = projected.values.fold<double>(0, (sum, value) => sum + value);
+  return ForecastResult(
+    categoryPredictions: projected,
+    totalPredicted: total,
+    predictedSavings: 0,
+    savingsPercentage: 0,
+  );
+}
+
+String _categoryName(String category) {
+  final trimmed = category.trim();
+  return trimmed.isEmpty ? 'General' : trimmed;
+}
+
+IconData _categoryIcon(String category) {
+  final value = category.toLowerCase();
+  if (value.contains('food') || value.contains('grocery')) {
+    return Icons.restaurant_rounded;
+  }
+  if (value.contains('transport') || value.contains('fuel')) {
+    return Icons.directions_car_rounded;
+  }
+  if (value.contains('rent') || value.contains('home')) {
+    return Icons.home_rounded;
+  }
+  if (value.contains('bill') || value.contains('util')) {
+    return Icons.receipt_rounded;
+  }
+  if (value.contains('health') || value.contains('medical')) {
+    return Icons.local_hospital_rounded;
+  }
+  if (value.contains('education') || value.contains('school')) {
+    return Icons.school_rounded;
+  }
+  return Icons.category_rounded;
 }

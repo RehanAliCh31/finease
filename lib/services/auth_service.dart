@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../app_constants.dart';
+import 'bootstrap_service.dart';
 import 'firestore_service.dart';
 
 class AuthService extends ChangeNotifier {
@@ -40,7 +41,8 @@ class AuthService extends ChangeNotifier {
 
   bool get isEmailVerified => _user?.emailVerified ?? false;
 
-  bool get canAccessProtectedFeatures => isAdmin || isEmailVerified;
+  bool get canAccessProtectedFeatures =>
+      isAdmin || isDemoAccount || isEmailVerified;
 
   bool get isBiometricEnabled => _isBiometricEnabled;
 
@@ -156,6 +158,18 @@ class AuthService extends ChangeNotifier {
       final uid = credential.user?.uid;
       await credential.user?.reload();
       _user = _auth.currentUser;
+
+      if (uid != null && email == AppConstants.demoEmail) {
+        try {
+          await BootstrapService.ensureDemoDataForUid(
+            uid,
+          ).timeout(const Duration(seconds: 8));
+        } catch (error) {
+          if (kDebugMode) {
+            debugPrint('Demo data repair skipped: $error');
+          }
+        }
+      }
 
       // Check suspended account
       if (uid != null && email != AppConstants.adminEmail) {

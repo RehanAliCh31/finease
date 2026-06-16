@@ -1,7 +1,4 @@
-import 'dart:math' as math;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,7 +10,6 @@ import '../../models/app_config.dart';
 import '../../services/app_config_service.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/app_config_gate.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -23,28 +19,21 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  static const List<_AdminTab> _tabs = [
+  static const _tabs = [
     _AdminTab('Overview', Icons.dashboard_rounded),
-    _AdminTab('Users', Icons.manage_accounts_rounded),
-    _AdminTab('Forum', Icons.forum_rounded),
+    _AdminTab('Users', Icons.people_alt_rounded),
+    _AdminTab('Review', Icons.fact_check_rounded),
     _AdminTab('Partners', Icons.handshake_rounded),
-    _AdminTab('Welfare', Icons.volunteer_activism_rounded),
     _AdminTab('App', Icons.tune_rounded),
-    _AdminTab('Reports', Icons.analytics_rounded),
   ];
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final TextEditingController _searchController = TextEditingController();
-  final DateFormat _dateFormat = DateFormat('MMM d, yyyy - h:mm a');
-  final DateFormat _shortDateFormat = DateFormat('MMM d, h:mm a');
+  final _db = FirebaseFirestore.instance;
+  final _searchController = TextEditingController();
+  final _configService = AppConfigService();
 
   int _tabIndex = 0;
-  bool _busy = false;
   String _search = '';
-  String _userFilter = 'All';
-  String _forumFilter = 'All';
-  String _partnerFilter = 'All';
-  String _welfareFilter = 'All';
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -54,193 +43,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 980;
-        return Scaffold(
-          backgroundColor: AppTheme.backgroundFor(context),
-          body: SafeArea(
-            child: isWide
-                ? Row(
-                    children: [
-                      _AdminSideRail(
-                        tabs: _tabs,
-                        selectedIndex: _tabIndex,
-                        onSelected: _selectTab,
-                        onCopyReport: _copyReport,
-                        onSeed: _seedAdminSamples,
-                        onSignOut: () => context.read<AuthService>().signOut(),
-                      ),
-                      VerticalDivider(width: 1, color: AppTheme.borderFor(context)),
-                      Expanded(child: _contentArea(isWide: true)),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      _mobileHeader(),
-                      Expanded(child: _contentArea(isWide: false)),
-                    ],
-                  ),
-          ),
-          floatingActionButton: _buildFab(),
-        );
-      },
-    );
-  }
-
-  Widget _contentArea({required bool isWide}) {
-    return Column(
-      children: [
-        if (isWide) _desktopHeader(),
-        if (_busy) const LinearProgressIndicator(minHeight: 2),
-        Expanded(child: _buildTab()),
-      ],
-    );
-  }
-
-  Widget _desktopHeader() {
-    final tab = _tabs[_tabIndex];
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceFor(context),
-        border: Border(bottom: BorderSide(color: AppTheme.borderFor(context))),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundFor(context),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _AdminHeader(
+              tabs: _tabs,
+              selectedIndex: _tabIndex,
+              busy: _busy,
+              onSelected: (index) => setState(() => _tabIndex = index),
+              onCopyReport: _copyReport,
+              onSignOut: () => context.read<AuthService>().signOut(),
             ),
-            child: Icon(tab.icon, color: AppTheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${tab.label} Console',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimaryFor(context),
-                  ),
-                ),
-                Text(
-                  'Signed in as ${AppConstants.adminEmail}',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSecondaryFor(context),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _ghostButton('Seed', Icons.auto_fix_high_rounded, _seedAdminSamples),
-          const SizedBox(width: 8),
-          _ghostButton('Report', Icons.file_copy_rounded, _copyReport),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            tooltip: 'Sign out',
-            style: IconButton.styleFrom(
-              backgroundColor: AppTheme.primary.withValues(alpha: 0.08),
-              foregroundColor: AppTheme.primary,
-            ),
-            onPressed: () => context.read<AuthService>().signOut(),
-            icon: Icon(Icons.logout_rounded),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mobileHeader() {
-    return Container(
-      decoration: BoxDecoration(gradient: AppTheme.cardGradient),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Admin Dashboard',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      AppConstants.adminEmail,
-                      style: GoogleFonts.inter(
-                        color: Colors.white.withValues(alpha: 0.76),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'Seed review samples',
-                onPressed: _seedAdminSamples,
-                icon: Icon(Icons.auto_fix_high_rounded),
-                color: Colors.white,
-              ),
-              IconButton(
-                tooltip: 'Copy report',
-                onPressed: _copyReport,
-                icon: Icon(Icons.file_copy_rounded),
-                color: Colors.white,
-              ),
-              IconButton(
-                tooltip: 'Sign out',
-                onPressed: () => context.read<AuthService>().signOut(),
-                icon: Icon(Icons.logout_rounded),
-                color: Colors.white,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 42,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _tabs.length,
-              separatorBuilder: (_, index) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final tab = _tabs[index];
-                final selected = index == _tabIndex;
-                return ChoiceChip(
-                  selected: selected,
-                  selectedColor: Colors.white,
-                  backgroundColor: Colors.white.withValues(alpha: 0.14),
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: selected ? 1 : 0.28),
-                  ),
-                  avatar: Icon(
-                    tab.icon,
-                    size: 17,
-                    color: selected ? AppTheme.primary : Colors.white,
-                  ),
-                  label: Text(tab.label),
-                  labelStyle: GoogleFonts.inter(
-                    color: selected ? AppTheme.primary : Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  onSelected: (_) => _selectTab(index),
-                );
-              },
-            ),
-          ),
-        ],
+            if (_busy) const LinearProgressIndicator(minHeight: 2),
+            Expanded(child: _buildTab()),
+          ],
+        ),
       ),
     );
   }
@@ -250,1060 +69,280 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 1:
         return _usersTab();
       case 2:
-        return _forumTab();
+        return _reviewTab();
       case 3:
         return _partnersTab();
       case 4:
-        return _welfareTab();
-      case 5:
-        return _appControlsTab();
-      case 6:
-        return _reportsTab();
+        return _appTab();
       default:
         return _overviewTab();
     }
   }
 
-  Widget? _buildFab() {
-    if (_tabIndex == 3) {
-      return FloatingActionButton.extended(
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        icon: Icon(Icons.add_business_rounded),
-        label: const Text('Partner'),
-        onPressed: () => _showPartnerDialog(),
-      );
-    }
-    if (_tabIndex == 4) {
-      return FloatingActionButton.extended(
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        icon: Icon(Icons.add_task_rounded),
-        label: const Text('Case'),
-        onPressed: () => _showWelfareDialog(),
-      );
-    }
-    return null;
-  }
-
   Widget _overviewTab() {
-    return _Stream4(
-      users: _db.collection('users').snapshots(),
-      posts: _db.collection('forum_posts').snapshots(),
-      partners: _db.collection('marketplace_partners').snapshots(),
-      welfare: _db.collection('welfare_applications').snapshots(),
-      builder: (context, users, posts, partners, welfare) {
-        final stats = _AdminStats.from(
-          users: users.docs,
-          posts: posts.docs,
-          partners: partners.docs,
-          welfare: welfare.docs,
-        );
-        final queue = _reviewQueueItems(
-          posts: posts.docs,
-          partners: partners.docs,
-          welfare: welfare.docs,
-        );
-
+    return _AdminDataBuilder(
+      db: _db,
+      builder: (context, data) {
+        final stats = _AdminStats.from(data);
         return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
           children: [
-            _overviewHero(stats),
-            const SizedBox(height: 16),
-            _MetricGrid(
-              items: [
-                _MetricItem(
-                  label: 'Users',
-                  value: '${stats.users}',
-                  detail: '${stats.suspendedUsers} suspended',
-                  icon: Icons.people_rounded,
-                  color: AppTheme.primary,
-                  progress: stats.userHealth,
-                ),
-                _MetricItem(
-                  label: 'Forum',
-                  value: '${stats.forumPosts}',
-                  detail: '${stats.flaggedPosts} flagged',
-                  icon: Icons.forum_rounded,
+            _HeroStatus(stats: stats),
+            const SizedBox(height: 14),
+            _MetricGrid(stats: stats),
+            const SizedBox(height: 22),
+            _SectionTitle(
+              title: 'Needs review',
+              trailing: '${stats.reviewLoad}',
+            ),
+            const SizedBox(height: 12),
+            if (stats.reviewLoad == 0)
+              const _EmptyPanel(
+                icon: Icons.verified_rounded,
+                title: 'No urgent queue',
+                message:
+                    'Flagged posts, pending welfare, and partner reviews are clear.',
+              )
+            else ...[
+              if (stats.flaggedPosts > 0)
+                _QueueCard(
+                  icon: Icons.flag_rounded,
+                  title: 'Flagged forum posts',
+                  count: stats.flaggedPosts,
                   color: AppTheme.warning,
-                  progress: stats.forumHealth,
+                  onTap: () => setState(() => _tabIndex = 2),
                 ),
-                _MetricItem(
-                  label: 'Partners',
-                  value: '${stats.activePartners}',
-                  detail: '${stats.partners} total',
-                  icon: Icons.handshake_rounded,
-                  color: AppTheme.success,
-                  progress: stats.partnerHealth,
-                ),
-                _MetricItem(
-                  label: 'Welfare',
-                  value: '${stats.pendingCases}',
-                  detail: '${stats.welfareCases} cases',
+              if (stats.pendingCases > 0)
+                _QueueCard(
                   icon: Icons.volunteer_activism_rounded,
+                  title: 'Pending welfare cases',
+                  count: stats.pendingCases,
                   color: AppTheme.error,
-                  progress: stats.welfarePressure,
+                  onTap: () => setState(() => _tabIndex = 2),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final wide = constraints.maxWidth >= 900;
-                final primary = Column(
-                  children: [
-                    _Panel(
-                      title: 'Operations Load',
-                      subtitle: 'Live count across admin-owned workflows',
-                      icon: Icons.stacked_bar_chart_rounded,
-                      action: _StatusPill(
-                        text: stats.reviewLoad == 0
-                            ? 'Clear'
-                            : '${stats.reviewLoad} reviews',
-                        color: stats.reviewLoad == 0
-                            ? AppTheme.success
-                            : AppTheme.warning,
-                      ),
-                      child: _OperationsBarChart(stats: stats),
-                    ),
-                    const SizedBox(height: 14),
-                    _ReviewQueuePanel(items: queue),
-                  ],
-                );
-                final secondary = Column(
-                  children: [
-                    _metricsEditor(),
-                    const SizedBox(height: 14),
-                    _Panel(
-                      title: 'Command Center',
-                      subtitle: 'Fast paths for the most common admin work',
-                      icon: Icons.bolt_rounded,
-                      child: _ActionGrid(
-                        actions: [
-                          _AdminAction(
-                            'Review users',
-                            Icons.manage_accounts_rounded,
-                            () => _selectTab(1),
-                          ),
-                          _AdminAction(
-                            'Moderate forum',
-                            Icons.shield_rounded,
-                            () => _selectTab(2),
-                          ),
-                          _AdminAction(
-                            'Approve partners',
-                            Icons.verified_rounded,
-                            () => _selectTab(3),
-                          ),
-                          _AdminAction(
-                            'Welfare queue',
-                            Icons.volunteer_activism_rounded,
-                            () => _selectTab(4),
-                          ),
-                          _AdminAction(
-                            'Manage app',
-                            Icons.tune_rounded,
-                            () => _selectTab(5),
-                          ),
-                          _AdminAction(
-                            'Copy report',
-                            Icons.file_copy_rounded,
-                            _copyReport,
-                          ),
-                          _AdminAction(
-                            'Seed samples',
-                            Icons.auto_fix_high_rounded,
-                            _seedAdminSamples,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _recentActivity(posts.docs),
-                  ],
-                );
-
-                if (!wide) {
-                  return Column(
-                    children: [primary, const SizedBox(height: 14), secondary],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 7, child: primary),
-                    const SizedBox(width: 14),
-                    Expanded(flex: 5, child: secondary),
-                  ],
-                );
-              },
-            ),
+              if (stats.unapprovedPartners > 0)
+                _QueueCard(
+                  icon: Icons.handshake_rounded,
+                  title: 'Partner approvals',
+                  count: stats.unapprovedPartners,
+                  color: AppTheme.primary,
+                  onTap: () => setState(() => _tabIndex = 3),
+                ),
+            ],
+            const SizedBox(height: 22),
+            _SectionTitle(title: 'Recent activity', trailing: 'Audit'),
+            const SizedBox(height: 12),
+            _AuditList(db: _db),
           ],
         );
       },
-    );
-  }
-
-  Widget _overviewHero(_AdminStats stats) {
-    final riskColor = stats.reviewLoad > 12
-        ? AppTheme.error
-        : stats.reviewLoad > 0
-        ? AppTheme.warning
-        : AppTheme.success;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: AppTheme.cardGradient,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: AppTheme.cardShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'FinEase Operations',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'One console for users, moderation, partners, welfare reviews, and reporting.',
-                      style: GoogleFonts.inter(
-                        color: Colors.white.withValues(alpha: 0.82),
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _StatusPill(
-                text: stats.reviewLoad == 0 ? 'Stable' : 'Action needed',
-                color: riskColor,
-                onDark: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _heroSignal(
-                'Review load',
-                '${stats.reviewLoad}',
-                Icons.rate_review_rounded,
-              ),
-              _heroSignal(
-                'Verified users',
-                '${stats.verifiedUsers}',
-                Icons.verified_user_rounded,
-              ),
-              _heroSignal(
-                'Urgent cases',
-                '${stats.urgentCases}',
-                Icons.priority_high_rounded,
-              ),
-              _heroSignal(
-                'Last refresh',
-                DateFormat('h:mm a').format(DateTime.now()),
-                Icons.sync_rounded,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _heroSignal(String label, String value, IconData icon) {
-    return Container(
-      width: 162,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                  ),
-                ),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metricsEditor() {
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _db.collection('system_metrics').doc('overview').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _ErrorPanel(message: '${snapshot.error}');
-        }
-        final data = snapshot.data?.data() ?? {};
-        final activeUsers = _intValue(data['activeUsers']);
-        final latency = _intValue(data['latencyMs']);
-        final pending = _intValue(data['pendingWelfare']);
-        final urgent = _intValue(data['urgentReviews']);
-        final latencyColor = latency <= 100 ? AppTheme.success : AppTheme.error;
-        final urgentColor = urgent <= 5 ? AppTheme.success : AppTheme.warning;
-
-        return _Panel(
-          title: 'System Health',
-          subtitle: 'Editable operational indicators',
-          icon: Icons.monitor_heart_rounded,
-          action: TextButton.icon(
-            onPressed: () => _showMetricsDialog(data),
-            icon: Icon(Icons.tune_rounded, size: 18),
-            label: const Text('Edit'),
-          ),
-          child: Column(
-            children: [
-              _HealthRow(
-                label: 'Active users',
-                value: NumberFormat.compact().format(activeUsers),
-                icon: Icons.people_alt_rounded,
-                color: AppTheme.primary,
-                progress: (activeUsers / 15000).clamp(0, 1).toDouble(),
-              ),
-              const SizedBox(height: 12),
-              _HealthRow(
-                label: 'Latency',
-                value: '${latency}ms',
-                icon: Icons.speed_rounded,
-                color: latencyColor,
-                progress: (latency / 250).clamp(0, 1).toDouble(),
-              ),
-              const SizedBox(height: 12),
-              _HealthRow(
-                label: 'Pending welfare',
-                value: '$pending',
-                icon: Icons.assignment_late_rounded,
-                color: AppTheme.warning,
-                progress: (pending / 80).clamp(0, 1).toDouble(),
-              ),
-              const SizedBox(height: 12),
-              _HealthRow(
-                label: 'Urgent reviews',
-                value: '$urgent',
-                icon: Icons.priority_high_rounded,
-                color: urgentColor,
-                progress: (urgent / 25).clamp(0, 1).toDouble(),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _recentActivity(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> posts,
-  ) {
-    final recent = posts.take(4).toList();
-    return _Panel(
-      title: 'Recent Activity',
-      subtitle: recent.isEmpty
-          ? 'No recent forum activity'
-          : 'Latest forum posts',
-      icon: Icons.history_rounded,
-      child: recent.isEmpty
-          ? const _EmbeddedEmpty(
-              icon: Icons.history_toggle_off_rounded,
-              title: 'No activity yet',
-              message: 'Forum posts will appear here as they arrive.',
-            )
-          : Column(
-              children: recent.map((doc) {
-                final data = doc.data();
-                final status = _field(data, 'moderationStatus', 'visible');
-                return _MiniActivity(
-                  icon: Icons.forum_rounded,
-                  title: _field(data, 'title', 'Forum discussion'),
-                  subtitle:
-                      '${_field(data, 'category', 'General')} by ${_field(data, 'authorName', 'User')}',
-                  status: status,
-                  color: _statusColor(status),
-                );
-              }).toList(),
-            ),
     );
   }
 
   Widget _usersTab() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db.collection('users').orderBy('email').snapshots(),
+      stream: _db.collection('users').snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _ErrorPanel(message: '${snapshot.error}');
-        }
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const _LoadingView(label: 'Loading users');
+          return const Center(child: CircularProgressIndicator());
         }
-
         final docs = snapshot.data?.docs ?? [];
-        final stats = _UserTabStats.from(docs);
-        final users = docs
-            .where(_matchesSearch)
-            .where((doc) => _matchesUserFilter(doc.data()))
-            .toList();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
+        final users = docs.where(_matchesSearch).toList()
+          ..sort(
+            (a, b) =>
+                _text(a.data(), 'email').compareTo(_text(b.data(), 'email')),
+          );
+        return _AdminListShell(
+          title: 'Users',
+          subtitle: '${users.length} accounts',
+          searchController: _searchController,
+          search: _search,
+          onSearch: (value) => setState(() => _search = value),
           children: [
-            _tabSummary(
-              title: 'User Command Center',
-              subtitle:
-                  'Search Firestore profiles, sync Firebase Auth users, edit roles, and queue sign-in controls.',
-              icon: Icons.manage_accounts_rounded,
-              items: [
-                _SummaryItem('Total', '${stats.total}', AppTheme.primary),
-                _SummaryItem('Active', '${stats.active}', AppTheme.success),
-                _SummaryItem('Suspended', '${stats.suspended}', AppTheme.error),
-                _SummaryItem('Verified', '${stats.verified}', AppTheme.warning),
-                _SummaryItem(
-                  'Auth synced',
-                  '${stats.authSynced}',
-                  AppTheme.primary,
-                ),
-                _SummaryItem(
-                  'Auth disabled',
-                  '${stats.authDisabled}',
-                  AppTheme.error,
-                ),
-              ],
-              action: _ghostButton(
-                'Sync Firebase Auth',
-                Icons.cloud_sync_rounded,
-                _requestFirebaseAuthSync,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _filterBar(
-              hint: 'Search users by name, email, role, or country',
-              selected: _userFilter,
-              filters: const [
-                'All',
-                'Active',
-                'Suspended',
-                'Disabled',
-                'Admin',
-                'Demo',
-              ],
-              onSelected: (value) => setState(() => _userFilter = value),
-            ),
-            const SizedBox(height: 12),
             if (users.isEmpty)
-              const _EmbeddedEmpty(
+              const _EmptyPanel(
                 icon: Icons.people_outline_rounded,
                 title: 'No users found',
-                message: 'Try a different search or status filter.',
+                message: 'Try another search.',
               )
             else
-              ...users.map(_userCard),
+              ...users.map(
+                (doc) => _UserCard(doc: doc, onAction: _setUserState),
+              ),
           ],
         );
       },
     );
   }
 
-  Widget _userCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final status = _field(data, 'accountStatus', 'active');
-    final role = _field(data, 'role', 'user');
-    final email = _field(data, 'email', 'No email');
-    final fullName = _field(data, 'fullName', email);
-    final isAdminEmail = email == AppConstants.adminEmail;
-    final authDisabled = data['authDisabled'] == true;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: _InfoCard(
-        icon: isAdminEmail
-            ? Icons.admin_panel_settings_rounded
-            : Icons.person_rounded,
-        title: fullName,
-        subtitle: email,
-        status: isAdminEmail
-            ? 'protected'
-            : authDisabled
-            ? 'auth disabled'
-            : status,
-        statusColor: isAdminEmail
-            ? AppTheme.primary
-            : authDisabled
-            ? AppTheme.error
-            : _statusColor(status),
-        metadata: [
-          _InfoMeta(Icons.badge_rounded, 'Role: $role'),
-          _InfoMeta(Icons.fingerprint_rounded, 'UID: ${doc.id}'),
-          _InfoMeta(
-            Icons.verified_user_rounded,
-            (data['emailVerified'] == true) ? 'Verified' : 'Unverified',
-          ),
-          _InfoMeta(
-            Icons.cloud_done_rounded,
-            data['authSyncedAt'] == null
-                ? 'Firestore profile'
-                : 'Auth synced ${_formatAnyDate(data['authSyncedAt'])}',
-          ),
-          _InfoMeta(
-            Icons.calendar_month_rounded,
-            _formatAnyDate(data['createdAt']),
-          ),
-        ],
-        actions: [
-          if (!isAdminEmail)
-            _smallButton(
-              status == 'suspended' ? 'Activate' : 'Suspend',
-              status == 'suspended'
-                  ? Icons.check_circle_rounded
-                  : Icons.block_rounded,
-              () => _setUserStatus(
-                doc.id,
-                status == 'suspended' ? 'active' : 'suspended',
-                email: email,
-              ),
-            ),
-          _smallButton('Edit', Icons.edit_rounded, () => _showUserEditor(doc)),
-          if (!isAdminEmail)
-            _smallButton(
-              authDisabled ? 'Enable sign-in' : 'Disable sign-in',
-              authDisabled ? Icons.lock_open_rounded : Icons.lock_rounded,
-              () => _requestUserAuthDisabled(doc, !authDisabled),
-            ),
-          _smallButton(
-            'Copy email',
-            Icons.copy_rounded,
-            () => _copyText(email, 'Email copied.'),
-          ),
-          _smallButton(
-            'Details',
-            Icons.badge_rounded,
-            () => _showDocumentDetails(
-              title: fullName,
-              subtitle: email,
-              path: 'users/${doc.id}',
-              icon: Icons.person_rounded,
-              data: data,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _forumTab() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db
-          .collection('forum_posts')
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _ErrorPanel(message: '${snapshot.error}');
-        }
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return const _LoadingView(label: 'Loading forum posts');
-        }
-
-        final docs = snapshot.data?.docs ?? [];
-        final flagged = docs
-            .where((doc) => doc.data()['moderationStatus'] == 'flagged')
-            .length;
-        final removed = docs
-            .where((doc) => doc.data()['moderationStatus'] == 'removed')
-            .length;
-        final posts = docs
-            .where(_matchesSearch)
-            .where(
-              (doc) => _matchesStatusFilter(
-                _field(doc.data(), 'moderationStatus', 'visible'),
-                _forumFilter,
-              ),
-            )
-            .toList();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
+  Widget _reviewTab() {
+    return _AdminDataBuilder(
+      db: _db,
+      builder: (context, data) {
+        final posts = data.posts.where((doc) {
+          final status = _text(doc.data(), 'moderationStatus', 'visible');
+          return status == 'flagged' || status == 'visible';
+        }).toList();
+        final welfare = data.welfare.where((doc) {
+          final status = _text(doc.data(), 'status', 'pending');
+          return status == 'pending' || status == 'urgent';
+        }).toList();
+        return _AdminListShell(
+          title: 'Review',
+          subtitle: '${posts.length + welfare.length} open items',
+          searchController: _searchController,
+          search: _search,
+          onSearch: (value) => setState(() => _search = value),
           children: [
-            _tabSummary(
-              title: 'Forum Moderation',
-              subtitle:
-                  'Keep public conversations useful, safe, and visible only when they should be.',
-              icon: Icons.forum_rounded,
-              items: [
-                _SummaryItem('Posts', '${docs.length}', AppTheme.primary),
-                _SummaryItem('Flagged', '$flagged', AppTheme.warning),
-                _SummaryItem('Removed', '$removed', AppTheme.error),
-              ],
+            _SectionTitle(
+              title: 'Forum moderation',
+              trailing: '${posts.length}',
             ),
-            const SizedBox(height: 12),
-            _filterBar(
-              hint: 'Search title, content, category, or author',
-              selected: _forumFilter,
-              filters: const ['All', 'Visible', 'Flagged', 'Removed'],
-              onSelected: (value) => setState(() => _forumFilter = value),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             if (posts.isEmpty)
-              const _EmbeddedEmpty(
-                icon: Icons.forum_outlined,
-                title: 'No posts found',
-                message: 'Moderation results will appear here.',
-              )
+              const _MiniEmpty(message: 'No forum posts need review.')
             else
-              ...posts.map(_forumCard),
+              ...posts
+                  .where(_matchesSearch)
+                  .map(
+                    (doc) => _ReviewCard(
+                      icon: Icons.forum_rounded,
+                      title: _text(doc.data(), 'title', 'Discussion'),
+                      subtitle: _text(doc.data(), 'content', 'No content'),
+                      status: _text(doc.data(), 'moderationStatus', 'visible'),
+                      actions: [
+                        _CardAction(
+                          'Visible',
+                          Icons.visibility_rounded,
+                          () => _setPostStatus(doc.id, 'visible'),
+                        ),
+                        _CardAction(
+                          'Flag',
+                          Icons.flag_rounded,
+                          () => _setPostStatus(doc.id, 'flagged'),
+                        ),
+                        _CardAction(
+                          'Remove',
+                          Icons.visibility_off_rounded,
+                          () => _setPostStatus(doc.id, 'removed'),
+                        ),
+                      ],
+                    ),
+                  ),
+            const SizedBox(height: 18),
+            _SectionTitle(
+              title: 'Welfare cases',
+              trailing: '${welfare.length}',
+            ),
+            const SizedBox(height: 10),
+            if (welfare.isEmpty)
+              const _MiniEmpty(message: 'No welfare cases need review.')
+            else
+              ...welfare
+                  .where(_matchesSearch)
+                  .map(
+                    (doc) => _ReviewCard(
+                      icon: Icons.volunteer_activism_rounded,
+                      title: _text(doc.data(), 'applicantName', 'Applicant'),
+                      subtitle: _text(
+                        doc.data(),
+                        'programName',
+                        'Welfare application',
+                      ),
+                      status: _text(doc.data(), 'status', 'pending'),
+                      actions: [
+                        _CardAction(
+                          'Approve',
+                          Icons.check_circle_rounded,
+                          () => _setWelfareStatus(doc.id, 'approved'),
+                        ),
+                        _CardAction(
+                          'Reject',
+                          Icons.cancel_rounded,
+                          () => _setWelfareStatus(doc.id, 'rejected'),
+                        ),
+                        _CardAction(
+                          'Resolve',
+                          Icons.done_all_rounded,
+                          () => _setWelfareStatus(doc.id, 'resolved'),
+                        ),
+                      ],
+                    ),
+                  ),
           ],
         );
       },
-    );
-  }
-
-  Widget _forumCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final status = _field(data, 'moderationStatus', 'visible');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: _InfoCard(
-        icon: status == 'removed'
-            ? Icons.visibility_off_rounded
-            : Icons.forum_rounded,
-        title: _field(data, 'title', 'Discussion'),
-        subtitle: _field(data, 'content', 'No content'),
-        status: status,
-        statusColor: _statusColor(status),
-        metadata: [
-          _InfoMeta(Icons.sell_rounded, _field(data, 'category', 'General')),
-          _InfoMeta(Icons.person_rounded, _field(data, 'authorName', 'User')),
-          _InfoMeta(
-            Icons.favorite_rounded,
-            '${_intValue(data['likes'])} likes',
-          ),
-          _InfoMeta(Icons.schedule_rounded, _formatAnyDate(data['createdAt'])),
-        ],
-        actions: [
-          _smallButton(
-            'Flag',
-            Icons.flag_rounded,
-            () => _setPostStatus(doc.id, 'flagged'),
-          ),
-          _smallButton(
-            'Restore',
-            Icons.visibility_rounded,
-            () => _setPostStatus(doc.id, 'visible'),
-          ),
-          _smallButton(
-            'Remove',
-            Icons.delete_outline_rounded,
-            () => _setPostStatus(doc.id, 'removed'),
-          ),
-          _smallButton(
-            'Details',
-            Icons.open_in_new_rounded,
-            () => _showDocumentDetails(
-              title: _field(data, 'title', 'Forum discussion'),
-              subtitle: 'forum_posts/${doc.id}',
-              path: 'forum_posts/${doc.id}',
-              icon: Icons.forum_rounded,
-              data: data,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
   Widget _partnersTab() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db
-          .collection('marketplace_partners')
-          .orderBy('priority')
-          .snapshots(),
+      stream: _db.collection('marketplace_partners').snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _ErrorPanel(message: '${snapshot.error}');
-        }
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const _LoadingView(label: 'Loading partners');
+          return const Center(child: CircularProgressIndicator());
         }
-
-        final docs = snapshot.data?.docs ?? [];
-        final active = docs.where((doc) => _isPartnerActive(doc.data())).length;
-        final hidden = docs.length - active;
-        final unapproved = docs
-            .where((doc) => (doc.data()['approved'] ?? true) != true)
-            .length;
-        final partners = docs
-            .where(_matchesSearch)
-            .where((doc) => _matchesPartnerFilter(doc.data()))
-            .toList();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
+        final partners =
+            (snapshot.data?.docs ?? []).where(_matchesSearch).toList()
+              ..sort((a, b) {
+                final pa = _num(a.data()['priority'], 99);
+                final pb = _num(b.data()['priority'], 99);
+                return pa.compareTo(pb);
+              });
+        return _AdminListShell(
+          title: 'Partners',
+          subtitle: '${partners.length} marketplace records',
+          searchController: _searchController,
+          search: _search,
+          onSearch: (value) => setState(() => _search = value),
+          trailing: IconButton.filled(
+            onPressed: () => _showPartnerSheet(),
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'Add partner',
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.primaryFor(context),
+              foregroundColor: Colors.white,
+            ),
+          ),
           children: [
-            _tabSummary(
-              title: 'Partner Marketplace',
-              subtitle:
-                  'Control which partners are live, approved, and featured for FinEase users.',
-              icon: Icons.handshake_rounded,
-              items: [
-                _SummaryItem('Total', '${docs.length}', AppTheme.primary),
-                _SummaryItem('Active', '$active', AppTheme.success),
-                _SummaryItem('Hidden', '$hidden', AppTheme.error),
-                _SummaryItem('Unapproved', '$unapproved', AppTheme.warning),
-              ],
-              action: _ghostButton(
-                'Add partner',
-                Icons.add_business_rounded,
-                () => _showPartnerDialog(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _filterBar(
-              hint: 'Search partner name, category, badge, or link',
-              selected: _partnerFilter,
-              filters: const ['All', 'Active', 'Hidden', 'Unapproved'],
-              onSelected: (value) => setState(() => _partnerFilter = value),
-            ),
-            const SizedBox(height: 12),
             if (partners.isEmpty)
-              const _EmbeddedEmpty(
-                icon: Icons.storefront_outlined,
+              const _EmptyPanel(
+                icon: Icons.handshake_outlined,
                 title: 'No partners found',
-                message: 'Add or adjust a partner to populate this view.',
+                message: 'Add a partner or adjust search.',
               )
             else
-              ...partners.map(_partnerCard),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _partnerCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final active = (data['status'] ?? 'active') == 'active';
-    final approved = (data['approved'] ?? true) == true;
-    final status = active && approved
-        ? 'active'
-        : !approved
-        ? 'review'
-        : 'hidden';
-    final priority = _intValue(data['priority'], fallback: 10);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: _InfoCard(
-        icon: _partnerIcon(data['iconName'] as String?),
-        title: _field(data, 'name', 'Partner'),
-        subtitle: _field(data, 'description', 'No description configured'),
-        status: status,
-        statusColor: _statusColor(status),
-        metadata: [
-          _InfoMeta(
-            Icons.category_rounded,
-            _field(data, 'category', 'General'),
-          ),
-          _InfoMeta(Icons.low_priority_rounded, 'Priority $priority'),
-          _InfoMeta(
-            Icons.verified_rounded,
-            approved ? 'Approved' : 'Needs approval',
-          ),
-          if (_field(data, 'websiteUrl', '').isNotEmpty)
-            _InfoMeta(Icons.link_rounded, _field(data, 'websiteUrl', '')),
-        ],
-        actions: [
-          _smallButton(
-            'Edit',
-            Icons.edit_rounded,
-            () => _showPartnerDialog(doc: doc),
-          ),
-          _smallButton(
-            active ? 'Disable' : 'Enable',
-            active ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-            () => _setPartnerStatus(doc, active ? 'inactive' : 'active'),
-          ),
-          _smallButton(
-            approved ? 'Unapprove' : 'Approve',
-            Icons.verified_rounded,
-            () => _setPartnerApproval(doc, !approved),
-          ),
-          _smallButton(
-            'Raise',
-            Icons.keyboard_arrow_up_rounded,
-            () => _adjustPartnerPriority(doc, -1),
-          ),
-          _smallButton(
-            'Lower',
-            Icons.keyboard_arrow_down_rounded,
-            () => _adjustPartnerPriority(doc, 1),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _welfareTab() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db
-          .collection('welfare_applications')
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _ErrorPanel(message: '${snapshot.error}');
-        }
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return const _LoadingView(label: 'Loading welfare cases');
-        }
-
-        final docs = snapshot.data?.docs ?? [];
-        final pending = docs
-            .where(
-              (doc) => _field(doc.data(), 'status', 'pending') == 'pending',
-            )
-            .length;
-        final urgent = docs
-            .where(
-              (doc) => _field(doc.data(), 'priority', 'normal') == 'urgent',
-            )
-            .length;
-        final resolved = docs
-            .where(
-              (doc) => _field(doc.data(), 'status', 'pending') == 'resolved',
-            )
-            .length;
-        final cases = docs
-            .where(_matchesSearch)
-            .where((doc) => _matchesWelfareFilter(doc.data()))
-            .toList();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
-          children: [
-            _tabSummary(
-              title: 'Welfare Review Desk',
-              subtitle:
-                  'Prioritize support requests, track approvals, and close cases with clear audit history.',
-              icon: Icons.volunteer_activism_rounded,
-              items: [
-                _SummaryItem('Cases', '${docs.length}', AppTheme.primary),
-                _SummaryItem('Pending', '$pending', AppTheme.warning),
-                _SummaryItem('Urgent', '$urgent', AppTheme.error),
-                _SummaryItem('Resolved', '$resolved', AppTheme.success),
-              ],
-              action: _ghostButton(
-                'Add case',
-                Icons.add_task_rounded,
-                () => _showWelfareDialog(),
+              ...partners.map(
+                (doc) => _PartnerAdminCard(
+                  doc: doc,
+                  onApprove: () =>
+                      _setPartnerState(doc, approved: true, status: 'active'),
+                  onHide: () =>
+                      _setPartnerState(doc, approved: false, status: 'hidden'),
+                  onEdit: () => _showPartnerSheet(doc: doc),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _filterBar(
-              hint: 'Search applicant, program, notes, priority, or status',
-              selected: _welfareFilter,
-              filters: const [
-                'All',
-                'Pending',
-                'Urgent',
-                'Approved',
-                'Rejected',
-                'Resolved',
-              ],
-              onSelected: (value) => setState(() => _welfareFilter = value),
-            ),
-            const SizedBox(height: 12),
-            if (cases.isEmpty)
-              const _EmbeddedEmpty(
-                icon: Icons.assignment_outlined,
-                title: 'No welfare cases found',
-                message: 'Cases matching your filters will appear here.',
-              )
-            else
-              ...cases.map(_welfareCard),
           ],
         );
       },
     );
   }
 
-  Widget _welfareCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final status = _field(data, 'status', 'pending');
-    final priority = _field(data, 'priority', 'normal');
-    final statusColor = priority == 'urgent' && status == 'pending'
-        ? AppTheme.error
-        : _statusColor(status);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: _InfoCard(
-        icon: Icons.volunteer_activism_rounded,
-        title: _field(data, 'applicantName', 'Applicant'),
-        subtitle: _field(data, 'notes', 'No notes added'),
-        status: priority == 'urgent' && status == 'pending' ? 'urgent' : status,
-        statusColor: statusColor,
-        metadata: [
-          _InfoMeta(
-            Icons.assignment_rounded,
-            _field(data, 'program', 'Support request'),
-          ),
-          _InfoMeta(Icons.priority_high_rounded, 'Priority: $priority'),
-          _InfoMeta(Icons.schedule_rounded, _formatAnyDate(data['createdAt'])),
-          if (data['reviewedAt'] != null)
-            _InfoMeta(
-              Icons.fact_check_rounded,
-              'Reviewed ${_formatAnyDate(data['reviewedAt'])}',
-            ),
-        ],
-        actions: [
-          _smallButton(
-            'Approve',
-            Icons.check_circle_rounded,
-            () => _setWelfareStatus(doc.id, 'approved'),
-          ),
-          _smallButton(
-            'Reject',
-            Icons.cancel_rounded,
-            () => _setWelfareStatus(doc.id, 'rejected'),
-          ),
-          _smallButton(
-            'Resolve',
-            Icons.task_alt_rounded,
-            () => _setWelfareStatus(doc.id, 'resolved'),
-          ),
-          _smallButton(
-            'Edit',
-            Icons.edit_rounded,
-            () => _showWelfareDialog(doc: doc),
-          ),
-          _smallButton(
-            'Details',
-            Icons.open_in_new_rounded,
-            () => _showDocumentDetails(
-              title: _field(data, 'applicantName', 'Applicant'),
-              subtitle: 'welfare_applications/${doc.id}',
-              path: 'welfare_applications/${doc.id}',
-              icon: Icons.volunteer_activism_rounded,
-              data: data,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _appControlsTab() {
+  Widget _appTab() {
     return StreamBuilder<AppConfig>(
-      stream: AppConfigService().watchConfig(),
+      stream: _configService.watchConfig(),
       initialData: AppConfig.defaults(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _ErrorPanel(message: '${snapshot.error}');
-        }
-
-        final config = snapshot.data ?? AppConfig.defaults();
-        final communityLive =
-            config.forumEnabled &&
-            config.forumPostingEnabled &&
-            config.forumCommentsEnabled;
-        final aiLive = config.chatbotEnabled && config.budgetAiEnabled;
-        final marketLive = config.marketplaceEnabled && config.welfareEnabled;
-
         return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
           children: [
-            _tabSummary(
-              title: 'App Control Room',
-              subtitle:
-                  'These controls write to Firestore and change what users can access in the live app.',
-              icon: Icons.tune_rounded,
-              items: [
-                _SummaryItem(
-                  'App mode',
-                  config.maintenanceMode ? 'Maintenance' : 'Live',
-                  config.maintenanceMode ? AppTheme.error : AppTheme.success,
-                ),
-                _SummaryItem(
-                  'Announcement',
-                  config.announcementEnabled ? 'On' : 'Off',
-                  config.announcementEnabled
-                      ? AppTheme.warning
-                      : AppTheme.textSecondaryFor(context),
-                ),
-                _SummaryItem(
-                  'Community',
-                  communityLive ? 'Open' : 'Limited',
-                  communityLive ? AppTheme.success : AppTheme.warning,
-                ),
-                _SummaryItem(
-                  'AI tools',
-                  aiLive ? 'Open' : 'Limited',
-                  aiLive ? AppTheme.success : AppTheme.warning,
-                ),
-                _SummaryItem(
-                  'Discovery',
-                  marketLive ? 'Open' : 'Limited',
-                  marketLive ? AppTheme.success : AppTheme.warning,
-                ),
-              ],
-              action: _ghostButton(
-                'Reset defaults',
-                Icons.restore_rounded,
-                () => _saveAppConfig(
-                  AppConfig.defaults(),
-                  'App controls reset to defaults.',
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
             _AppConfigEditor(
-              config: config,
-              onSave: (nextConfig) =>
-                  _saveAppConfig(nextConfig, 'App controls saved.'),
+              config: snapshot.data ?? AppConfig.defaults(),
+              onSave: _saveConfig,
             ),
           ],
         );
@@ -1311,1445 +350,153 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _reportsTab() {
-    return _Stream4(
-      users: _db.collection('users').snapshots(),
-      posts: _db.collection('forum_posts').snapshots(),
-      partners: _db.collection('marketplace_partners').snapshots(),
-      welfare: _db.collection('welfare_applications').snapshots(),
-      builder: (context, users, posts, partners, welfare) {
-        final stats = _AdminStats.from(
-          users: users.docs,
-          posts: posts.docs,
-          partners: partners.docs,
-          welfare: welfare.docs,
-        );
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
-          children: [
-            _tabSummary(
-              title: 'Reports and Audit',
-              subtitle:
-                  'Generate operational snapshots and inspect admin-side activity.',
-              icon: Icons.analytics_rounded,
-              items: [
-                _SummaryItem(
-                  'Review load',
-                  '${stats.reviewLoad}',
-                  AppTheme.warning,
-                ),
-                _SummaryItem('Users', '${stats.users}', AppTheme.primary),
-                _SummaryItem('Partners', '${stats.partners}', AppTheme.success),
-                _SummaryItem('Cases', '${stats.welfareCases}', AppTheme.error),
-              ],
-            ),
-            const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final wide = constraints.maxWidth >= 900;
-                final reportPanel = _Panel(
-                  title: 'Export Center',
-                  subtitle: 'Copy clean text reports to share or archive',
-                  icon: Icons.file_copy_rounded,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _wideButton(
-                        'Copy operational report',
-                        Icons.summarize_rounded,
-                        _copyReport,
-                      ),
-                      const SizedBox(height: 10),
-                      _wideButton(
-                        'Copy review queue',
-                        Icons.rate_review_rounded,
-                        _copyReviewQueue,
-                      ),
-                      const SizedBox(height: 10),
-                      _wideButton(
-                        'Seed review samples',
-                        Icons.auto_fix_high_rounded,
-                        _seedAdminSamples,
-                      ),
-                    ],
-                  ),
-                );
-                final chartPanel = _Panel(
-                  title: 'Operations Mix',
-                  subtitle: 'Snapshot of current admin workload',
-                  icon: Icons.bar_chart_rounded,
-                  child: _OperationsBarChart(stats: stats),
-                );
-
-                if (!wide) {
-                  return Column(
-                    children: [
-                      reportPanel,
-                      const SizedBox(height: 14),
-                      chartPanel,
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 5, child: reportPanel),
-                    const SizedBox(width: 14),
-                    Expanded(flex: 7, child: chartPanel),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            _auditLogPanel(),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _tabSummary({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required List<_SummaryItem> items,
-    Widget? action,
-  }) {
-    return _Panel(
-      title: title,
-      subtitle: subtitle,
-      icon: icon,
-      action: action,
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: items
-            .map(
-              (item) => Container(
-                width: 150,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: item.color.withValues(alpha: 0.16)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: item.color,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondaryFor(context),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-
-  Widget _filterBar({
-    required String hint,
-    required String selected,
-    required List<String> filters,
-    required ValueChanged<String> onSelected,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _searchController,
-            onChanged: (value) => setState(() => _search = value.toLowerCase()),
-            decoration: InputDecoration(
-              hintText: hint,
-              prefixIcon: Icon(Icons.search_rounded),
-              suffixIcon: _search.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear search',
-                      icon: Icon(Icons.close_rounded),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _search = '');
-                      },
-                    ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: filters.map((filter) {
-              final isSelected = selected == filter;
-              return ChoiceChip(
-                selected: isSelected,
-                label: Text(filter),
-                selectedColor: AppTheme.primary,
-                backgroundColor: AppTheme.surfaceFor(context),
-                side: BorderSide(
-                  color: isSelected ? AppTheme.primary : AppTheme.borderFor(context),
-                ),
-                labelStyle: GoogleFonts.inter(
-                  color: isSelected ? Colors.white : AppTheme.textSecondaryFor(context),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-                onSelected: (_) => onSelected(filter),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _auditLogPanel() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db
-          .collection('admin_audit_logs')
-          .orderBy('createdAt', descending: true)
-          .limit(10)
-          .snapshots(),
-      builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
-        return _Panel(
-          title: 'Audit Log',
-          subtitle: docs.isEmpty
-              ? 'No admin actions logged yet'
-              : 'Latest admin actions',
-          icon: Icons.fact_check_rounded,
-          child: docs.isEmpty
-              ? const _EmbeddedEmpty(
-                  icon: Icons.fact_check_outlined,
-                  title: 'No audit events',
-                  message: 'Admin actions will be recorded here.',
-                )
-              : Column(
-                  children: docs.map((doc) {
-                    final data = doc.data();
-                    final action = _field(data, 'action', 'admin_action');
-                    final target = _field(data, 'target', 'unknown target');
-                    return _MiniActivity(
-                      icon: Icons.admin_panel_settings_rounded,
-                      title: _labelize(action),
-                      subtitle:
-                          '$target - ${_formatAnyDate(data['createdAt'])}',
-                      status: 'audit',
-                      color: AppTheme.primary,
-                    );
-                  }).toList(),
-                ),
-        );
-      },
-    );
-  }
-
-  List<_QueueItemData> _reviewQueueItems({
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> posts,
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> partners,
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> welfare,
-  }) {
-    final queue = <_QueueItemData>[];
-
-    for (final doc
-        in posts
-            .where((d) => d.data()['moderationStatus'] == 'flagged')
-            .take(3)) {
-      final data = doc.data();
-      queue.add(
-        _QueueItemData(
-          icon: Icons.flag_rounded,
-          color: AppTheme.warning,
-          title: _field(data, 'title', 'Flagged forum post'),
-          subtitle:
-              '${_field(data, 'category', 'General')} by ${_field(data, 'authorName', 'User')}',
-          status: 'forum',
-          onOpen: () => _selectTab(2),
-        ),
-      );
-    }
-
-    for (final doc
-        in welfare
-            .where((d) => _field(d.data(), 'status', 'pending') == 'pending')
-            .take(3)) {
-      final data = doc.data();
-      final urgent = _field(data, 'priority', 'normal') == 'urgent';
-      queue.add(
-        _QueueItemData(
-          icon: urgent
-              ? Icons.priority_high_rounded
-              : Icons.assignment_late_rounded,
-          color: urgent ? AppTheme.error : AppTheme.warning,
-          title: _field(data, 'applicantName', 'Pending welfare case'),
-          subtitle: _field(data, 'program', 'Support request'),
-          status: urgent ? 'urgent' : 'pending',
-          onOpen: () => _selectTab(4),
-        ),
-      );
-    }
-
-    for (final doc
-        in partners
-            .where((d) => (d.data()['approved'] ?? true) != true)
-            .take(3)) {
-      final data = doc.data();
-      queue.add(
-        _QueueItemData(
-          icon: Icons.handshake_rounded,
-          color: AppTheme.primary,
-          title: _field(data, 'name', 'Partner review'),
-          subtitle: _field(data, 'category', 'Marketplace partner'),
-          status: 'partner',
-          onOpen: () => _selectTab(3),
-        ),
-      );
-    }
-
-    return queue;
-  }
-
-  bool _matchesSearch(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    if (_search.isEmpty) {
-      return true;
-    }
-    return doc.data().values.join(' ').toLowerCase().contains(_search);
-  }
-
-  bool _matchesUserFilter(Map<String, dynamic> data) {
-    final status = _field(data, 'accountStatus', 'active').toLowerCase();
-    final role = _field(data, 'role', 'user').toLowerCase();
-    final isDemo = data['isDemoAccount'] == true || role == 'demo';
-    switch (_userFilter) {
-      case 'Active':
-        return status != 'suspended' && data['authDisabled'] != true;
-      case 'Suspended':
-        return status == 'suspended';
-      case 'Disabled':
-        return data['authDisabled'] == true;
-      case 'Admin':
-        return role == 'admin' || data['email'] == AppConstants.adminEmail;
-      case 'Demo':
-        return isDemo;
-      default:
-        return true;
-    }
-  }
-
-  bool _matchesStatusFilter(String status, String filter) {
-    if (filter == 'All') {
-      return true;
-    }
-    return status.toLowerCase() == filter.toLowerCase();
-  }
-
-  bool _matchesPartnerFilter(Map<String, dynamic> data) {
-    final active = _isPartnerActive(data);
-    final approved = (data['approved'] ?? true) == true;
-    switch (_partnerFilter) {
-      case 'Active':
-        return active;
-      case 'Hidden':
-        return !active;
-      case 'Unapproved':
-        return !approved;
-      default:
-        return true;
-    }
-  }
-
-  bool _matchesWelfareFilter(Map<String, dynamic> data) {
-    final status = _field(data, 'status', 'pending').toLowerCase();
-    final priority = _field(data, 'priority', 'normal').toLowerCase();
-    switch (_welfareFilter) {
-      case 'Pending':
-        return status == 'pending';
-      case 'Urgent':
-        return priority == 'urgent' && status == 'pending';
-      case 'Approved':
-      case 'Rejected':
-      case 'Resolved':
-        return status == _welfareFilter.toLowerCase();
-      default:
-        return true;
-    }
-  }
-
-  bool _isPartnerActive(Map<String, dynamic> data) {
-    return (data['status'] ?? 'active') == 'active' &&
-        (data['approved'] ?? true) == true;
-  }
-
-  void _selectTab(int index) {
-    setState(() {
-      _tabIndex = index;
-      _search = '';
-      _searchController.clear();
-    });
-  }
-
-  Future<void> _requestFirebaseAuthSync() async {
-    await _runAdminAction('Firebase Auth sync queued.', () async {
-      final ref = await _db.collection('admin_user_sync_requests').add({
-        'requestedByEmail': AppConstants.adminEmail,
-        'status': 'queued',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      await _logAdminAction('firebase_auth_sync_requested', ref.path, {
-        'requestedByEmail': AppConstants.adminEmail,
-      });
-    });
-  }
-
-  Future<void> _requestUserAuthDisabled(
+  Future<void> _setUserState(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
-    bool disabled,
+    String status,
   ) async {
-    final data = doc.data();
-    final email = _field(data, 'email', 'No email');
-    await _runAdminAction(
-      disabled ? 'Disable sign-in queued.' : 'Enable sign-in queued.',
-      () async {
-        await doc.reference.set({
-          'authDisabled': disabled,
-          'authActionStatus': 'queued',
-          'authActionQueuedAt': FieldValue.serverTimestamp(),
-          'accountStatus': disabled ? 'suspended' : 'active',
-        }, SetOptions(merge: true));
-        await _queueUserAuthAction(
-          uid: doc.id,
-          action: disabled ? 'disableAuth' : 'enableAuth',
-          payload: {'email': email},
-        );
-      },
-    );
-  }
-
-  Future<void> _queueUserAuthAction({
-    required String uid,
-    required String action,
-    required Map<String, dynamic> payload,
-  }) async {
-    final ref = await _db.collection('admin_user_actions').add({
-      'uid': uid,
-      'action': action,
-      'payload': payload,
-      'requestedByEmail': AppConstants.adminEmail,
-      'status': 'queued',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    await _logAdminAction(action, ref.path, {'uid': uid, ...payload});
-  }
-
-  Future<void> _setUserStatus(
-    String uid,
-    String status, {
-    String? email,
-  }) async {
-    await _runAdminAction('User marked $status.', () async {
-      await _db.collection('users').doc(uid).set({
+    final email = _text(doc.data(), 'email');
+    if (email == AppConstants.adminEmail) {
+      _snack('Primary admin account is protected.', isError: true);
+      return;
+    }
+    await _runAction('User marked $status', () async {
+      await doc.reference.set({
         'accountStatus': status,
-        'statusUpdatedAt': FieldValue.serverTimestamp(),
+        'adminUpdatedAt': FieldValue.serverTimestamp(),
+        'adminUpdatedBy': AppConstants.adminEmail,
       }, SetOptions(merge: true));
-      if (email != AppConstants.adminEmail) {
-        await _queueUserAuthAction(
-          uid: uid,
-          action: status == 'suspended' ? 'disableAuth' : 'enableAuth',
-          payload: {'email': email},
-        );
-      }
-      await _logAdminAction('user_status_$status', 'users/$uid', {
-        'email': email,
-        'status': status,
-      });
+      await _log('user_status_$status', doc.reference.path, {'email': email});
     });
   }
 
   Future<void> _setPostStatus(String postId, String status) async {
-    await _runAdminAction('Post marked $status.', () async {
+    await _runAction('Post marked $status', () async {
       await _db.collection('forum_posts').doc(postId).set({
         'moderationStatus': status,
         'moderatedAt': FieldValue.serverTimestamp(),
         'moderatedBy': AppConstants.adminEmail,
       }, SetOptions(merge: true));
-      await _logAdminAction('post_status_$status', 'forum_posts/$postId', {
-        'status': status,
-      });
-    });
-  }
-
-  Future<void> _setPartnerStatus(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-    String status,
-  ) async {
-    await _runAdminAction('Partner marked $status.', () async {
-      await doc.reference.set({
-        'status': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      await _logAdminAction('partner_status_$status', doc.reference.path, {
-        'status': status,
-      });
-    });
-  }
-
-  Future<void> _setPartnerApproval(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-    bool approved,
-  ) async {
-    await _runAdminAction(
-      approved ? 'Partner approved.' : 'Partner approval removed.',
-      () async {
-        await doc.reference.set({
-          'approved': approved,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        await _logAdminAction(
-          approved ? 'partner_approved' : 'partner_unapproved',
-          doc.reference.path,
-          {'approved': approved},
-        );
-      },
-    );
-  }
-
-  Future<void> _adjustPartnerPriority(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-    int delta,
-  ) async {
-    final current = _intValue(doc.data()['priority'], fallback: 10);
-    final next = math.max(1, current + delta);
-    await _runAdminAction('Partner priority updated.', () async {
-      await doc.reference.set({
-        'priority': next,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      await _logAdminAction('partner_priority', doc.reference.path, {
-        'from': current,
-        'to': next,
-      });
+      await _log('post_status_$status', 'forum_posts/$postId', {});
     });
   }
 
   Future<void> _setWelfareStatus(String id, String status) async {
-    await _runAdminAction('Case marked $status.', () async {
+    await _runAction('Case marked $status', () async {
       await _db.collection('welfare_applications').doc(id).set({
         'status': status,
         'reviewedAt': FieldValue.serverTimestamp(),
         'reviewedBy': AppConstants.adminEmail,
       }, SetOptions(merge: true));
-      await _logAdminAction(
-        'welfare_status_$status',
-        'welfare_applications/$id',
-        {'status': status},
-      );
+      await _log('welfare_status_$status', 'welfare_applications/$id', {});
     });
   }
 
-  Future<void> _saveAppConfig(AppConfig config, String message) async {
-    await _runAdminAction(message, () async {
-      await AppConfigService().saveConfig(config);
-      await _logAdminAction('app_config_updated', 'app_config/global', {
+  Future<void> _setPartnerState(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc, {
+    required bool approved,
+    required String status,
+  }) async {
+    await _runAction('Partner updated', () async {
+      await doc.reference.set({
+        'approved': approved,
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedBy': AppConstants.adminEmail,
+      }, SetOptions(merge: true));
+      await _log('partner_$status', doc.reference.path, {'approved': approved});
+    });
+  }
+
+  Future<void> _saveConfig(AppConfig config) async {
+    await _runAction('App controls saved', () async {
+      await _configService.saveConfig(config);
+      await _log('app_config_updated', 'app_config/global', {
         'maintenanceMode': config.maintenanceMode,
         'announcementEnabled': config.announcementEnabled,
         'marketplaceEnabled': config.marketplaceEnabled,
         'forumEnabled': config.forumEnabled,
-        'forumPostingEnabled': config.forumPostingEnabled,
-        'forumCommentsEnabled': config.forumCommentsEnabled,
         'welfareEnabled': config.welfareEnabled,
-        'chatbotEnabled': config.chatbotEnabled,
-        'budgetAiEnabled': config.budgetAiEnabled,
-        'brandName': config.brandName,
-        'logoUrl': config.logoUrl,
-        'primaryColorHex': config.primaryColorHex,
-        'secondaryColorHex': config.secondaryColorHex,
       });
-    });
-  }
-
-  Future<void> _seedAdminSamples() async {
-    await _runAdminAction('Admin sample data is ready.', () async {
-      final batch = _db.batch();
-      final welfare = _db.collection('welfare_applications');
-      final partners = _db.collection('marketplace_partners');
-
-      batch.set(welfare.doc('sample-bisp-review'), {
-        'applicantName': 'Ayesha Khan',
-        'program': 'Benazir Income Support Programme',
-        'status': 'pending',
-        'priority': 'urgent',
-        'notes': 'Household income verification needed before referral.',
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      batch.set(welfare.doc('sample-scholarship-review'), {
-        'applicantName': 'Usman Ali',
-        'program': 'Education Scholarship Desk',
-        'status': 'pending',
-        'priority': 'normal',
-        'notes': 'Student uploaded fee estimate and CNIC details offline.',
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      batch.set(
-        _db.collection('forum_posts').doc('sample-admin-flag'),
-        {
-          'title': 'Suspicious investment link review',
-          'content':
-              'A user reported a high-return link that needs moderation before it spreads.',
-          'category': 'Investing',
-          'authorName': 'FinEase Monitor',
-          'authorAvatar': '',
-          'authorId': 'system',
-          'likes': 0,
-          'comments': 0,
-          'moderationStatus': 'flagged',
-          'createdAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-      batch.set(partners.doc('sample-partner-review'), {
-        'name': 'Micro Growth Capital Desk',
-        'category': 'Business',
-        'description':
-            'Pending partner review for small business financing referrals.',
-        'badge': 'Needs Review',
-        'ctaLabel': 'Review Offer',
-        'websiteUrl': 'https://finease.app',
-        'priority': 30,
-        'iconName': 'briefcase',
-        'colorHex': AppTheme.primary.toARGB32(),
-        'status': 'inactive',
-        'approved': false,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      batch.set(_db.collection('admin_audit_logs').doc(), {
-        'action': 'seed_admin_samples',
-        'target': 'admin_console',
-        'adminEmail': AppConstants.adminEmail,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      await batch.commit();
     });
   }
 
   Future<void> _copyReport() async {
-    await _runAdminAction('Report copied to clipboard.', () async {
-      final users = await _db.collection('users').get();
-      final posts = await _db.collection('forum_posts').get();
-      final partners = await _db.collection('marketplace_partners').get();
-      final welfare = await _db.collection('welfare_applications').get();
-      final metrics = await _db
-          .collection('system_metrics')
-          .doc('overview')
-          .get();
-      final stats = _AdminStats.from(
+    final users = await _db.collection('users').get();
+    final posts = await _db.collection('forum_posts').get();
+    final partners = await _db.collection('marketplace_partners').get();
+    final welfare = await _db.collection('welfare_applications').get();
+    final stats = _AdminStats.from(
+      _AdminData(
         users: users.docs,
         posts: posts.docs,
         partners: partners.docs,
         welfare: welfare.docs,
-      );
-      final report = StringBuffer()
-        ..writeln('FinEase Admin Report')
-        ..writeln('Generated,${_dateFormat.format(DateTime.now())}')
-        ..writeln('Users,${stats.users}')
-        ..writeln('Active Users,${stats.activeUsers}')
-        ..writeln('Verified Users,${stats.verifiedUsers}')
-        ..writeln('Suspended Users,${stats.suspendedUsers}')
-        ..writeln('Forum Posts,${stats.forumPosts}')
-        ..writeln('Flagged Posts,${stats.flaggedPosts}')
-        ..writeln('Removed Posts,${stats.removedPosts}')
-        ..writeln('Partners,${stats.partners}')
-        ..writeln('Active Partners,${stats.activePartners}')
-        ..writeln('Hidden Partners,${stats.hiddenPartners}')
-        ..writeln('Unapproved Partners,${stats.unapprovedPartners}')
-        ..writeln('Welfare Cases,${stats.welfareCases}')
-        ..writeln('Pending Welfare,${stats.pendingCases}')
-        ..writeln('Urgent Welfare,${stats.urgentCases}')
-        ..writeln('Resolved Welfare,${stats.resolvedCases}')
-        ..writeln('Review Load,${stats.reviewLoad}')
-        ..writeln('System Metrics,"${metrics.data()}"');
-      await Clipboard.setData(ClipboardData(text: report.toString()));
-      await _logAdminAction('copy_operational_report', 'reports/operations', {
-        'reviewLoad': stats.reviewLoad,
-      });
-    });
-  }
-
-  Future<void> _copyReviewQueue() async {
-    await _runAdminAction('Review queue copied to clipboard.', () async {
-      final posts = await _db.collection('forum_posts').get();
-      final partners = await _db.collection('marketplace_partners').get();
-      final welfare = await _db.collection('welfare_applications').get();
-      final queue = _reviewQueueItems(
-        posts: posts.docs,
-        partners: partners.docs,
-        welfare: welfare.docs,
-      );
-      final buffer = StringBuffer()
-        ..writeln('FinEase Review Queue')
-        ..writeln('Generated,${_dateFormat.format(DateTime.now())}');
-      if (queue.isEmpty) {
-        buffer.writeln('No pending review items.');
-      } else {
-        for (final item in queue) {
-          buffer.writeln('${item.status},${item.title},${item.subtitle}');
-        }
-      }
-      await Clipboard.setData(ClipboardData(text: buffer.toString()));
-      await _logAdminAction('copy_review_queue', 'reports/review_queue', {
-        'items': queue.length,
-      });
-    });
-  }
-
-  void _showMetricsDialog(Map<String, dynamic> data) {
-    final activeUsers = TextEditingController(
-      text: '${data['activeUsers'] ?? 12842}',
-    );
-    final latency = TextEditingController(text: '${data['latencyMs'] ?? 12}');
-    final pending = TextEditingController(
-      text: '${data['pendingWelfare'] ?? 42}',
-    );
-    final urgent = TextEditingController(
-      text: '${data['urgentReviews'] ?? 12}',
-    );
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('System metrics'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _numberField(activeUsers, 'Active users'),
-              const SizedBox(height: 10),
-              _numberField(latency, 'Latency ms'),
-              const SizedBox(height: 10),
-              _numberField(pending, 'Pending welfare'),
-              const SizedBox(height: 10),
-              _numberField(urgent, 'Urgent reviews'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _runAdminAction('Metrics updated.', () async {
-                await _db.collection('system_metrics').doc('overview').set({
-                  'activeUsers': int.tryParse(activeUsers.text) ?? 0,
-                  'latencyMs': int.tryParse(latency.text) ?? 0,
-                  'pendingWelfare': int.tryParse(pending.text) ?? 0,
-                  'urgentReviews': int.tryParse(urgent.text) ?? 0,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                }, SetOptions(merge: true));
-                await _logAdminAction(
-                  'update_system_metrics',
-                  'system_metrics/overview',
-                  {
-                    'activeUsers': activeUsers.text,
-                    'latencyMs': latency.text,
-                    'pendingWelfare': pending.text,
-                    'urgentReviews': urgent.text,
-                  },
-                );
-              });
-            },
-            icon: Icon(Icons.save_rounded),
-            label: const Text('Save'),
-          ),
-        ],
       ),
     );
+    final report = StringBuffer()
+      ..writeln('FinEase Admin Report')
+      ..writeln('Generated,${DateTime.now().toIso8601String()}')
+      ..writeln('Users,${stats.users}')
+      ..writeln('Suspended Users,${stats.suspendedUsers}')
+      ..writeln('Forum Posts,${stats.forumPosts}')
+      ..writeln('Flagged Posts,${stats.flaggedPosts}')
+      ..writeln('Partners,${stats.partners}')
+      ..writeln('Unapproved Partners,${stats.unapprovedPartners}')
+      ..writeln('Welfare Cases,${stats.welfareCases}')
+      ..writeln('Pending Welfare,${stats.pendingCases}');
+    await Clipboard.setData(ClipboardData(text: report.toString()));
+    _snack('Admin report copied');
   }
 
-  void _showPartnerDialog({QueryDocumentSnapshot<Map<String, dynamic>>? doc}) {
-    final data = doc?.data() ?? {};
-    final name = TextEditingController(text: data['name'] ?? '');
-    final category = TextEditingController(text: data['category'] ?? 'Finance');
-    final description = TextEditingController(text: data['description'] ?? '');
-    final badge = TextEditingController(text: data['badge'] ?? 'Verified');
-    final cta = TextEditingController(text: data['ctaLabel'] ?? 'Learn More');
-    final websiteUrl = TextEditingController(text: data['websiteUrl'] ?? '');
-    final priority = TextEditingController(text: '${data['priority'] ?? 10}');
-    final iconName = TextEditingController(text: data['iconName'] ?? 'bank');
-    final colorHex = TextEditingController(
-      text: _formatColorInput(data['colorHex']),
-    );
-
-    showDialog(
+  void _showPartnerSheet({QueryDocumentSnapshot<Map<String, dynamic>>? doc}) {
+    showModalBottomSheet<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(doc == null ? 'Add partner' : 'Edit partner'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: category,
-                decoration: const InputDecoration(labelText: 'Category'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: description,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Description'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: websiteUrl,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(labelText: 'Website URL'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: badge,
-                decoration: const InputDecoration(labelText: 'Badge'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: cta,
-                decoration: const InputDecoration(labelText: 'CTA label'),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(child: _numberField(priority, 'Priority')),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: iconName,
-                      decoration: const InputDecoration(
-                        labelText: 'Icon name',
-                        hintText: 'bank',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: colorHex,
-                decoration: const InputDecoration(
-                  labelText: 'Color hex',
-                  hintText: '#2E3192',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final title = name.text.trim();
-              if (title.isEmpty) {
-                _snack('Partner name is required.');
-                return;
-              }
-              Navigator.pop(dialogContext);
-              final payload = {
-                'name': title,
-                'category': category.text.trim().isEmpty
-                    ? 'General'
-                    : category.text.trim(),
-                'description': description.text.trim(),
-                'badge': badge.text.trim(),
-                'ctaLabel': cta.text.trim().isEmpty
-                    ? 'Learn More'
-                    : cta.text.trim(),
-                'websiteUrl': websiteUrl.text.trim(),
-                'priority': int.tryParse(priority.text) ?? 10,
-                'iconName': iconName.text.trim().isEmpty
-                    ? 'bank'
-                    : iconName.text.trim(),
-                'colorHex':
-                    _parseColorHex(colorHex.text) ??
-                    data['colorHex'] ??
-                    AppTheme.primary.toARGB32(),
-                'status': data['status'] ?? 'active',
-                'approved': data['approved'] ?? true,
-                'updatedAt': FieldValue.serverTimestamp(),
-              };
-              await _runAdminAction('Partner saved.', () async {
-                if (doc == null) {
-                  final ref = await _db
-                      .collection('marketplace_partners')
-                      .add(payload);
-                  await _logAdminAction('partner_created', ref.path, {
-                    'name': title,
-                  });
-                } else {
-                  await doc.reference.set(payload, SetOptions(merge: true));
-                  await _logAdminAction('partner_updated', doc.reference.path, {
-                    'name': title,
-                  });
-                }
-              });
-            },
-            icon: Icon(Icons.save_rounded),
-            label: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showWelfareDialog({QueryDocumentSnapshot<Map<String, dynamic>>? doc}) {
-    final data = doc?.data() ?? {};
-    final applicant = TextEditingController(text: data['applicantName'] ?? '');
-    final program = TextEditingController(
-      text: data['program'] ?? 'Financial support review',
-    );
-    final notes = TextEditingController(text: data['notes'] ?? '');
-    var priority = _field(data, 'priority', 'normal');
-    var status = _field(data, 'status', 'pending');
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: Text(doc == null ? 'Add welfare case' : 'Edit welfare case'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: applicant,
-                    decoration: const InputDecoration(
-                      labelText: 'Applicant name',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: program,
-                    decoration: const InputDecoration(labelText: 'Program'),
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: priority,
-                    decoration: const InputDecoration(labelText: 'Priority'),
-                    items: const ['normal', 'urgent']
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(_capitalized(value)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() => priority = value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: status,
-                    decoration: const InputDecoration(labelText: 'Status'),
-                    items: const ['pending', 'approved', 'rejected', 'resolved']
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(_capitalized(value)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() => status = value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: notes,
-                    minLines: 2,
-                    maxLines: 5,
-                    decoration: const InputDecoration(labelText: 'Notes'),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final name = applicant.text.trim().isEmpty
-                      ? 'Applicant'
-                      : applicant.text.trim();
-                  Navigator.pop(dialogContext);
-                  final payload = {
-                    'applicantName': name,
-                    'program': program.text.trim().isEmpty
-                        ? 'Financial support review'
-                        : program.text.trim(),
-                    'notes': notes.text.trim(),
-                    'status': status,
-                    'priority': priority,
-                    'updatedAt': FieldValue.serverTimestamp(),
-                    if (doc == null) 'createdAt': FieldValue.serverTimestamp(),
-                  };
-                  await _runAdminAction('Welfare case saved.', () async {
-                    if (doc == null) {
-                      final ref = await _db
-                          .collection('welfare_applications')
-                          .add(payload);
-                      await _logAdminAction('welfare_created', ref.path, {
-                        'applicantName': name,
-                      });
-                    } else {
-                      await doc.reference.set(payload, SetOptions(merge: true));
-                      await _logAdminAction(
-                        'welfare_updated',
-                        doc.reference.path,
-                        {
-                          'applicantName': name,
-                          'status': status,
-                          'priority': priority,
-                        },
-                      );
-                    }
-                  });
-                },
-                icon: Icon(Icons.save_rounded),
-                label: const Text('Save'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showUserEditor(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final fullName = TextEditingController(text: _field(data, 'fullName', ''));
-    final country = TextEditingController(
-      text: _field(data, 'country', AppConstants.countryName),
-    );
-    final language = TextEditingController(
-      text: _field(data, 'language', 'English (Pakistan)'),
-    );
-    final monthlyIncome = TextEditingController(
-      text: data['monthlyIncome'] == null ? '' : '${data['monthlyIncome']}',
-    );
-    final adminNotes = TextEditingController(
-      text: _field(data, 'adminNotes', ''),
-    );
-    final originalRole = _field(data, 'role', 'user');
-    var role = originalRole;
-    var status = _field(data, 'accountStatus', 'active');
-    var emailVerified = data['emailVerified'] == true;
-    var pushAlerts = data['pushAlerts'] != false;
-    var monthlyReports = data['monthlyReports'] != false;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Manage Firebase user'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SelectableText(
-                  _field(data, 'email', 'No email'),
-                  style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context)),
-                ),
-                const SizedBox(height: 10),
-                SelectableText(
-                  'UID: ${doc.id}',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSecondaryFor(context),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: fullName,
-                  decoration: const InputDecoration(labelText: 'Full name'),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: role,
-                        decoration: const InputDecoration(labelText: 'Role'),
-                        items: const ['user', 'demo', 'admin']
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(_capitalized(value)),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            setDialogState(() => role = value);
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: status,
-                        decoration: const InputDecoration(labelText: 'Status'),
-                        items: const ['active', 'suspended']
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(_capitalized(value)),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            setDialogState(() => status = value);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: monthlyIncome,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Monthly income',
-                    prefixText: 'PKR ',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: country,
-                  decoration: const InputDecoration(labelText: 'Country'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: language,
-                  decoration: const InputDecoration(labelText: 'Language'),
-                ),
-                const SizedBox(height: 10),
-                SwitchListTile(
-                  value: emailVerified,
-                  onChanged: (value) =>
-                      setDialogState(() => emailVerified = value),
-                  title: const Text('Mark profile email verified'),
-                  subtitle: const Text(
-                    'Updates Firestore profile. Firebase Auth email verification still comes from Auth sync.',
-                  ),
-                ),
-                SwitchListTile(
-                  value: pushAlerts,
-                  onChanged: (value) =>
-                      setDialogState(() => pushAlerts = value),
-                  title: const Text('Push alerts'),
-                ),
-                SwitchListTile(
-                  value: monthlyReports,
-                  onChanged: (value) =>
-                      setDialogState(() => monthlyReports = value),
-                  title: const Text('Monthly reports'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: adminNotes,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Admin notes'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                final income = double.tryParse(monthlyIncome.text.trim());
-                await _runAdminAction('User profile updated.', () async {
-                  final profilePatch = {
-                    'fullName': fullName.text.trim().isEmpty
-                        ? _field(data, 'email', 'FinEase user')
-                        : fullName.text.trim(),
-                    'role': role,
-                    'accountStatus': status,
-                    'country': country.text.trim().isEmpty
-                        ? AppConstants.countryName
-                        : country.text.trim(),
-                    'language': language.text.trim().isEmpty
-                        ? 'English (Pakistan)'
-                        : language.text.trim(),
-                    'emailVerified': emailVerified,
-                    'pushAlerts': pushAlerts,
-                    'monthlyReports': monthlyReports,
-                    'adminNotes': adminNotes.text.trim(),
-                    'adminUpdatedAt': FieldValue.serverTimestamp(),
-                    'adminUpdatedBy': AppConstants.adminEmail,
-                  };
-                  if (income != null) {
-                    profilePatch['monthlyIncome'] = income;
-                  }
-                  await doc.reference.set(
-                    profilePatch,
-                    SetOptions(merge: true),
-                  );
-                  if (role != originalRole) {
-                    await _queueUserAuthAction(
-                      uid: doc.id,
-                      action: 'setRole',
-                      payload: {'role': role},
-                    );
-                  }
-                  if (_field(data, 'accountStatus', 'active') != status &&
-                      _field(data, 'email', '') != AppConstants.adminEmail) {
-                    await _queueUserAuthAction(
-                      uid: doc.id,
-                      action: status == 'suspended'
-                          ? 'disableAuth'
-                          : 'enableAuth',
-                      payload: {'status': status},
-                    );
-                  }
-                  await _logAdminAction(
-                    'user_profile_updated',
-                    'users/${doc.id}',
-                    {'role': role, 'status': status},
-                  );
-                });
-              },
-              icon: Icon(Icons.save_rounded),
-              label: const Text('Save user'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showDocumentDetails({
-    required String title,
-    required String subtitle,
-    required String path,
-    required IconData icon,
-    required Map<String, dynamic> data,
-  }) {
-    final entries = data.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.78,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(icon, color: AppTheme.primary),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimaryFor(context),
-                            ),
-                          ),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textSecondaryFor(context),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Copy path',
-                      onPressed: () => _copyText(path, 'Document path copied.'),
-                      icon: Icon(Icons.copy_rounded),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(20),
-                  itemCount: entries.length,
-                  separatorBuilder: (_, index) => const Divider(height: 20),
-                  itemBuilder: (context, index) {
-                    final entry = entries[index];
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.key,
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textSecondaryFor(context),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        SelectableText(
-                          _valueToText(entry.value),
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textPrimaryFor(context),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      builder: (context) => _PartnerEditorSheet(
+        doc: doc,
+        onSave: (data) async {
+          await _runAction('Partner saved', () async {
+            if (doc == null) {
+              final ref = await _db.collection('marketplace_partners').add({
+                ...data,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+              await _log('partner_created', ref.path, {'name': data['name']});
+            } else {
+              await doc.reference.set({
+                ...data,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+              await _log('partner_updated', doc.reference.path, {
+                'name': data['name'],
+              });
+            }
+          });
+        },
       ),
     );
   }
 
-  Widget _numberField(TextEditingController controller, String label) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      decoration: InputDecoration(labelText: label),
-    );
-  }
-
-  Widget _smallButton(String label, IconData icon, VoidCallback? onPressed) {
-    return TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      label: Text(label),
-      style: TextButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        foregroundColor: AppTheme.primary,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-      ),
-    );
-  }
-
-  Widget _ghostButton(String label, IconData icon, VoidCallback onPressed) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppTheme.primary,
-        side: BorderSide(color: AppTheme.borderFor(context)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      ),
-    );
-  }
-
-  Widget _wideButton(String label, IconData icon, VoidCallback onPressed) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        alignment: Alignment.centerLeft,
-        foregroundColor: AppTheme.primary,
-        side: BorderSide(color: AppTheme.borderFor(context)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      ),
-    );
-  }
-
-  Future<void> _runAdminAction(
-    String successMessage,
+  Future<void> _runAction(
+    String success,
     Future<void> Function() action,
   ) async {
-    if (_busy) {
-      return;
-    }
+    if (_busy) return;
     setState(() => _busy = true);
     try {
       await action();
-      _snack(successMessage);
+      if (!mounted) return;
+      _snack(success);
     } catch (error) {
-      _snack('Admin action failed: $error');
+      if (!mounted) return;
+      _snack('Admin action failed: $error', isError: true);
     } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _logAdminAction(
+  Future<void> _log(
     String action,
     String target,
     Map<String, dynamic> details,
@@ -2763,298 +510,512 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
   }
 
-  Future<void> _copyText(String text, String message) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    _snack(message);
+  bool _matchesSearch(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final query = _search.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    final data = doc.data();
+    final haystack = [
+      doc.id,
+      _text(data, 'email'),
+      _text(data, 'fullName'),
+      _text(data, 'role'),
+      _text(data, 'title'),
+      _text(data, 'content'),
+      _text(data, 'name'),
+      _text(data, 'category'),
+      _text(data, 'applicantName'),
+      _text(data, 'programName'),
+    ].join(' ').toLowerCase();
+    return haystack.contains(query);
   }
 
-  String _field(Map<String, dynamic> data, String key, [String fallback = '']) {
-    final value = data[key];
-    if (value == null) {
-      return fallback;
-    }
-    final text = '$value'.trim();
-    return text.isEmpty ? fallback : text;
-  }
-
-  int _intValue(Object? value, {int fallback = 0}) {
-    if (value is int) {
-      return value;
-    }
-    if (value is num) {
-      return value.round();
-    }
-    return int.tryParse('$value') ?? fallback;
-  }
-
-  String _formatAnyDate(Object? value) {
-    if (value is Timestamp) {
-      return _shortDateFormat.format(value.toDate());
-    }
-    if (value is DateTime) {
-      return _shortDateFormat.format(value);
-    }
-    if (value is String && value.trim().isNotEmpty) {
-      return value;
-    }
-    return 'No date';
-  }
-
-  String _valueToText(Object? value) {
-    if (value is Timestamp) {
-      return _dateFormat.format(value.toDate());
-    }
-    if (value is DateTime) {
-      return _dateFormat.format(value);
-    }
-    return '$value';
-  }
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'active':
-      case 'visible':
-      case 'approved':
-      case 'resolved':
-      case 'verified':
-        return AppTheme.success;
-      case 'pending':
-      case 'flagged':
-      case 'review':
-      case 'audit':
-        return AppTheme.warning;
-      case 'urgent':
-      case 'suspended':
-      case 'removed':
-      case 'rejected':
-      case 'hidden':
-      case 'inactive':
-        return AppTheme.error;
-      case 'protected':
-      case 'admin':
-        return AppTheme.primary;
-      default:
-        return AppTheme.textSecondaryFor(context);
-    }
-  }
-
-  IconData _partnerIcon(String? name) {
-    switch (name) {
-      case 'shield':
-        return Icons.shield_rounded;
-      case 'briefcase':
-        return Icons.work_rounded;
-      case 'sun':
-        return Icons.solar_power_rounded;
-      case 'school':
-        return Icons.school_rounded;
-      case 'bank':
-        return Icons.account_balance_rounded;
-      default:
-        return Icons.storefront_rounded;
-    }
-  }
-
-  String _formatColorInput(Object? value) {
-    if (value is int) {
-      final rgb = (value & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
-      return '#${rgb.toUpperCase()}';
-    }
-    return '#2E3192';
-  }
-
-  int? _parseColorHex(String input) {
-    var value = input.trim().replaceAll('#', '');
-    if (value.startsWith('0x')) {
-      value = value.substring(2);
-    }
-    if (value.length == 6) {
-      value = 'FF$value';
-    }
-    if (value.length != 8) {
-      return null;
-    }
-    return int.tryParse(value, radix: 16);
-  }
-
-  String _labelize(String value) {
-    return value
-        .replaceAll('_', ' ')
-        .split(' ')
-        .where((part) => part.isNotEmpty)
-        .map(_capitalized)
-        .join(' ');
-  }
-
-  static String _capitalized(String value) {
-    if (value.isEmpty) {
-      return value;
-    }
-    return '${value[0].toUpperCase()}${value.substring(1)}';
-  }
-
-  BoxDecoration _cardDecoration() {
-    return BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: AppTheme.borderFor(context)),
-      boxShadow: AppTheme.softShadow,
+  void _snack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppTheme.error : AppTheme.success,
+      ),
     );
-  }
-
-  void _snack(String message) {
-    if (!mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
-class _AdminSideRail extends StatelessWidget {
-  const _AdminSideRail({
+class _AdminHeader extends StatelessWidget {
+  const _AdminHeader({
     required this.tabs,
     required this.selectedIndex,
+    required this.busy,
     required this.onSelected,
     required this.onCopyReport,
-    required this.onSeed,
     required this.onSignOut,
   });
 
   final List<_AdminTab> tabs;
   final int selectedIndex;
+  final bool busy;
   final ValueChanged<int> onSelected;
   final VoidCallback onCopyReport;
-  final VoidCallback onSeed;
   final VoidCallback onSignOut;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 262,
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        border: Border(bottom: BorderSide(color: AppTheme.borderFor(context))),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              StreamBuilder<AppConfig>(
-                stream: AppConfigService().watchConfig(),
-                initialData: AppConfig.defaults(),
-                builder: (context, snapshot) {
-                  final config = snapshot.data ?? AppConfig.defaults();
-                  return AppBrandLogo(logoUrl: config.logoUrl, size: 42);
-                },
-              ),
-              const SizedBox(width: 10),
               Expanded(
-                child: StreamBuilder<AppConfig>(
-                  stream: AppConfigService().watchConfig(),
-                  initialData: AppConfig.defaults(),
-                  builder: (context, snapshot) {
-                    final config = snapshot.data ?? AppConfig.defaults();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          config.brandName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
-                            color: AppTheme.textPrimaryFor(context),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          'Admin Panel',
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textSecondaryFor(context),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Admin',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.textPrimaryFor(context),
+                        fontSize: 27,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      AppConstants.adminEmail,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondaryFor(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              IconButton(
+                onPressed: busy ? null : onCopyReport,
+                icon: const Icon(Icons.file_copy_rounded),
+                tooltip: 'Copy report',
+              ),
+              IconButton(
+                onPressed: busy ? null : onSignOut,
+                icon: const Icon(Icons.logout_rounded),
+                tooltip: 'Sign out',
               ),
             ],
           ),
-          const SizedBox(height: 22),
-          Expanded(
-            child: ListView.separated(
-              itemCount: tabs.length,
-              separatorBuilder: (_, index) => const SizedBox(height: 6),
-              itemBuilder: (context, index) {
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(tabs.length, (index) {
+                final selected = index == selectedIndex;
                 final tab = tabs[index];
-                final selected = selectedIndex == index;
-                return InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => onSelected(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 11,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? AppTheme.primary.withValues(alpha: 0.1)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: selected ? AppTheme.primary : Colors.transparent,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          tab.icon,
-                          size: 21,
-                          color: selected
-                              ? AppTheme.primary
-                              : AppTheme.textSecondaryFor(context),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            tab.label,
-                            style: GoogleFonts.inter(
-                              color: selected
-                                  ? AppTheme.primary
-                                  : AppTheme.textSecondaryFor(context),
-                              fontWeight: selected
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    selected: selected,
+                    avatar: Icon(tab.icon, size: 17),
+                    label: Text(tab.label),
+                    onSelected: (_) => onSelected(index),
                   ),
                 );
-              },
+              }),
             ),
           ),
-          const Divider(height: 24),
-          _SideAction(
-            label: 'Copy report',
-            icon: Icons.file_copy_rounded,
-            onPressed: onCopyReport,
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminListShell extends StatelessWidget {
+  const _AdminListShell({
+    required this.title,
+    required this.subtitle,
+    required this.searchController,
+    required this.search,
+    required this.onSearch,
+    required this.children,
+    this.trailing,
+  });
+
+  final String title;
+  final String subtitle;
+  final TextEditingController searchController;
+  final String search;
+  final ValueChanged<String> onSearch;
+  final List<Widget> children;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _SectionTitle(title: title, trailing: subtitle),
+            ),
+            ?trailing,
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: searchController,
+          onChanged: onSearch,
+          decoration: const InputDecoration(
+            labelText: 'Search',
+            prefixIcon: Icon(Icons.search_rounded),
           ),
-          const SizedBox(height: 6),
-          _SideAction(
-            label: 'Seed samples',
-            icon: Icons.auto_fix_high_rounded,
-            onPressed: onSeed,
+        ),
+        const SizedBox(height: 14),
+        ...children,
+      ],
+    );
+  }
+}
+
+class _HeroStatus extends StatelessWidget {
+  const _HeroStatus({required this.stats});
+
+  final _AdminStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final healthy = stats.reviewLoad == 0;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _StatusPill(
+            label: healthy ? 'Stable' : 'Needs review',
+            color: healthy ? AppTheme.success : AppTheme.warning,
           ),
-          const SizedBox(height: 6),
-          _SideAction(
-            label: 'Sign out',
-            icon: Icons.logout_rounded,
-            onPressed: onSignOut,
+          const SizedBox(height: 12),
+          Text(
+            healthy
+                ? 'Operations are clear.'
+                : '${stats.reviewLoad} items need action.',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 23,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Users, moderation, marketplace partners, welfare cases, and app switches are controlled here.',
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({required this.stats});
+
+  final _AdminStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.55,
+      children: [
+        _MetricTile(
+          'Users',
+          '${stats.users}',
+          Icons.people_rounded,
+          AppTheme.primary,
+        ),
+        _MetricTile(
+          'Suspended',
+          '${stats.suspendedUsers}',
+          Icons.block_rounded,
+          AppTheme.error,
+        ),
+        _MetricTile(
+          'Forum',
+          '${stats.forumPosts}',
+          Icons.forum_rounded,
+          AppTheme.warning,
+        ),
+        _MetricTile(
+          'Partners',
+          '${stats.activePartners}/${stats.partners}',
+          Icons.handshake_rounded,
+          AppTheme.success,
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile(this.label, this.value, this.icon, this.color);
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const Spacer(),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondaryFor(context),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserCard extends StatelessWidget {
+  const _UserCard({required this.doc, required this.onAction});
+
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final Future<void> Function(
+    QueryDocumentSnapshot<Map<String, dynamic>>,
+    String,
+  )
+  onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data();
+    final email = _text(data, 'email', 'No email');
+    final name = _text(data, 'fullName', email);
+    final status = _text(data, 'accountStatus', 'active');
+    final role = _text(data, 'role', 'user');
+    final protected = email == AppConstants.adminEmail;
+    return _AdminCard(
+      icon: protected
+          ? Icons.admin_panel_settings_rounded
+          : Icons.person_rounded,
+      title: name,
+      subtitle: email,
+      status: protected ? 'protected' : status,
+      statusColor: protected ? AppTheme.primary : _statusColor(status),
+      meta: [
+        'Role: $role',
+        data['emailVerified'] == true ? 'Verified' : 'Unverified',
+      ],
+      actions: [
+        if (!protected)
+          _CardAction(
+            status == 'suspended' ? 'Activate' : 'Suspend',
+            status == 'suspended'
+                ? Icons.check_circle_rounded
+                : Icons.block_rounded,
+            () => onAction(doc, status == 'suspended' ? 'active' : 'suspended'),
+          ),
+        _CardAction(
+          'Copy',
+          Icons.copy_rounded,
+          () => Clipboard.setData(ClipboardData(text: email)),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.status,
+    required this.actions,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String status;
+  final List<_CardAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return _AdminCard(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      status: status,
+      statusColor: _statusColor(status),
+      meta: const [],
+      actions: actions,
+    );
+  }
+}
+
+class _PartnerAdminCard extends StatelessWidget {
+  const _PartnerAdminCard({
+    required this.doc,
+    required this.onApprove,
+    required this.onHide,
+    required this.onEdit,
+  });
+
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final VoidCallback onApprove;
+  final VoidCallback onHide;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data();
+    final approved = data['approved'] as bool? ?? true;
+    final status = _text(data, 'status', approved ? 'active' : 'review');
+    return _AdminCard(
+      icon: Icons.handshake_rounded,
+      title: _text(data, 'name', 'Partner'),
+      subtitle: _text(data, 'description', 'No description'),
+      status: approved ? status : 'unapproved',
+      statusColor: approved ? _statusColor(status) : AppTheme.warning,
+      meta: [
+        _text(data, 'category', 'General'),
+        'Priority ${_num(data['priority'], 99).toStringAsFixed(0)}',
+      ],
+      actions: [
+        _CardAction('Approve', Icons.check_circle_rounded, onApprove),
+        _CardAction('Hide', Icons.visibility_off_rounded, onHide),
+        _CardAction('Edit', Icons.edit_rounded, onEdit),
+      ],
+    );
+  }
+}
+
+class _AdminCard extends StatelessWidget {
+  const _AdminCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.status,
+    required this.statusColor,
+    required this.meta,
+    required this.actions,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String status;
+  final Color statusColor;
+  final List<String> meta;
+  final List<_CardAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppTheme.primaryFor(context)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.textPrimaryFor(context),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondaryFor(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _StatusPill(label: status, color: statusColor),
+            ],
+          ),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: meta.map((item) => _InfoChip(label: item)).toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: actions
+                .map(
+                  (action) => OutlinedButton.icon(
+                    onPressed: action.onTap,
+                    icon: Icon(action.icon, size: 17),
+                    label: Text(action.label),
+                  ),
+                )
+                .toList(),
           ),
         ],
       ),
@@ -3073,532 +1034,330 @@ class _AppConfigEditor extends StatefulWidget {
 }
 
 class _AppConfigEditorState extends State<_AppConfigEditor> {
-  late bool _maintenanceMode;
-  late bool _announcementEnabled;
-  late bool _marketplaceEnabled;
-  late bool _forumEnabled;
-  late bool _forumPostingEnabled;
-  late bool _forumCommentsEnabled;
-  late bool _welfareEnabled;
-  late bool _chatbotEnabled;
-  late bool _budgetAiEnabled;
-
-  late final TextEditingController _announcementTitleController;
-  late final TextEditingController _announcementMessageController;
-  late final TextEditingController _brandNameController;
-  late final TextEditingController _brandTaglineController;
-  late final TextEditingController _logoUrlController;
-  late final TextEditingController _primaryColorController;
-  late final TextEditingController _secondaryColorController;
-  late final TextEditingController _homeHeroTitleController;
-  late final TextEditingController _homeHeroMessageController;
-  late final TextEditingController _supportEmailController;
-  late final TextEditingController _supportMessageController;
+  late bool _maintenance;
+  late bool _announcement;
+  late bool _marketplace;
+  late bool _forum;
+  late bool _posting;
+  late bool _comments;
+  late bool _welfare;
+  late bool _chatbot;
+  late bool _budgetAi;
+  late final TextEditingController _brand;
+  late final TextEditingController _support;
+  late final TextEditingController _announcementTitle;
+  late final TextEditingController _announcementMessage;
 
   @override
   void initState() {
     super.initState();
-    _announcementTitleController = TextEditingController();
-    _announcementMessageController = TextEditingController();
-    _brandNameController = TextEditingController();
-    _brandTaglineController = TextEditingController();
-    _logoUrlController = TextEditingController();
-    _primaryColorController = TextEditingController();
-    _secondaryColorController = TextEditingController();
-    _homeHeroTitleController = TextEditingController();
-    _homeHeroMessageController = TextEditingController();
-    _supportEmailController = TextEditingController();
-    _supportMessageController = TextEditingController();
-    _applyConfig(widget.config);
+    _brand = TextEditingController();
+    _support = TextEditingController();
+    _announcementTitle = TextEditingController();
+    _announcementMessage = TextEditingController();
+    _apply(widget.config);
   }
 
   @override
   void didUpdateWidget(covariant _AppConfigEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.config.updatedAt != widget.config.updatedAt) {
-      _applyConfig(widget.config);
+      _apply(widget.config);
     }
   }
 
   @override
   void dispose() {
-    _announcementTitleController.dispose();
-    _announcementMessageController.dispose();
-    _brandNameController.dispose();
-    _brandTaglineController.dispose();
-    _logoUrlController.dispose();
-    _primaryColorController.dispose();
-    _secondaryColorController.dispose();
-    _homeHeroTitleController.dispose();
-    _homeHeroMessageController.dispose();
-    _supportEmailController.dispose();
-    _supportMessageController.dispose();
+    _brand.dispose();
+    _support.dispose();
+    _announcementTitle.dispose();
+    _announcementMessage.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 900;
-        final switches = _Panel(
-          title: 'Live Feature Switches',
-          subtitle:
-              'Saving these toggles changes access across the user-facing app.',
-          icon: Icons.toggle_on_rounded,
-          child: Column(
-            children: [
-              _controlSwitch(
-                title: 'Maintenance mode',
-                subtitle:
-                    'Blocks the user app with the support message. Admin stays in the panel.',
-                icon: Icons.construction_rounded,
-                value: _maintenanceMode,
-                danger: true,
-                onChanged: (value) => setState(() => _maintenanceMode = value),
+    return Column(
+      children: [
+        _ConfigPanel(
+          title: 'Feature switches',
+          children: [
+            _SwitchRow(
+              'Maintenance',
+              Icons.construction_rounded,
+              _maintenance,
+              (value) => setState(() => _maintenance = value),
+              danger: true,
+            ),
+            _SwitchRow(
+              'Marketplace',
+              Icons.storefront_rounded,
+              _marketplace,
+              (value) => setState(() => _marketplace = value),
+            ),
+            _SwitchRow(
+              'Forum',
+              Icons.forum_rounded,
+              _forum,
+              (value) => setState(() => _forum = value),
+            ),
+            _SwitchRow(
+              'Posting',
+              Icons.edit_rounded,
+              _posting,
+              (value) => setState(() => _posting = value),
+            ),
+            _SwitchRow(
+              'Comments',
+              Icons.chat_rounded,
+              _comments,
+              (value) => setState(() => _comments = value),
+            ),
+            _SwitchRow(
+              'Welfare',
+              Icons.volunteer_activism_rounded,
+              _welfare,
+              (value) => setState(() => _welfare = value),
+            ),
+            _SwitchRow(
+              'Chatbot',
+              Icons.smart_toy_rounded,
+              _chatbot,
+              (value) => setState(() => _chatbot = value),
+            ),
+            _SwitchRow(
+              'Budget AI',
+              Icons.auto_awesome_rounded,
+              _budgetAi,
+              (value) => setState(() => _budgetAi = value),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _ConfigPanel(
+          title: 'Live copy',
+          children: [
+            TextField(
+              controller: _brand,
+              decoration: const InputDecoration(labelText: 'Brand name'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _support,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Support message'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _announcementTitle,
+              decoration: const InputDecoration(
+                labelText: 'Announcement title',
               ),
-              _controlSwitch(
-                title: 'Marketplace',
-                subtitle: 'Controls access to partner marketplace listings.',
-                icon: Icons.storefront_rounded,
-                value: _marketplaceEnabled,
-                onChanged: (value) =>
-                    setState(() => _marketplaceEnabled = value),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _announcementMessage,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Announcement message',
               ),
-              _controlSwitch(
-                title: 'Welfare programs',
-                subtitle: 'Controls access to the welfare program directory.',
-                icon: Icons.volunteer_activism_rounded,
-                value: _welfareEnabled,
-                onChanged: (value) => setState(() => _welfareEnabled = value),
-              ),
-              _controlSwitch(
-                title: 'Forum access',
-                subtitle:
-                    'Controls whether users can open the community forum.',
-                icon: Icons.forum_rounded,
-                value: _forumEnabled,
-                onChanged: (value) => setState(() => _forumEnabled = value),
-              ),
-              _controlSwitch(
-                title: 'Forum posting',
-                subtitle: 'Controls whether users can publish new discussions.',
-                icon: Icons.edit_rounded,
-                value: _forumPostingEnabled,
-                onChanged: (value) =>
-                    setState(() => _forumPostingEnabled = value),
-              ),
-              _controlSwitch(
-                title: 'Forum comments',
-                subtitle: 'Controls whether users can add comments to posts.',
-                icon: Icons.chat_bubble_rounded,
-                value: _forumCommentsEnabled,
-                onChanged: (value) =>
-                    setState(() => _forumCommentsEnabled = value),
-              ),
-              _controlSwitch(
-                title: 'AI chatbot',
-                subtitle: 'Controls access to FinEase AI chat.',
-                icon: Icons.smart_toy_rounded,
-                value: _chatbotEnabled,
-                onChanged: (value) => setState(() => _chatbotEnabled = value),
-              ),
-              _controlSwitch(
-                title: 'Budget AI insights',
-                subtitle:
-                    'Controls generated AI recommendations on the budget screen.',
-                icon: Icons.auto_awesome_rounded,
-                value: _budgetAiEnabled,
-                onChanged: (value) => setState(() => _budgetAiEnabled = value),
-              ),
-            ],
+            ),
+            const SizedBox(height: 10),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _announcement,
+              activeThumbColor: AppTheme.primaryFor(context),
+              title: const Text('Show announcement'),
+              onChanged: (value) => setState(() => _announcement = value),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.save_rounded),
+            label: const Text('Save app controls'),
           ),
-        );
-
-        final content = Column(
-          children: [
-            _Panel(
-              title: 'Brand and Home UI',
-              subtitle:
-                  'Change the visible app identity, remote logo, brand colors, and home hero copy.',
-              icon: Icons.palette_rounded,
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      AppBrandLogo(
-                        logoUrl: _logoUrlController.text,
-                        size: 58,
-                        backgroundColor: AppTheme.primary.withValues(
-                          alpha: 0.08,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: _logoUrlController,
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            labelText: 'Logo image URL',
-                            hintText: 'https://...',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _brandNameController,
-                    decoration: const InputDecoration(labelText: 'App name'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _brandTaglineController,
-                    decoration: const InputDecoration(labelText: 'App tagline'),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _primaryColorController,
-                          decoration: const InputDecoration(
-                            labelText: 'Primary color',
-                            hintText: '#2E3192',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _secondaryColorController,
-                          decoration: const InputDecoration(
-                            labelText: 'Secondary color',
-                            hintText: '#00F2EA',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _homeHeroTitleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Home card title',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _homeHeroMessageController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Home card message',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            _Panel(
-              title: 'Announcement Banner',
-              subtitle:
-                  'This message appears above the main user app immediately after save.',
-              icon: Icons.campaign_rounded,
-              child: Column(
-                children: [
-                  _controlSwitch(
-                    title: 'Show announcement',
-                    subtitle: 'Display the banner to signed-in users.',
-                    icon: Icons.notifications_active_rounded,
-                    value: _announcementEnabled,
-                    onChanged: (value) =>
-                        setState(() => _announcementEnabled = value),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _announcementTitleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Announcement title',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _announcementMessageController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Announcement message',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            _Panel(
-              title: 'Support Copy',
-              subtitle:
-                  'Used by paused features and maintenance screens across the app.',
-              icon: Icons.support_agent_rounded,
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _supportEmailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Support email',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _supportMessageController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Paused feature / maintenance message',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            _Panel(
-              title: 'Publish Changes',
-              subtitle:
-                  'App users receive these changes from Firestore streams without a rebuild.',
-              icon: Icons.rocket_launch_rounded,
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _save,
-                  icon: Icon(Icons.save_rounded),
-                  label: const Text('Save Live App Controls'),
-                ),
-              ),
-            ),
-          ],
-        );
-
-        if (!wide) {
-          return Column(
-            children: [switches, const SizedBox(height: 14), content],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 5, child: switches),
-            const SizedBox(width: 14),
-            Expanded(flex: 6, child: content),
-          ],
-        );
-      },
+        ),
+      ],
     );
   }
 
-  void _applyConfig(AppConfig config) {
-    _maintenanceMode = config.maintenanceMode;
-    _announcementEnabled = config.announcementEnabled;
-    _marketplaceEnabled = config.marketplaceEnabled;
-    _forumEnabled = config.forumEnabled;
-    _forumPostingEnabled = config.forumPostingEnabled;
-    _forumCommentsEnabled = config.forumCommentsEnabled;
-    _welfareEnabled = config.welfareEnabled;
-    _chatbotEnabled = config.chatbotEnabled;
-    _budgetAiEnabled = config.budgetAiEnabled;
-    _brandNameController.text = config.brandName;
-    _brandTaglineController.text = config.brandTagline;
-    _logoUrlController.text = config.logoUrl;
-    _primaryColorController.text = config.primaryColorHex;
-    _secondaryColorController.text = config.secondaryColorHex;
-    _homeHeroTitleController.text = config.homeHeroTitle;
-    _homeHeroMessageController.text = config.homeHeroMessage;
-    _announcementTitleController.text = config.announcementTitle;
-    _announcementMessageController.text = config.announcementMessage;
-    _supportEmailController.text = config.supportEmail;
-    _supportMessageController.text = config.supportMessage;
+  void _apply(AppConfig config) {
+    _maintenance = config.maintenanceMode;
+    _announcement = config.announcementEnabled;
+    _marketplace = config.marketplaceEnabled;
+    _forum = config.forumEnabled;
+    _posting = config.forumPostingEnabled;
+    _comments = config.forumCommentsEnabled;
+    _welfare = config.welfareEnabled;
+    _chatbot = config.chatbotEnabled;
+    _budgetAi = config.budgetAiEnabled;
+    _brand.text = config.brandName;
+    _support.text = config.supportMessage;
+    _announcementTitle.text = config.announcementTitle;
+    _announcementMessage.text = config.announcementMessage;
   }
 
   void _save() {
     widget.onSave(
       widget.config.copyWith(
-        maintenanceMode: _maintenanceMode,
-        announcementEnabled: _announcementEnabled,
-        announcementTitle: _announcementTitleController.text.trim(),
-        announcementMessage: _announcementMessageController.text.trim(),
-        marketplaceEnabled: _marketplaceEnabled,
-        forumEnabled: _forumEnabled,
-        forumPostingEnabled: _forumPostingEnabled,
-        forumCommentsEnabled: _forumCommentsEnabled,
-        welfareEnabled: _welfareEnabled,
-        chatbotEnabled: _chatbotEnabled,
-        budgetAiEnabled: _budgetAiEnabled,
-        brandName: _brandNameController.text.trim(),
-        brandTagline: _brandTaglineController.text.trim(),
-        logoUrl: _logoUrlController.text.trim(),
-        primaryColorHex: _primaryColorController.text.trim(),
-        secondaryColorHex: _secondaryColorController.text.trim(),
-        homeHeroTitle: _homeHeroTitleController.text.trim(),
-        homeHeroMessage: _homeHeroMessageController.text.trim(),
-        supportEmail: _supportEmailController.text.trim(),
-        supportMessage: _supportMessageController.text.trim(),
-      ),
-    );
-  }
-
-  Widget _controlSwitch({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-    bool danger = false,
-  }) {
-    final color = danger && value ? AppTheme.error : AppTheme.primary;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.14)),
-      ),
-      child: SwitchListTile(
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: color,
-        secondary: Icon(icon, color: color),
-        title: Text(
-          title,
-          style: GoogleFonts.inter(
-            color: AppTheme.textPrimaryFor(context),
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: GoogleFonts.inter(
-            color: AppTheme.textSecondaryFor(context),
-            fontSize: 12,
-            height: 1.35,
-          ),
-        ),
+        maintenanceMode: _maintenance,
+        announcementEnabled: _announcement,
+        marketplaceEnabled: _marketplace,
+        forumEnabled: _forum,
+        forumPostingEnabled: _posting,
+        forumCommentsEnabled: _comments,
+        welfareEnabled: _welfare,
+        chatbotEnabled: _chatbot,
+        budgetAiEnabled: _budgetAi,
+        brandName: _brand.text.trim(),
+        supportMessage: _support.text.trim(),
+        announcementTitle: _announcementTitle.text.trim(),
+        announcementMessage: _announcementMessage.text.trim(),
       ),
     );
   }
 }
 
-class _SideAction extends StatelessWidget {
-  const _SideAction({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
+class _PartnerEditorSheet extends StatefulWidget {
+  const _PartnerEditorSheet({required this.doc, required this.onSave});
 
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
+  final QueryDocumentSnapshot<Map<String, dynamic>>? doc;
+  final Future<void> Function(Map<String, dynamic>) onSave;
+
+  @override
+  State<_PartnerEditorSheet> createState() => _PartnerEditorSheetState();
+}
+
+class _PartnerEditorSheetState extends State<_PartnerEditorSheet> {
+  late final TextEditingController _name;
+  late final TextEditingController _category;
+  late final TextEditingController _description;
+  late final TextEditingController _priority;
+  bool _approved = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.doc?.data() ?? const <String, dynamic>{};
+    _name = TextEditingController(text: _text(data, 'name'));
+    _category = TextEditingController(text: _text(data, 'category', 'Loans'));
+    _description = TextEditingController(text: _text(data, 'description'));
+    _priority = TextEditingController(
+      text: '${_num(data['priority'], 20).round()}',
+    );
+    _approved = data['approved'] as bool? ?? true;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _category.dispose();
+    _description.dispose();
+    _priority.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-        style: TextButton.styleFrom(
-          alignment: Alignment.centerLeft,
-          foregroundColor: AppTheme.primary,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        ),
+    return _SheetFrame(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SheetHandle(),
+          Text(
+            widget.doc == null ? 'Add partner' : 'Edit partner',
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Name'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _category,
+            decoration: const InputDecoration(labelText: 'Category'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _description,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(labelText: 'Description'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _priority,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Priority'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _approved,
+            activeThumbColor: AppTheme.primaryFor(context),
+            title: const Text('Approved and visible'),
+            onChanged: (value) => setState(() => _approved = value),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_rounded),
+              label: Text(_saving ? 'Saving...' : 'Save partner'),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _Stream4 extends StatelessWidget {
-  const _Stream4({
-    required this.users,
-    required this.posts,
-    required this.partners,
-    required this.welfare,
-    required this.builder,
-  });
-
-  final Stream<QuerySnapshot<Map<String, dynamic>>> users;
-  final Stream<QuerySnapshot<Map<String, dynamic>>> posts;
-  final Stream<QuerySnapshot<Map<String, dynamic>>> partners;
-  final Stream<QuerySnapshot<Map<String, dynamic>>> welfare;
-  final Widget Function(
-    BuildContext,
-    QuerySnapshot<Map<String, dynamic>>,
-    QuerySnapshot<Map<String, dynamic>>,
-    QuerySnapshot<Map<String, dynamic>>,
-    QuerySnapshot<Map<String, dynamic>>,
-  )
-  builder;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: users,
-      builder: (context, usersSnapshot) {
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: posts,
-          builder: (context, postsSnapshot) {
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: partners,
-              builder: (context, partnersSnapshot) {
-                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: welfare,
-                  builder: (context, welfareSnapshot) {
-                    final error =
-                        usersSnapshot.error ??
-                        postsSnapshot.error ??
-                        partnersSnapshot.error ??
-                        welfareSnapshot.error;
-                    if (error != null) {
-                      return _ErrorPanel(message: '$error');
-                    }
-                    if (!usersSnapshot.hasData ||
-                        !postsSnapshot.hasData ||
-                        !partnersSnapshot.hasData ||
-                        !welfareSnapshot.hasData) {
-                      return const _LoadingView(label: 'Loading admin data');
-                    }
-                    return builder(
-                      context,
-                      usersSnapshot.data!,
-                      postsSnapshot.data!,
-                      partnersSnapshot.data!,
-                      welfareSnapshot.data!,
-                    );
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    await widget.onSave({
+      'name': _name.text.trim(),
+      'category': _category.text.trim().isEmpty
+          ? 'General'
+          : _category.text.trim(),
+      'description': _description.text.trim(),
+      'priority': int.tryParse(_priority.text.trim()) ?? 20,
+      'approved': _approved,
+      'status': _approved ? 'active' : 'review',
+      'badge': _approved ? 'Verified' : 'Review',
+      'ctaLabel': 'View details',
+      'colorHex': 0xFF2E3192,
+      'iconName': 'storefront',
+    });
+    if (mounted) Navigator.pop(context);
   }
 }
 
-class _Panel extends StatelessWidget {
-  const _Panel({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.child,
-    this.action,
-  });
+class _ConfigPanel extends StatelessWidget {
+  const _ConfigPanel({required this.title, required this.children});
 
   final String title;
-  final String subtitle;
-  final IconData icon;
-  final Widget child;
-  final Widget? action;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
@@ -3609,633 +1368,175 @@ class _Panel extends StatelessWidget {
         color: AppTheme.surfaceFor(context),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.borderFor(context)),
-        boxShadow: AppTheme.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: AppTheme.primary, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimaryFor(context),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondaryFor(context),
-                        fontSize: 12,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (action != null) ...[const SizedBox(width: 10), action!],
-            ],
-          ),
-          const SizedBox(height: 14),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.items});
-
-  final List<_MetricItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 260,
-        mainAxisExtent: 150,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemBuilder: (context, index) => _MetricTile(item: items[index]),
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.item});
-
-  final _MetricItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.borderFor(context)),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(item.icon, color: item.color, size: 20),
-              ),
-              const Spacer(),
-              Text(
-                '${((item.progress ?? 0) * 100).round()}%',
-                style: GoogleFonts.inter(
-                  color: AppTheme.textSecondaryFor(context),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
           Text(
-            item.value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            title,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 25,
-              fontWeight: FontWeight.w900,
-              color: item.color,
-            ),
-          ),
-          Text(
-            item.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
               color: AppTheme.textPrimaryFor(context),
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          Text(
-            item.detail,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: AppTheme.textSecondaryFor(context),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              minHeight: 5,
-              value: item.progress?.clamp(0, 1),
-              color: item.color,
-              backgroundColor: item.color.withValues(alpha: 0.12),
-            ),
-          ),
+          const SizedBox(height: 12),
+          ...children,
         ],
       ),
     );
   }
 }
 
-class _OperationsBarChart extends StatelessWidget {
-  const _OperationsBarChart({required this.stats});
-
-  final _AdminStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final data = [
-      _ChartDatum('Users', stats.users.toDouble(), AppTheme.primary),
-      _ChartDatum('Forum', stats.forumPosts.toDouble(), AppTheme.warning),
-      _ChartDatum('Partners', stats.partners.toDouble(), AppTheme.success),
-      _ChartDatum('Cases', stats.welfareCases.toDouble(), AppTheme.error),
-    ];
-    final maxValue = math.max(
-      4.0,
-      data.map((datum) => datum.value).reduce(math.max) * 1.25,
-    );
-
-    return SizedBox(
-      height: 250,
-      child: BarChart(
-        BarChartData(
-          maxY: maxValue,
-          alignment: BarChartAlignment.spaceAround,
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => AppTheme.textPrimaryFor(context),
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final datum = data[group.x.toInt()];
-                return BarTooltipItem(
-                  '${datum.label}\n${rod.toY.toStringAsFixed(0)}',
-                  GoogleFonts.inter(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
-                  ),
-                );
-              },
-            ),
-          ),
-          gridData: FlGridData(
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: AppTheme.borderFor(context),
-              strokeWidth: 1,
-              dashArray: [4, 4],
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 38,
-                getTitlesWidget: (value, meta) => Text(
-                  NumberFormat.compact().format(value),
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textHintFor(context),
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 34,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= data.length) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      data[index].label,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondaryFor(context),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          barGroups: List.generate(data.length, (index) {
-            final datum = data[index];
-            return BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: datum.value,
-                  width: 24,
-                  color: datum.color,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(6),
-                  ),
-                ),
-              ],
-            );
-          }),
-        ),
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOutCubic,
-      ),
-    );
-  }
-}
-
-class _ReviewQueuePanel extends StatelessWidget {
-  const _ReviewQueuePanel({required this.items});
-
-  final List<_QueueItemData> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
-      title: 'Priority Queue',
-      subtitle: items.isEmpty
-          ? 'No pending items need attention'
-          : '${items.length} items surfaced from live data',
-      icon: Icons.rate_review_rounded,
-      action: _StatusPill(
-        text: items.isEmpty ? 'Clear' : 'Review',
-        color: items.isEmpty ? AppTheme.success : AppTheme.warning,
-      ),
-      child: items.isEmpty
-          ? const _EmbeddedEmpty(
-              icon: Icons.task_alt_rounded,
-              title: 'Queue clear',
-              message:
-                  'Flagged posts, urgent welfare cases, and partner reviews will land here.',
-            )
-          : Column(
-              children: items
-                  .map(
-                    (item) => _MiniActivity(
-                      icon: item.icon,
-                      title: item.title,
-                      subtitle: item.subtitle,
-                      status: item.status,
-                      color: item.color,
-                      onTap: item.onOpen,
-                    ),
-                  )
-                  .toList(),
-            ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.statusColor,
-    this.metadata = const [],
-    this.actions = const [],
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow(
+    this.title,
+    this.icon,
+    this.value,
+    this.onChanged, {
+    this.danger = false,
   });
 
-  final IconData icon;
   final String title;
-  final String subtitle;
-  final String status;
-  final Color statusColor;
-  final List<_InfoMeta> metadata;
-  final List<Widget> actions;
+  final IconData icon;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceFor(context),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.borderFor(context)),
-        boxShadow: AppTheme.softShadow,
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      secondary: Icon(
+        icon,
+        color: danger ? AppTheme.error : AppTheme.primaryFor(context),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: statusColor),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.textPrimaryFor(context),
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondaryFor(context),
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              _StatusPill(text: status, color: statusColor),
-            ],
-          ),
-          if (metadata.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: metadata
-                  .map(
-                    (meta) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceCardFor(context),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.borderFor(context)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            meta.icon,
-                            size: 14,
-                            color: AppTheme.textSecondaryFor(context),
-                          ),
-                          const SizedBox(width: 5),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 260),
-                            child: Text(
-                              meta.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                color: AppTheme.textSecondaryFor(context),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
-          if (actions.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(spacing: 4, runSpacing: 4, children: actions),
-          ],
-        ],
-      ),
+      title: Text(title),
+      value: value,
+      activeThumbColor: danger ? AppTheme.error : AppTheme.primaryFor(context),
+      onChanged: onChanged,
     );
   }
 }
 
-class _ActionGrid extends StatelessWidget {
-  const _ActionGrid({required this.actions});
+class _AuditList extends StatelessWidget {
+  const _AuditList({required this.db});
 
-  final List<_AdminAction> actions;
+  final FirebaseFirestore db;
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: actions.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 220,
-        mainAxisExtent: 52,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
-      itemBuilder: (context, index) {
-        final action = actions[index];
-        return OutlinedButton.icon(
-          onPressed: action.onPressed,
-          icon: Icon(action.icon, size: 18),
-          label: Text(
-            action.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          style: OutlinedButton.styleFrom(
-            alignment: Alignment.centerLeft,
-            foregroundColor: AppTheme.primary,
-            side: BorderSide(color: AppTheme.borderFor(context)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            backgroundColor: AppTheme.surfaceFor(context),
-          ),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: db
+          .collection('admin_audit_logs')
+          .orderBy('createdAt', descending: true)
+          .limit(6)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return const _MiniEmpty(message: 'Admin actions will appear here.');
+        }
+        return Column(
+          children: docs.map((doc) {
+            final data = doc.data();
+            return _AdminCard(
+              icon: Icons.history_rounded,
+              title: _text(data, 'action', 'Admin action'),
+              subtitle: _text(data, 'target', 'No target'),
+              status: 'audit',
+              statusColor: AppTheme.primary,
+              meta: [_formatTimestamp(data['createdAt'])],
+              actions: const [],
+            );
+          }).toList(),
         );
       },
     );
   }
 }
 
-class _MiniActivity extends StatelessWidget {
-  const _MiniActivity({
+class _QueueCard extends StatelessWidget {
+  const _QueueCard({
     required this.icon,
     required this.title,
-    required this.subtitle,
-    required this.status,
+    required this.count,
     required this.color,
-    this.onTap,
+    required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
-  final String status;
+  final int count;
   final Color color;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final row = Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceCardFor(context),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.borderFor(context)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textPrimaryFor(context),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSecondaryFor(context),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          _StatusPill(text: status, color: color),
-        ],
-      ),
-    );
-
-    if (onTap == null) {
-      return row;
-    }
-
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
       onTap: onTap,
-      child: row,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceFor(context),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.borderFor(context)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimaryFor(context),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              '$count',
+              style: GoogleFonts.plusJakartaSans(
+                color: color,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _HealthRow extends StatelessWidget {
-  const _HealthRow({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.progress,
-  });
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.trailing});
 
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final double progress;
+  final String title;
+  final String trailing;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimaryFor(context),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: GoogleFonts.plusJakartaSans(
-                      color: color,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: LinearProgressIndicator(
-                  minHeight: 5,
-                  value: progress.clamp(0, 1),
-                  color: color,
-                  backgroundColor: color.withValues(alpha: 0.12),
-                ),
-              ),
-            ],
+          child: Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppTheme.textPrimaryFor(context),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Text(
+          trailing,
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondaryFor(context),
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -4244,50 +1545,58 @@ class _HealthRow extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.text,
-    required this.color,
-    this.onDark = false,
-  });
+  const _StatusPill({required this.label, required this.color});
 
-  final String text;
+  final String label;
   final Color color;
-  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
-    final foreground = onDark ? Colors.white : color;
-    final background = onDark
-        ? Colors.white.withValues(alpha: 0.14)
-        : color.withValues(alpha: 0.1);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: background,
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: onDark
-              ? Colors.white.withValues(alpha: 0.18)
-              : color.withValues(alpha: 0.16),
-        ),
       ),
       child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        label,
         style: GoogleFonts.inter(
-          color: foreground,
-          fontWeight: FontWeight.w800,
+          color: color,
           fontSize: 11,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
   }
 }
 
-class _EmbeddedEmpty extends StatelessWidget {
-  const _EmbeddedEmpty({
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.mutedFillFor(context),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: AppTheme.textSecondaryFor(context),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyPanel extends StatelessWidget {
+  const _EmptyPanel({
     required this.icon,
     required this.title,
     required this.message,
@@ -4300,8 +1609,7 @@ class _EmbeddedEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.surfaceFor(context),
         borderRadius: BorderRadius.circular(8),
@@ -4309,24 +1617,23 @@ class _EmbeddedEmpty extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(icon, size: 46, color: AppTheme.textHintFor(context)),
+          Icon(icon, color: AppTheme.primaryFor(context), size: 40),
           const SizedBox(height: 10),
           Text(
             title,
-            textAlign: TextAlign.center,
             style: GoogleFonts.plusJakartaSans(
               color: AppTheme.textPrimaryFor(context),
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               color: AppTheme.textSecondaryFor(context),
-              height: 1.4,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -4335,275 +1642,209 @@ class _EmbeddedEmpty extends StatelessWidget {
   }
 }
 
-class _LoadingView extends StatelessWidget {
-  const _LoadingView({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(color: AppTheme.primary),
-          const SizedBox(height: 12),
-          Text(label, style: GoogleFonts.inter(color: AppTheme.textSecondaryFor(context))),
-        ],
-      ),
-    );
-  }
-}
-
-class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.message});
+class _MiniEmpty extends StatelessWidget {
+  const _MiniEmpty({required this.message});
 
   final String message;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: _EmbeddedEmpty(
-          icon: Icons.error_outline_rounded,
-          title: 'Admin data unavailable',
-          message: message,
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderFor(context)),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          color: AppTheme.textSecondaryFor(context),
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
 }
 
+class _SheetFrame extends StatelessWidget {
+  const _SheetFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.92,
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceFor(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(top: false, child: SingleChildScrollView(child: child)),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 42,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 18),
+        decoration: BoxDecoration(
+          color: AppTheme.borderFor(context),
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminDataBuilder extends StatelessWidget {
+  const _AdminDataBuilder({required this.db, required this.builder});
+
+  final FirebaseFirestore db;
+  final Widget Function(BuildContext context, _AdminData data) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: db.collection('users').snapshots(),
+      builder: (context, users) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: db.collection('forum_posts').snapshots(),
+          builder: (context, posts) {
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: db.collection('marketplace_partners').snapshots(),
+              builder: (context, partners) {
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: db.collection('welfare_applications').snapshots(),
+                  builder: (context, welfare) {
+                    if (!users.hasData ||
+                        !posts.hasData ||
+                        !partners.hasData ||
+                        !welfare.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return builder(
+                      context,
+                      _AdminData(
+                        users: users.data!.docs,
+                        posts: posts.data!.docs,
+                        partners: partners.data!.docs,
+                        welfare: welfare.data!.docs,
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _AdminData {
+  const _AdminData({
+    required this.users,
+    required this.posts,
+    required this.partners,
+    required this.welfare,
+  });
+
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> users;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> posts;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> partners;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> welfare;
+}
+
 class _AdminStats {
   const _AdminStats({
     required this.users,
-    required this.activeUsers,
     required this.suspendedUsers,
-    required this.verifiedUsers,
-    required this.adminUsers,
     required this.forumPosts,
     required this.flaggedPosts,
-    required this.removedPosts,
     required this.partners,
     required this.activePartners,
-    required this.hiddenPartners,
     required this.unapprovedPartners,
     required this.welfareCases,
     required this.pendingCases,
-    required this.urgentCases,
-    required this.resolvedCases,
   });
 
   final int users;
-  final int activeUsers;
   final int suspendedUsers;
-  final int verifiedUsers;
-  final int adminUsers;
   final int forumPosts;
   final int flaggedPosts;
-  final int removedPosts;
   final int partners;
   final int activePartners;
-  final int hiddenPartners;
   final int unapprovedPartners;
   final int welfareCases;
   final int pendingCases;
-  final int urgentCases;
-  final int resolvedCases;
 
-  int get reviewLoad => flaggedPosts + pendingCases + unapprovedPartners;
+  int get reviewLoad => flaggedPosts + unapprovedPartners + pendingCases;
 
-  double get userHealth => users == 0 ? 1 : activeUsers / users;
-
-  double get forumHealth =>
-      forumPosts == 0 ? 1 : 1 - (flaggedPosts / forumPosts);
-
-  double get partnerHealth => partners == 0 ? 1 : activePartners / partners;
-
-  double get welfarePressure => welfareCases == 0
-      ? 0
-      : (pendingCases / welfareCases).clamp(0, 1).toDouble();
-
-  static _AdminStats from({
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> users,
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> posts,
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> partners,
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> welfare,
-  }) {
-    final suspendedUsers = users
-        .where((doc) => doc.data()['accountStatus'] == 'suspended')
-        .length;
-    final activeUsers = users.length - suspendedUsers;
-    final verifiedUsers = users
-        .where((doc) => doc.data()['emailVerified'] == true)
-        .length;
-    final adminUsers = users
+  factory _AdminStats.from(_AdminData data) {
+    final suspended = data.users
         .where(
-          (doc) =>
-              doc.data()['role'] == 'admin' ||
-              doc.data()['email'] == AppConstants.adminEmail,
+          (doc) => _text(doc.data(), 'accountStatus', 'active') == 'suspended',
         )
         .length;
-    final flaggedPosts = posts
-        .where((doc) => doc.data()['moderationStatus'] == 'flagged')
-        .length;
-    final removedPosts = posts
-        .where((doc) => doc.data()['moderationStatus'] == 'removed')
-        .length;
-    final activePartners = partners
+    final flagged = data.posts
         .where(
           (doc) =>
-              (doc.data()['status'] ?? 'active') == 'active' &&
-              (doc.data()['approved'] ?? true) == true,
+              _text(doc.data(), 'moderationStatus', 'visible') == 'flagged',
         )
         .length;
-    final unapprovedPartners = partners
-        .where((doc) => (doc.data()['approved'] ?? true) != true)
-        .length;
-    final pendingCases = welfare
-        .where((doc) => (doc.data()['status'] ?? 'pending') == 'pending')
-        .length;
-    final urgentCases = welfare
+    final activePartners = data.partners
         .where(
           (doc) =>
-              (doc.data()['priority'] ?? 'normal') == 'urgent' &&
-              (doc.data()['status'] ?? 'pending') == 'pending',
+              (_text(doc.data(), 'status', 'active') == 'active') &&
+              (doc.data()['approved'] as bool? ?? true),
         )
         .length;
-    final resolvedCases = welfare
-        .where((doc) => (doc.data()['status'] ?? 'pending') == 'resolved')
+    final unapproved = data.partners
+        .where((doc) => (doc.data()['approved'] as bool? ?? true) != true)
         .length;
-
+    final pending = data.welfare
+        .where((doc) => _text(doc.data(), 'status', 'pending') == 'pending')
+        .length;
     return _AdminStats(
-      users: users.length,
-      activeUsers: activeUsers,
-      suspendedUsers: suspendedUsers,
-      verifiedUsers: verifiedUsers,
-      adminUsers: adminUsers,
-      forumPosts: posts.length,
-      flaggedPosts: flaggedPosts,
-      removedPosts: removedPosts,
-      partners: partners.length,
+      users: data.users.length,
+      suspendedUsers: suspended,
+      forumPosts: data.posts.length,
+      flaggedPosts: flagged,
+      partners: data.partners.length,
       activePartners: activePartners,
-      hiddenPartners: partners.length - activePartners,
-      unapprovedPartners: unapprovedPartners,
-      welfareCases: welfare.length,
-      pendingCases: pendingCases,
-      urgentCases: urgentCases,
-      resolvedCases: resolvedCases,
+      unapprovedPartners: unapproved,
+      welfareCases: data.welfare.length,
+      pendingCases: pending,
     );
   }
 }
 
-class _UserTabStats {
-  const _UserTabStats({
-    required this.total,
-    required this.active,
-    required this.suspended,
-    required this.verified,
-    required this.authSynced,
-    required this.authDisabled,
-  });
-
-  final int total;
-  final int active;
-  final int suspended;
-  final int verified;
-  final int authSynced;
-  final int authDisabled;
-
-  static _UserTabStats from(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> users,
-  ) {
-    final suspended = users
-        .where((doc) => doc.data()['accountStatus'] == 'suspended')
-        .length;
-    final verified = users
-        .where((doc) => doc.data()['emailVerified'] == true)
-        .length;
-    final authSynced = users
-        .where((doc) => doc.data()['authSyncedAt'] != null)
-        .length;
-    final authDisabled = users
-        .where((doc) => doc.data()['authDisabled'] == true)
-        .length;
-    return _UserTabStats(
-      total: users.length,
-      active: users.length - suspended,
-      suspended: suspended,
-      verified: verified,
-      authSynced: authSynced,
-      authDisabled: authDisabled,
-    );
-  }
-}
-
-class _MetricItem {
-  const _MetricItem({
-    required this.label,
-    required this.value,
-    required this.detail,
-    required this.icon,
-    required this.color,
-    this.progress,
-  });
-
-  final String label;
-  final String value;
-  final String detail;
-  final IconData icon;
-  final Color color;
-  final double? progress;
-}
-
-class _SummaryItem {
-  const _SummaryItem(this.label, this.value, this.color);
-
-  final String label;
-  final String value;
-  final Color color;
-}
-
-class _InfoMeta {
-  const _InfoMeta(this.icon, this.label);
-
-  final IconData icon;
-  final String label;
-}
-
-class _QueueItemData {
-  const _QueueItemData({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.onOpen,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final String status;
-  final VoidCallback onOpen;
-}
-
-class _ChartDatum {
-  const _ChartDatum(this.label, this.value, this.color);
-
-  final String label;
-  final double value;
-  final Color color;
-}
-
-class _AdminAction {
-  const _AdminAction(this.label, this.icon, this.onPressed);
+class _CardAction {
+  const _CardAction(this.label, this.icon, this.onTap);
 
   final String label;
   final IconData icon;
-  final VoidCallback onPressed;
+  final VoidCallback onTap;
 }
 
 class _AdminTab {
@@ -4611,4 +1852,45 @@ class _AdminTab {
 
   final String label;
   final IconData icon;
+}
+
+String _text(Map<String, dynamic> data, String key, [String fallback = '']) {
+  final value = data[key];
+  if (value == null) return fallback;
+  final text = '$value'.trim();
+  return text.isEmpty ? fallback : text;
+}
+
+double _num(Object? value, double fallback) {
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value') ?? fallback;
+}
+
+Color _statusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'active':
+    case 'visible':
+    case 'approved':
+    case 'resolved':
+      return AppTheme.success;
+    case 'pending':
+    case 'flagged':
+    case 'review':
+    case 'unapproved':
+      return AppTheme.warning;
+    case 'suspended':
+    case 'removed':
+    case 'rejected':
+    case 'hidden':
+      return AppTheme.error;
+    default:
+      return AppTheme.primary;
+  }
+}
+
+String _formatTimestamp(Object? value) {
+  if (value is Timestamp) {
+    return DateFormat('MMM d, h:mm a').format(value.toDate());
+  }
+  return 'No date';
 }

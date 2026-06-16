@@ -14,6 +14,14 @@
                 "--web-port",
                 "8080"
             ],
+            "toolArgs": [
+                "--dart-define",
+                "MODELS_API_TOKEN=${env:MODELS_API_TOKEN}",
+                "--dart-define",
+                "GITHUB_MODELS_TOKEN=${env:GITHUB_MODELS_TOKEN}",
+                "--dart-define",
+                "GITHUB_MODELS_MODEL=${env:GITHUB_MODELS_MODEL}"
+            ],
             "flutterMode": "debug"
         }
     ]

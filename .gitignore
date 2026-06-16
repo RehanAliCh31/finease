@@ -12,6 +12,17 @@
 .swiftpm/
 migrate_working_dir/
 
+# Local secrets. Use GitHub Actions secrets or local environment variables.
+.env
+.env.*
+!.env.example
+assets/env
+
+# Generated deployment output.
+.firebase/
+public/
+node_modules/
+
 # IntelliJ related
 *.iml
 *.ipr

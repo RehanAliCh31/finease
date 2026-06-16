@@ -8,7 +8,7 @@ class AppConstants {
   static const String adminEmail = 'admin@finease.app';
   static const String adminPassword = 'FineaseAdmin123!';
 
-  static const String geminiModel = 'gemini-2.5-flash';
+  static const String githubModelsModel = 'openai/gpt-4o-mini';
 
   static const List<String> budgetCategories = [
     'Electricity',
