@@ -23,12 +23,6 @@
       }
     ]
   },
-  "auth": {
-    "providers": {
-      "anonymous": true,
-      "emailPassword": true
-    }
-  },
   "flutter": {
     "platforms": {
       "android": {
