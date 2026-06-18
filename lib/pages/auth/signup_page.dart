@@ -198,11 +198,7 @@ class _SignupPageState extends State<SignupPage>
       SnackBar(
         content: Row(
           children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: Colors.white,
-              size: 18,
-            ),
+            Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
             const SizedBox(width: 10),
             Expanded(child: Text(msg, style: GoogleFonts.inter(fontSize: 13))),
           ],
@@ -306,7 +302,6 @@ class _SignupPageState extends State<SignupPage>
                                 fontSize: 30,
                                 fontWeight: FontWeight.w800,
                                 color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -1,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -314,11 +309,15 @@ class _SignupPageState extends State<SignupPage>
                               'Secure your financial future with FinEase.',
                               style: GoogleFonts.inter(
                                 fontSize: 14,
-                                color: Theme.of(context).textTheme.bodyMedium?.color,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyMedium?.color,
                                 height: 1.5,
                               ),
                             ),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 18),
+                            _buildSignupValueCard(context),
+                            const SizedBox(height: 28),
 
                             // ── Full Name ──
                             _fieldLabel(context, 'Full Name'),
@@ -481,6 +480,71 @@ class _SignupPageState extends State<SignupPage>
       color: Theme.of(context).colorScheme.onSurface,
     ),
   );
+
+  Widget _buildSignupValueCard(BuildContext context) {
+    final items = [
+      (Icons.account_balance_wallet_rounded, 'Budget plan'),
+      (Icons.trending_up_rounded, 'Forecast risk'),
+      (Icons.savings_rounded, 'Savings goals'),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Your account connects the main resilience tools:',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: items
+                .map(
+                  (item) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(item.$1, color: _primary, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          item.$2,
+                          style: GoogleFonts.inter(
+                            color: _primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildField({
     required BuildContext context,

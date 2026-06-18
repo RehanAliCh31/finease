@@ -85,8 +85,8 @@ class _SecurityOverlayState extends State<SecurityOverlay>
                           const SizedBox(height: 48),
                           ElevatedButton.icon(
                             onPressed: () => security.unlockApp(),
-                            icon: Icon(Icons.fingerprint_rounded),
-                            label: const Text('Unlock with Biometrics'),
+                            icon: const Icon(Icons.fingerprint_rounded),
+                            label: const Text('Unlock with Fingerprint'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2E3192),
                               foregroundColor: Colors.white,

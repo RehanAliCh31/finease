@@ -12,6 +12,24 @@ import '../admin/admin_dashboard_screen.dart';
 import '../profile/about_page.dart';
 import '../settings/settings_screen.dart';
 
+double _profileDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value.replaceAll(',', '')) ?? 0;
+  return 0;
+}
+
+String _profileText(Map<String, dynamic> profile, String key, String fallback) {
+  final value = profile[key];
+  if (value is String && value.trim().isNotEmpty) return value.trim();
+  return fallback;
+}
+
+double _profileSavingsPercent(dynamic value) {
+  final raw = _profileDouble(value);
+  if (raw <= 0) return 0;
+  return raw <= 1 ? raw * 100 : raw;
+}
+
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
@@ -171,7 +189,7 @@ class ProfilePage extends StatelessWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: _StatCard(
-                                label: 'Biometric',
+                                label: 'Fingerprint',
                                 value: authService.isBiometricEnabled
                                     ? 'On'
                                     : 'Off',
@@ -181,6 +199,23 @@ class ProfilePage extends StatelessWidget {
                         );
                       },
                     ),
+                  if (firestoreService != null) ...[
+                    const SizedBox(height: 16),
+                    StreamBuilder<Map<String, dynamic>>(
+                      stream: firestoreService.getUserProfile(),
+                      builder: (context, snapshot) {
+                        final profile = snapshot.data ?? const {};
+                        return _FinancialProfileCard(
+                          profile: profile,
+                          onEdit: () => _showFinancialProfileSheet(
+                            context,
+                            authService,
+                            profile,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Container(
                     decoration: BoxDecoration(
@@ -197,7 +232,7 @@ class ProfilePage extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                    'Sign in again from the login screen to enable biometric unlock.',
+                                    'Sign in again from the login screen to enable fingerprint unlock.',
                                   ),
                                 ),
                               );
@@ -206,14 +241,14 @@ class ProfilePage extends StatelessWidget {
                             }
                           },
                           title: Text(
-                            'Touch ID / Face ID',
+                            'Fingerprint unlock',
                             style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           subtitle: Text(
                             authService.isBiometricEnabled
-                                ? 'Biometric quick login is active on this device.'
+                                ? 'Fingerprint quick login is active on this device.'
                                 : 'Enable this from login after entering your password.',
                             style: GoogleFonts.inter(color: Colors.grey[600]),
                           ),
@@ -350,6 +385,199 @@ class ProfilePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _showFinancialProfileSheet(
+    BuildContext context,
+    AuthService authService,
+    Map<String, dynamic> profile,
+  ) async {
+    final nameController = TextEditingController(
+      text: _profileText(
+        profile,
+        'fullName',
+        authService.user?.displayName ?? '',
+      ),
+    );
+    final incomeController = TextEditingController(
+      text: _profileDouble(profile['monthlyIncome']) > 0
+          ? _profileDouble(profile['monthlyIncome']).toStringAsFixed(0)
+          : '',
+    );
+    final savingsController = TextEditingController(
+      text: _profileSavingsPercent(profile['targetSavingsRate']) > 0
+          ? _profileSavingsPercent(
+              profile['targetSavingsRate'],
+            ).toStringAsFixed(0)
+          : '',
+    );
+    final countryController = TextEditingController(
+      text: _profileText(profile, 'country', 'Pakistan'),
+    );
+    final languageController = TextEditingController(
+      text: _profileText(profile, 'language', 'English (Pakistan)'),
+    );
+
+    var saving = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (modalContext, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.viewInsetsOf(modalContext).bottom + 20,
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Financial profile',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'These details improve budgets, forecasts, welfare matching, and loan affordability checks.',
+                    style: GoogleFonts.inter(
+                      color: Colors.grey[600],
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _ProfileEditField(
+                    controller: nameController,
+                    label: 'Full name',
+                    icon: Icons.person_outline_rounded,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 12),
+                  _ProfileEditField(
+                    controller: incomeController,
+                    label: 'Monthly income',
+                    icon: Icons.payments_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _ProfileEditField(
+                    controller: savingsController,
+                    label: 'Savings target (%)',
+                    icon: Icons.savings_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _ProfileEditField(
+                    controller: countryController,
+                    label: 'Country',
+                    icon: Icons.public_rounded,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 12),
+                  _ProfileEditField(
+                    controller: languageController,
+                    label: 'Language',
+                    icon: Icons.language_rounded,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              setSheetState(() => saving = true);
+                              final income =
+                                  double.tryParse(
+                                    incomeController.text.trim().replaceAll(
+                                      ',',
+                                      '',
+                                    ),
+                                  ) ??
+                                  0;
+                              final savingsPercent =
+                                  double.tryParse(
+                                    savingsController.text.trim().replaceAll(
+                                      ',',
+                                      '',
+                                    ),
+                                  ) ??
+                                  0;
+                              try {
+                                await authService.firestoreService
+                                    ?.saveUserProfile({
+                                      'fullName': nameController.text.trim(),
+                                      'monthlyIncome': income.clamp(
+                                        0,
+                                        double.infinity,
+                                      ),
+                                      'targetSavingsRate':
+                                          savingsPercent.clamp(0, 100) / 100,
+                                      'country': countryController.text.trim(),
+                                      'language': languageController.text
+                                          .trim(),
+                                    });
+                                if (!sheetContext.mounted) return;
+                                Navigator.pop(sheetContext);
+                                _showSavingSnack(
+                                  context,
+                                  'Financial profile updated.',
+                                );
+                              } catch (error) {
+                                setSheetState(() => saving = false);
+                                if (!sheetContext.mounted) return;
+                                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Could not update profile: $error',
+                                    ),
+                                    backgroundColor: AppTheme.error,
+                                  ),
+                                );
+                              }
+                            },
+                      icon: saving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.save_rounded),
+                      label: Text(saving ? 'Saving...' : 'Save profile'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    nameController.dispose();
+    incomeController.dispose();
+    savingsController.dispose();
+    countryController.dispose();
+    languageController.dispose();
   }
 
   Future<void> _showProfilePhotoActions(
@@ -638,6 +866,217 @@ class _PhotoActionTile extends StatelessWidget {
           Icons.chevron_right_rounded,
           color: isDestructive ? AppTheme.error : Colors.grey[400],
         ),
+      ),
+    );
+  }
+}
+
+class _FinancialProfileCard extends StatelessWidget {
+  const _FinancialProfileCard({required this.profile, required this.onEdit});
+
+  final Map<String, dynamic> profile;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final income = _profileDouble(profile['monthlyIncome']);
+    final savingsTarget = _profileSavingsPercent(profile['targetSavingsRate']);
+    final country = _profileText(profile, 'country', 'Pakistan');
+    final language = _profileText(profile, 'language', 'English (Pakistan)');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.manage_accounts_rounded,
+                  color: AppTheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Financial profile',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Used by budgets, forecast, welfare, loans, and coach.',
+                      style: GoogleFonts.inter(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 360;
+              final width = wide
+                  ? (constraints.maxWidth - 10) / 2
+                  : constraints.maxWidth;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _FinancePill(
+                    width: width,
+                    label: 'Monthly income',
+                    value: income > 0 ? CurrencyUtils.format(income) : 'Add',
+                    icon: Icons.payments_rounded,
+                  ),
+                  _FinancePill(
+                    width: width,
+                    label: 'Savings target',
+                    value: savingsTarget > 0
+                        ? '${savingsTarget.toStringAsFixed(0)}%'
+                        : 'Set',
+                    icon: Icons.savings_rounded,
+                  ),
+                  _FinancePill(
+                    width: width,
+                    label: 'Country',
+                    value: country,
+                    icon: Icons.public_rounded,
+                  ),
+                  _FinancePill(
+                    width: width,
+                    label: 'Language',
+                    value: language,
+                    icon: Icons.language_rounded,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_rounded),
+              label: const Text('Update financial profile'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FinancePill extends StatelessWidget {
+  const _FinancePill({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final double width;
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Theme.of(context).dividerColor),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppTheme.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: Colors.grey[600],
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w900,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileEditField extends StatelessWidget {
+  const _ProfileEditField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      textCapitalization: textCapitalization,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }

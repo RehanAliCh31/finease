@@ -7,7 +7,7 @@ class SecurityService extends ChangeNotifier {
   final LocalAuthentication _localAuth = LocalAuthentication();
   bool _isAppLocked = false;
   bool _isBiometricEnabled = false;
-  
+
   bool get isAppLocked => _isAppLocked;
   bool get isBiometricEnabled => _isBiometricEnabled;
 
@@ -59,9 +59,8 @@ class SecurityService extends ChangeNotifier {
 
   Future<bool> canUseBiometrics() async {
     try {
-      final bool canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
-      final bool canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
-      return canAuthenticate;
+      final biometrics = await _localAuth.getAvailableBiometrics();
+      return biometrics.contains(BiometricType.fingerprint);
     } catch (e) {
       return false;
     }

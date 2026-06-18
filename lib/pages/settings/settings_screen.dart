@@ -128,7 +128,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   _tile(
                     Icons.fingerprint_rounded,
-                    'Biometric Login',
+                    'Fingerprint Login',
                     trailing: Switch(
                       value: authService.isBiometricEnabled,
                       onChanged: (v) async {
@@ -136,7 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'Sign in again from the login screen to enable biometric unlock.',
+                                'Sign in again from the login screen to enable fingerprint unlock.',
                               ),
                             ),
                           );
@@ -148,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         }
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Biometric login disabled.'),
+                            content: Text('Fingerprint login disabled.'),
                           ),
                         );
                       },

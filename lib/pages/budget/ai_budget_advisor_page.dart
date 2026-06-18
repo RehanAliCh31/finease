@@ -112,12 +112,6 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                                 analytics: analytics,
                                 budgets: budgets,
                               ),
-                              onAutoBudget: () => _showAutoBudgetPreview(
-                                context,
-                                firestoreService,
-                                analytics: analytics,
-                                budgets: budgets,
-                              ),
                               onUseSavings: analytics.isOverBudget
                                   ? () => _confirmSavingsPull(
                                       context,
@@ -132,21 +126,23 @@ class _AIBudgetAdvisorPageState extends State<AIBudgetAdvisorPage> {
                               const SizedBox(height: 12),
                               _NoticeBanner(message: analytics.warning!),
                             ],
-                            const SizedBox(height: 16),
-                            _BudgetActions(
-                              onEdit: () => _showBudgetEditor(
-                                context,
-                                firestoreService,
-                                analytics: analytics,
-                                budgets: budgets,
+                            if (budgets.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              _BudgetActions(
+                                onEdit: () => _showBudgetEditor(
+                                  context,
+                                  firestoreService,
+                                  analytics: analytics,
+                                  budgets: budgets,
+                                ),
+                                onAutoBudget: () => _showAutoBudgetPreview(
+                                  context,
+                                  firestoreService,
+                                  analytics: analytics,
+                                  budgets: budgets,
+                                ),
                               ),
-                              onAutoBudget: () => _showAutoBudgetPreview(
-                                context,
-                                firestoreService,
-                                analytics: analytics,
-                                budgets: budgets,
-                              ),
-                            ),
+                            ],
                             const SizedBox(height: 22),
                             _SectionTitle(
                               title: 'Categories',
@@ -737,7 +733,7 @@ class _BudgetAnalytics {
 
   String get primaryActionLabel {
     if (projectedIncome <= 0) return 'Review setup';
-    if (totalBudgeted <= 0) return 'Auto-budget';
+    if (totalBudgeted <= 0) return 'Create budget';
     if (isOverBudget && profileSavings > 0) return 'Use savings support';
     if (isOverBudget || isOverPlanned || overCategoryCount > 0) {
       return 'Adjust budget';
@@ -756,7 +752,7 @@ class _BudgetAnalytics {
   String get nextAction {
     if (projectedIncome <= 0) return 'Add income so budgets can be validated.';
     if (totalBudgeted <= 0) {
-      return 'Create a starter budget or use Auto-budget.';
+      return 'Create a starter plan below or enter category limits manually.';
     }
     if (isOverBudget) {
       return 'Reduce spending or use savings support deliberately.';
@@ -892,13 +888,11 @@ class _BudgetStatusCard extends StatelessWidget {
   const _BudgetStatusCard({
     required this.analytics,
     required this.onEdit,
-    required this.onAutoBudget,
     required this.onUseSavings,
   });
 
   final _BudgetAnalytics analytics;
   final VoidCallback onEdit;
-  final VoidCallback onAutoBudget;
   final VoidCallback? onUseSavings;
 
   @override
@@ -1028,7 +1022,7 @@ class _BudgetStatusCard extends StatelessWidget {
 
   VoidCallback _primaryAction() {
     if (analytics.projectedIncome <= 0) return onEdit;
-    if (analytics.totalBudgeted <= 0) return onAutoBudget;
+    if (analytics.totalBudgeted <= 0) return onEdit;
     if (analytics.isOverBudget && analytics.profileSavings > 0) {
       return onUseSavings ?? onEdit;
     }
@@ -1037,7 +1031,7 @@ class _BudgetStatusCard extends StatelessWidget {
 
   IconData _primaryIcon() {
     if (analytics.projectedIncome <= 0) return Icons.tune_rounded;
-    if (analytics.totalBudgeted <= 0) return Icons.auto_awesome_rounded;
+    if (analytics.totalBudgeted <= 0) return Icons.tune_rounded;
     if (analytics.isOverBudget && analytics.profileSavings > 0) {
       return Icons.savings_rounded;
     }

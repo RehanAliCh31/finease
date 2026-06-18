@@ -106,7 +106,7 @@ class _LoginPageState extends State<LoginPage>
 
     if (_isCurrentlyLockedOut) {
       _showSnack(
-        '🔒 Too many failed attempts. Try again in $_lockoutRemaining.',
+        'Too many failed attempts. Try again in $_lockoutRemaining.',
         isError: true,
       );
       HapticFeedback.heavyImpact();
@@ -140,7 +140,7 @@ class _LoginPageState extends State<LoginPage>
             _lockoutEnd = DateTime.now().add(const Duration(seconds: 30));
           });
           _showSnack(
-            '🔒 Account temporarily locked after $_failedAttempts failed attempts. Wait 30s.',
+            'Account temporarily locked after $_failedAttempts failed attempts. Wait 30s.',
             isError: true,
           );
         } else {
@@ -150,7 +150,7 @@ class _LoginPageState extends State<LoginPage>
           // Show remaining attempts warning
           if (_failedAttempts >= 3) {
             _showSnack(
-              '⚠️ Warning: ${5 - _failedAttempts} attempt(s) remaining before lockout.',
+              'Warning: ${5 - _failedAttempts} attempt(s) remaining before lockout.',
               isError: true,
             );
           }
@@ -159,6 +159,17 @@ class _LoginPageState extends State<LoginPage>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loginAsDemo() async {
+    if (_isLoading) return;
+    setState(() {
+      _emailCtrl.text = AppConstants.demoEmail;
+      _passCtrl.text = AppConstants.demoPassword;
+      _emailTouched = true;
+      _passTouched = true;
+    });
+    await _login();
   }
 
   String _friendlyError(String raw) {
@@ -245,7 +256,7 @@ class _LoginPageState extends State<LoginPage>
                   context,
                   listen: false,
                 ).sendPasswordResetEmail(email);
-                _showSnack('✅ Reset email sent to $email. Check your inbox.');
+                _showSnack('Reset email sent to $email. Check your inbox.');
               } catch (_) {
                 _showSnack(
                   'Could not send reset email. Verify the address and try again.',
@@ -375,9 +386,9 @@ class _LoginPageState extends State<LoginPage>
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Enable biometric login?'),
+        title: const Text('Enable fingerprint login?'),
         content: const Text(
-          'Use Touch ID or Face ID next time instead of typing your password.',
+          'Use your fingerprint next time instead of typing your password.',
         ),
         actions: [
           TextButton(
@@ -404,7 +415,7 @@ class _LoginPageState extends State<LoginPage>
       final auth = Provider.of<AuthService>(context, listen: false);
       if (!await auth.canUseBiometrics()) {
         _showSnack(
-          'Biometric authentication not available on this device.',
+          'Fingerprint unlock is not available on this device.',
           isError: true,
         );
         return;
@@ -413,15 +424,15 @@ class _LoginPageState extends State<LoginPage>
       if (mounted) {
         _showSnack(
           didAuth
-              ? 'Biometric login successful.'
-              : 'Biometric login is not enabled yet. Sign in with password once to enable it.',
+              ? 'Fingerprint login successful.'
+              : 'Fingerprint login is not enabled yet. Sign in with password once to enable it.',
           isError: !didAuth,
         );
       }
     } catch (e) {
       if (mounted) {
         _showSnack(
-          'Biometric authentication failed: ${e.toString()}',
+          'Fingerprint authentication failed: ${e.toString()}',
           isError: true,
         );
       }
@@ -547,7 +558,7 @@ class _LoginPageState extends State<LoginPage>
                         textInputAction: TextInputAction.done,
                         decoration: _fieldDeco(
                           context,
-                          '••••••••',
+                          '********',
                           Icons.lock_outline_rounded,
                           suffix: IconButton(
                             icon: Icon(
@@ -577,8 +588,22 @@ class _LoginPageState extends State<LoginPage>
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _loginAsDemo,
+                          icon: const Icon(Icons.play_circle_outline_rounded),
+                          label: Text(
+                            'Use Demo Account',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
                           onPressed: _isLoading ? null : _sendEmailLink,
-                          icon: Icon(Icons.link_rounded),
+                          icon: const Icon(Icons.link_rounded),
                           label: Text(
                             'Email Me a Password-less Link',
                             style: GoogleFonts.plusJakartaSans(
@@ -594,7 +619,7 @@ class _LoginPageState extends State<LoginPage>
                           onPressed: _isLoading
                               ? null
                               : _completeEmailLinkManually,
-                          icon: Icon(Icons.mark_email_read_rounded),
+                          icon: const Icon(Icons.mark_email_read_rounded),
                           label: Text(
                             'I already have a password-less link',
                             style: GoogleFonts.plusJakartaSans(
@@ -627,24 +652,13 @@ class _LoginPageState extends State<LoginPage>
                       const SizedBox(height: 24),
 
                       // ── Biometric Buttons ──
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildBioButton(
-                              context,
-                              Icons.fingerprint_rounded,
-                              'Touch ID',
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildBioButton(
-                              context,
-                              Icons.face_unlock_rounded,
-                              'Face ID',
-                            ),
-                          ),
-                        ],
+                      SizedBox(
+                        width: double.infinity,
+                        child: _buildBioButton(
+                          context,
+                          Icons.fingerprint_rounded,
+                          'Fingerprint',
+                        ),
                       ),
                       const SizedBox(height: 40),
 

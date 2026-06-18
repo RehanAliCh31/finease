@@ -425,7 +425,7 @@ class AuthService extends ChangeNotifier {
   }
 
   // =========================
-  // Enable Biometric Login
+  // Enable Fingerprint Login
   // =========================
 
   Future<void> enableBiometricLogin({
@@ -435,9 +435,7 @@ class AuthService extends ChangeNotifier {
     final isSupported = await canUseBiometrics();
 
     if (!isSupported) {
-      throw Exception(
-        'Biometric authentication is not available on this device.',
-      );
+      throw Exception('Fingerprint unlock is not available on this device.');
     }
 
     await _secureStorage.write(key: 'biometric_email', value: email);
@@ -454,7 +452,7 @@ class AuthService extends ChangeNotifier {
   }
 
   // =========================
-  // Disable Biometric Login
+  // Disable Fingerprint Login
   // =========================
 
   Future<void> disableBiometricLogin() async {
@@ -472,13 +470,13 @@ class AuthService extends ChangeNotifier {
   }
 
   // =========================
-  // Biometrics Available?
+  // Fingerprint Available?
   // =========================
 
   Future<bool> canUseBiometrics() async {
     try {
-      return await _localAuth.canCheckBiometrics ||
-          await _localAuth.isDeviceSupported();
+      final biometrics = await getAvailableBiometrics();
+      return biometrics.contains(BiometricType.fingerprint);
     } catch (_) {
       return false;
     }
@@ -505,7 +503,7 @@ class AuthService extends ChangeNotifier {
   }
 
   // =========================
-  // Authenticate Biometrics
+  // Authenticate Fingerprint
   // =========================
 
   Future<bool> authenticateWithBiometrics() async {
@@ -530,8 +528,7 @@ class AuthService extends ChangeNotifier {
     }
 
     final didAuthenticate = await _localAuth.authenticate(
-      localizedReason:
-          'Authenticate with Touch ID or Face ID to unlock FinEase',
+      localizedReason: 'Authenticate with your fingerprint to unlock FinEase',
       biometricOnly: true,
       persistAcrossBackgrounding: true,
     );
