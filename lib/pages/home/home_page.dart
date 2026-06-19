@@ -28,6 +28,7 @@ import '../savings/savings_tracker_page.dart';
 import '../transactions/add_transaction_page.dart';
 import '../transactions/all_transactions_page.dart';
 import '../welfare/welfare_programs_page.dart';
+import '../rewards/rewards_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.appConfig});
@@ -317,6 +318,12 @@ class _HomePageState extends State<HomePage> {
           page: const CommunityForumPage(),
         ),
       ),
+      _ToolEntry(
+        label: 'Rewards',
+        icon: Icons.card_giftcard_outlined,
+        color: const Color(0xFF475569),
+        onTap: () => _openPage(const RewardsScreen()),
+        ),
     ];
 
     showModalBottomSheet<void>(
