@@ -52,6 +52,7 @@ dependencies:
   shared_preferences: ^2.5.5
   firebase_data_connect: ^0.3.0+2
   image_picker: ^1.2.2
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:

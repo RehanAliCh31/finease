@@ -26,6 +26,10 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Use the microphone to log expenses by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Convert your spoken expense details into transaction text.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

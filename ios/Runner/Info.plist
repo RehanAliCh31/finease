@@ -45,11 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Use Face ID to quickly and securely sign in to FinEase.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a profile picture for your FinEase account.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose a profile picture for your FinEase account.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Use the microphone to log expenses by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Convert your spoken expense details into transaction text.</string>
 </dict>
 </plist>

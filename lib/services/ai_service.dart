@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../app_constants.dart';
 import '../models/budget_plan.dart';
+import '../models/parsed_expense.dart';
 import '../models/saving_goal.dart';
 import '../models/transaction.dart';
 import '../utils/currency_utils.dart';
@@ -258,6 +259,211 @@ Transactions:
 ${transactions.take(80).map((t) => '${t.type} | ${t.category} | ${CurrencyUtils.format(t.amount)} | ${t.title}').join('\n')}
 ''';
     return _generate(prompt);
+  }
+
+  /// Parse natural language expense input and extract structured data
+  /// Example: "I spent 500 rupees on lunch today"
+  /// Returns ParsedExpense with amount, category, and description
+  Future<ParsedExpense> parseExpenseFromNaturalLanguage(
+    String userInput, {
+    List<String> availableCategories = const [
+      'Groceries',
+      'Transport',
+      'Education',
+      'Electricity',
+      'Healthcare',
+      'Entertainment',
+      'Savings',
+      'Others',
+    ],
+  }) async {
+    if (userInput.trim().isEmpty) {
+      return ParsedExpense(isExpense: false, error: 'Input cannot be empty');
+    }
+
+    final localFallback = _parseExpenseLocally(userInput, availableCategories);
+    if (localFallback.isValid) {
+      return localFallback;
+    }
+
+    final prompt =
+        '''You are an AI that extracts expense information from natural language text.
+Parse the user input and respond ONLY with a JSON object. Do not add any explanation.
+
+Available categories: ${availableCategories.join(', ')}
+
+User input: "$userInput"
+
+Respond with JSON in this exact format:
+{
+  "is_expense": true/false,
+  "amount": <number or null>,
+  "category": "<category name or null>",
+  "description": "<brief description or null>",
+  "confidence": "high/medium/low",
+  "raw_input": "$userInput"
+}
+
+Rules:
+1. Set is_expense to true only if the user is describing spending money
+2. Extract the amount as a number (not text)
+3. Match category to available categories. Be flexible: "lunch" -> Groceries, "taxi" -> Transport, "doctor" -> Healthcare
+4. If confidence is low or amount is missing, still return valid JSON
+5. Return ONLY the JSON object, no other text''';
+
+    try {
+      final response = await _generate(prompt);
+
+      // Try to extract JSON from response
+      final jsonMatch = RegExp(r'\{[^{}]*\}').firstMatch(response);
+      if (jsonMatch != null) {
+        try {
+          final decoded = jsonDecode(jsonMatch.group(0)!);
+          final parsed = ParsedExpense.fromJson(decoded);
+          return parsed.isValid ? parsed : localFallback;
+        } catch (e) {
+          // JSON parsing failed, return error
+          return localFallback.isValid
+              ? localFallback
+              : ParsedExpense(
+                  isExpense: false,
+                  error: 'Failed to parse AI response: $e',
+                  rawInput: userInput,
+                );
+        }
+      }
+
+      return localFallback.isValid
+          ? localFallback
+          : ParsedExpense(
+              isExpense: false,
+              error: 'Could not extract JSON from response',
+              rawInput: userInput,
+            );
+    } catch (error) {
+      return localFallback.isValid
+          ? localFallback
+          : ParsedExpense(
+              isExpense: false,
+              error: 'AI parsing failed: $error',
+              rawInput: userInput,
+            );
+    }
+  }
+
+  ParsedExpense _parseExpenseLocally(
+    String userInput,
+    List<String> availableCategories,
+  ) {
+    final input = userInput.trim();
+    final lower = input.toLowerCase();
+    final expenseVerb = RegExp(
+      r'\b(spent|paid|bought|purchased|used|expense|charged|cost)\b',
+    );
+    if (!expenseVerb.hasMatch(lower)) {
+      return ParsedExpense(isExpense: false, rawInput: userInput);
+    }
+
+    final amountMatch = RegExp(
+      r'(?:pkr|rs\.?|rupees?)\s*([0-9][0-9,]*(?:\.\d+)?)|([0-9][0-9,]*(?:\.\d+)?)\s*(?:pkr|rs\.?|rupees?)?',
+      caseSensitive: false,
+    ).firstMatch(input);
+    final amountText = amountMatch?.group(1) ?? amountMatch?.group(2);
+    final amount = double.tryParse(amountText?.replaceAll(',', '') ?? '');
+    if (amount == null || amount <= 0) {
+      return ParsedExpense(isExpense: true, rawInput: userInput);
+    }
+
+    final category = _categoryFromText(lower, availableCategories);
+    return ParsedExpense(
+      isExpense: true,
+      amount: amount,
+      category: category,
+      description: _descriptionFromInput(input),
+      rawInput: userInput,
+      confidence: category == 'Others' ? 'medium' : 'high',
+    );
+  }
+
+  String _categoryFromText(String lower, List<String> availableCategories) {
+    final keywordMap = <String, List<String>>{
+      'Groceries': [
+        'food',
+        'grocery',
+        'groceries',
+        'lunch',
+        'dinner',
+        'breakfast',
+        'restaurant',
+        'meal',
+        'snack',
+        'milk',
+        'vegetable',
+      ],
+      'Transport': [
+        'taxi',
+        'uber',
+        'careem',
+        'bus',
+        'fuel',
+        'petrol',
+        'rickshaw',
+        'transport',
+        'fare',
+      ],
+      'Education': [
+        'school',
+        'college',
+        'university',
+        'tuition',
+        'book',
+        'course',
+        'fees',
+      ],
+      'Electricity': [
+        'electricity',
+        'utility',
+        'utilities',
+        'bill',
+        'wapda',
+        'k-electric',
+      ],
+      'Healthcare': [
+        'doctor',
+        'hospital',
+        'medicine',
+        'medical',
+        'clinic',
+        'pharmacy',
+        'health',
+      ],
+      'Entertainment': [
+        'movie',
+        'cinema',
+        'netflix',
+        'game',
+        'outing',
+        'entertainment',
+        'subscription',
+      ],
+      'Savings': ['saving', 'savings', 'deposit'],
+    };
+
+    for (final entry in keywordMap.entries) {
+      if (entry.value.any(lower.contains)) {
+        return availableCategories.contains(entry.key) ? entry.key : 'Others';
+      }
+    }
+    if (availableCategories.contains('Others')) return 'Others';
+    return availableCategories.isEmpty ? 'Others' : availableCategories.first;
+  }
+
+  String _descriptionFromInput(String input) {
+    final cleaned = input
+        .replaceAll(RegExp(r'\b(i|have|just)\b', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return cleaned.isEmpty ? 'Voice expense' : cleaned;
   }
 
   Future<String> _generate(String prompt) async {
